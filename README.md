@@ -31,6 +31,9 @@ o GitHub: bagzcode
 o Email: juwono@binus.edu
 
 o GitHub: Juwono136
+
+---
+
 3. Project Overview
 
 3.1. Problem Statement
