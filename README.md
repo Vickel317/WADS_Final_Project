@@ -6,7 +6,7 @@ Students usually have trouble to find an environment that supports collaboration
 
 3.2 Solution Overview
 
-**Main Features**'
+**Main Features**
 
 Our web application provides an AI powered academic social platform designed to connect students. This platform have some features such as:
 
