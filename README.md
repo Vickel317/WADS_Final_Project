@@ -13,7 +13,7 @@ Group Members:
 |            Name              |  StudentID   |   Role  |GitHub Name|
 |------------------------------|:------------:|:-------:|----------:|
 | Vickelsteins August Santoso  | 2802505941   | Coding  | Vickel317 |
-| Harris Ekaputra Suryadi      | 2802400502   | Coding  | Harris    |
+| Harris Ekaputra Suryadi      | 2802400502   | Coding  | HES2209   |
 | Kevin Makmur Kurniawan       | 2802547553   | Coding  | kevMkr    |
 
 2. Instructor & Repository Access
