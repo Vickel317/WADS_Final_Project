@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: (
@@ -25,58 +27,104 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   return (
-    <aside className="fixed left-0 top-0 h-full w-56 bg-white border-r border-gray-100 flex flex-col z-40"
-      style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
+    <>
+      {/* Mobile Hamburger Menu */}
+      <button
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="fixed top-4 left-4 z-50 md:hidden p-2 rounded-lg hover:bg-gray-100"
+      >
+        {mobileOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
 
-      {/* Brand */}
-      <div className="px-5 py-5 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}>
-            <span className="text-white text-sm">🎓</span>
-          </div>
-          <div>
-            <p className="text-gray-800 font-bold text-sm" style={{ fontFamily: "'DM Serif Display', serif" }}>Academify</p>
-            <p className="text-gray-400 text-[10px] leading-none">Learn Together, Grow Together</p>
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-full bg-white border-r border-gray-100 flex flex-col z-40 transition-all duration-300 ${
+          collapsed ? "w-16" : "w-56"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+        style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
+      >
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
+
+        {/* Brand */}
+        <div className="px-4 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
+            >
+              <span className="text-white text-sm">🎓</span>
+            </div>
+            {!collapsed && (
+              <div>
+                <p className="text-gray-800 font-bold text-sm" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                  Academify
+                </p>
+                <p className="text-gray-400 text-[10px] leading-none">Learn Together, Grow Together</p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
-            <Link key={item.href} href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                active
-                  ? "text-white font-medium"
-                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-              }`}
-              style={active ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}>
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-4 space-y-0.5">
+          {navItems.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
+                  active ? "text-white font-medium" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                }`}
+                style={active ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
+                title={collapsed ? item.label : ""}
+              >
+                {item.icon}
+                {!collapsed && item.label}
+              </Link>
+            );
+          })}
+        </nav>
 
-      {/* User */}
-      <div className="px-4 py-4 border-t border-gray-100">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-            <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <p className="text-gray-700 text-xs font-semibold truncate">John Doe</p>
-            <p className="text-gray-400 text-[10px] truncate">Computer Science</p>
+        {/* User */}
+        <div className="px-3 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="text-gray-700 text-xs font-semibold truncate">John Doe</p>
+                <p className="text-gray-400 text-[10px] truncate">Computer Science</p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
-    </aside>
+
+        {/* Toggle Button */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="hidden md:flex items-center justify-center py-3 px-2 border-t border-gray-100 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+          title={collapsed ? "Expand" : "Collapse"}
+        >
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
+      </aside>
+    </>
   );
 }

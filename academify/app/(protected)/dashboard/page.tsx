@@ -62,7 +62,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {statCards.map((s) => (
           <div key={s.label} className="bg-white rounded-2xl p-4 border border-gray-100 flex items-center justify-between">
             <div>
@@ -77,14 +77,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent Activity */}
-        <div className="col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="col-span-1 lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-700 text-sm mb-4">Recent Activity</h2>
           <div className="space-y-4">
             {displayActivity.map((a) => (
-              <div key={a.id} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0 mt-0.5">
+              <div key={a.id} className="flex flex-col sm:flex-row sm:gap-3 gap-2">
+                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
                   <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
                   </svg>
@@ -109,7 +109,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Upcoming Events */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="col-span-1 bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-700 text-sm mb-4">Upcoming Events</h2>
           <div className="space-y-3">
             {displayEvents.map((ev) => (
@@ -117,13 +117,17 @@ export default function DashboardPage() {
                 className="block border border-gray-100 hover:border-teal-200 rounded-xl p-3.5 transition group">
                 <p className="text-sm font-semibold text-gray-700 group-hover:text-teal-600 transition mb-2">{ev.title}</p>
                 <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    {ev.time}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 text-[11px] text-gray-400 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      {ev.time}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    {ev.location}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 text-[11px] text-gray-400 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                      {ev.location}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -136,12 +140,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Trending Discussions */}
-        <div className="col-span-3 bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="col-span-1 lg:col-span-3 bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="font-semibold text-gray-700 text-sm mb-4">Trending Discussions</h2>
           <div className="space-y-3">
             {displayThreads.map((t) => (
               <Link key={t.id} href={`/thread/${t.id}`}
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition group">
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl hover:bg-gray-50 transition group">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-700 group-hover:text-teal-600 transition">{t.title}</p>
                   <p className="text-xs text-gray-400 mt-0.5">by {t.author}</p>
@@ -156,7 +160,7 @@ export default function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <span className="ml-4 px-3 py-1 text-xs font-medium text-teal-700 bg-teal-50 rounded-full shrink-0">{t.tag}</span>
+                <span className="mt-3 sm:mt-0 sm:ml-4 px-3 py-1 text-xs font-medium text-teal-700 bg-teal-50 rounded-full shrink-0">{t.tag}</span>
               </Link>
             ))}
           </div>
