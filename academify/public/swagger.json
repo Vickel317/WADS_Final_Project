@@ -1,0 +1,157 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Academify API",
+    "description": "API documentation for Academify",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000"
+    }
+  ],
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Register new user"
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Login user"
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout"
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get current user"
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Refresh token"
+      }
+    },
+    "/api/users/{userId}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get user profile"
+      },
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update user profile"
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Delete account"
+      }
+    },
+    "/api/users/{userId}/posts": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get user's posts"
+      }
+    },
+    "/api/users/{userId}/events": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get user's events"
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "List events (filters: upstream, page)"
+      },
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Create new event"
+      }
+    },
+    "/api/events/{eventId}": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get event details with attendees"
+      },
+      "put": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Update own event"
+      },
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Delete own event"
+      }
+    },
+    "/api/events/{eventId}/rsvp": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "RSVP to event"
+      },
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Cancel RSVP"
+      }
+    },
+    "/api/events/{eventId}/attendees": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Get attendee list"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object"
+      },
+      "Event": {
+        "type": "object"
+      }
+    }
+  }
+}
