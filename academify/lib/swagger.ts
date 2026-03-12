@@ -269,10 +269,15 @@ const options = {
   apis: [
     "./app/api/auth/**/*.ts",
     "./app/api/posts/**/*.ts",
+    "./app/api/comments/**/*.ts",
     "./app/api/files/**/*.ts",
     "./app/api/messages/**/*.ts",
     "./app/api/events/**/*.ts",
     "./app/api/users/**/*.ts",
+    "./app/api/categories/**/*.ts",
+    "./app/api/reports/**/*.ts",
+    "./app/api/moderation/**/*.ts",
+    "./app/api/admin/**/*.ts",
   ],
 };
 
