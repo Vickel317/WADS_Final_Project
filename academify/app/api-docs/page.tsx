@@ -6,7 +6,7 @@ export default function ApiDocs() {
   return (
     <div className="min-h-screen bg-white">
       <SwaggerUI 
-        url="/swagger.json"
+        url="/api/swagger"
         docExpansion="list"
         defaultModelsExpandDepth={1}
       />
