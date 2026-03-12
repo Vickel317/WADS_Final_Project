@@ -84,9 +84,12 @@ export let threads: Array<{
   title: string;
   content: string;
   categoryId: string;
-  author: { name: string };
+  tag: string;
+  author: string;
   replyCount: number;
+  replies: number;
   views: number;
+  likes: number;
   createdAt: string;
   updatedAt?: string;
 }> = [
@@ -95,9 +98,12 @@ export let threads: Array<{
     title: "Best resources for learning React?",
     content: "Looking for good React learning resources.",
     categoryId: "tech",
-    author: { name: "Alex Turner" },
+    tag: "tech",
+    author: "Alex Turner",
     replyCount: 24,
+    replies: 24,
     views: 120,
+    likes: 120,
     createdAt: new Date().toISOString(),
   },
   {
@@ -105,9 +111,12 @@ export let threads: Array<{
     title: "Tips for Data Structures exam",
     content: "Any tips for the upcoming DS exam?",
     categoryId: "academics",
-    author: { name: "Sarah Chen" },
+    tag: "academics",
+    author: "Sarah Chen",
     replyCount: 15,
+    replies: 15,
     views: 89,
+    likes: 89,
     createdAt: new Date().toISOString(),
   },
   {
@@ -115,9 +124,12 @@ export let threads: Array<{
     title: "Anyone joining the hackathon?",
     content: "Looking for teammates for the upcoming hackathon.",
     categoryId: "general",
-    author: { name: "Mike Johnson" },
+    tag: "general",
+    author: "Mike Johnson",
     replyCount: 8,
+    replies: 8,
     views: 45,
+    likes: 45,
     createdAt: new Date().toISOString(),
   },
 ];
@@ -173,9 +185,12 @@ export async function POST(request: NextRequest) {
       title,
       content,
       categoryId,
-      author: { name: "Current User" }, // TODO: get from JWT token in Week 8
+      tag: categoryId,
+      author: "Current User", // TODO: get from JWT token in Week 8
       replyCount: 0,
+      replies: 0,
       views: 0,
+      likes: 0,
       createdAt: new Date().toISOString(),
     };
 
