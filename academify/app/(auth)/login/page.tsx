@@ -39,13 +39,13 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-[#f0fafa] px-4"
+      className="w-screen h-screen flex items-center justify-center bg-[#f0fafa]"
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
     >
       {/* Google Font */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
 
-      <div className="w-full max-w-7xl min-h-[650px] flex rounded-3xl overflow-hidden shadow-2xl shadow-teal-900/20">
+      <div className="w-screen h-screen flex rounded-none overflow-hidden shadow-2xl shadow-teal-900/20">
         {/* ── Left Panel ── */}
         <div
           className="hidden md:flex flex-col justify-between w-1/2 p-14 relative overflow-hidden"

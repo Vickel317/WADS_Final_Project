@@ -109,16 +109,16 @@ export default function ForumsPage() {
   };
 
   return (
-    <div>
+    <div className="flex flex-col">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Discussion Forums</h1>
           <p className="text-sm text-gray-400 mt-0.5">Connect, discuss, and learn together</p>
         </div>
         <button
           onClick={() => router.push(`/forums/${activeCategory === "all" ? "general" : activeCategory}/new`)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition"
+          className="flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition w-full sm:w-auto"
           style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,9 +128,9 @@ export default function ForumsPage() {
         </button>
       </div>
 
-      <div className="flex gap-4 items-start">
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
         {/* Categories Sidebar */}
-        <div className="w-56 shrink-0 bg-white rounded-2xl border border-gray-100 p-4">
+        <div className="w-full lg:w-56 lg:shrink-0 bg-white rounded-2xl border border-gray-100 p-4">
           <p className="text-sm font-semibold text-gray-700 mb-3 px-1">Categories</p>
           <div className="space-y-1">
             {categories.map((cat) => {
@@ -139,7 +139,7 @@ export default function ForumsPage() {
                 <button
                   key={cat.slug}
                   onClick={() => handleCategoryClick(cat.slug)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition ${
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs sm:text-sm transition ${
                     active ? "text-white font-medium" : "text-gray-600 hover:bg-gray-50"
                   }`}
                   style={active ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
@@ -159,9 +159,9 @@ export default function ForumsPage() {
         </div>
 
         {/* Threads Panel */}
-        <div className="flex-1 bg-white rounded-2xl border border-gray-100">
+        <div className="flex-1 bg-white rounded-2xl border border-gray-100 min-h-0">
           {/* Search */}
-          <div className="px-4 pt-4 pb-3 border-b border-gray-100">
+          <div className="px-3 sm:px-4 pt-3 sm:pt-4 pb-2 sm:pb-3 border-b border-gray-100">
             <div className="relative">
               <svg
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -172,19 +172,19 @@ export default function ForumsPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search discussions..."
-                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
+                placeholder="Search..."
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs sm:text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
               />
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 px-4 py-2 border-b border-gray-100">
+          <div className="flex items-center gap-1 px-3 sm:px-4 py-2 border-b border-gray-100 overflow-x-auto">
             {(["Trending", "Recent", "Most Popular", "Unanswered"] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition whitespace-nowrap ${
                   activeTab === tab
                     ? "bg-teal-50 text-teal-700"
                     : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
@@ -198,11 +198,11 @@ export default function ForumsPage() {
           {/* Thread List */}
           <div className="divide-y divide-gray-50">
             {filteredThreads.length === 0 ? (
-              <div className="py-16 text-center text-gray-400 text-sm">No threads found.</div>
+              <div className="py-12 sm:py-16 text-center text-gray-400 text-xs sm:text-sm px-3 sm:px-4">No threads found.</div>
             ) : (
               filteredThreads.map((thread) => (
-                <div key={thread.id} className="flex items-start gap-4 px-4 py-4 hover:bg-gray-50/50 transition cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mt-0.5">
+                <div key={thread.id} className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-3 sm:px-4 py-4 hover:bg-gray-50/50 transition cursor-pointer">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 hidden sm:flex">
                     <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
@@ -210,22 +210,22 @@ export default function ForumsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {thread.pinned && (
-                        <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-600">
+                        <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-600 shrink-0">
                           Pinned
                         </span>
                       )}
-                      <h3 className="text-sm font-semibold text-gray-900 truncate">{thread.title}</h3>
+                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{thread.title}</h3>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-2">
-                      <span>by {thread.author}</span>
-                      <span>•</span>
-                      <span className="px-2 py-0.5 rounded-md font-medium text-teal-700 bg-teal-50">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 text-xs text-gray-400 mb-2">
+                      <span className="hidden sm:inline">by {thread.author}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="px-2 py-0.5 rounded-md font-medium text-teal-700 bg-teal-50 w-fit">
                         {thread.category}
                       </span>
-                      <span>•</span>
+                      <span className="hidden sm:inline">•</span>
                       <span>{thread.time}</span>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-gray-400">
+                    <div className="flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-400">
                       <button className="flex items-center gap-1 hover:text-teal-600 transition">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />

@@ -2,15 +2,15 @@
 
 export default function Topbar() {
   return (
-    <header className="fixed top-0 left-56 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-6 gap-4 z-30"
+    <header className="fixed top-0 left-0 md:left-56 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-4 z-30 transition-all duration-300"
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       {/* Search */}
-      <div className="flex-1 max-w-sm relative">
+      <div className="flex-1 max-w-xs md:max-w-sm relative hidden sm:block">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
         <input
-          placeholder="Search for forums, files, events..."
+          placeholder="Search..."
           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
         />
       </div>

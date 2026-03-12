@@ -369,7 +369,7 @@ export default function EventsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard value={23} label="Events Attended" />
         <StatCard value={8} label="Events Organized" />
         <StatCard value={5} label="Upcoming" />
@@ -377,9 +377,9 @@ export default function EventsPage() {
       </div>
 
       {/* Body */}
-      <div className="flex gap-5">
+      <div className="flex flex-col lg:flex-row gap-5">
         {/* Calendar */}
-        <div className="w-64 shrink-0">
+        <div className="w-full lg:w-64 lg:shrink-0">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-sm font-semibold text-gray-700 mb-3">Calendar</p>
 
@@ -458,7 +458,7 @@ export default function EventsPage() {
         </div>
 
         {/* Upcoming events */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 w-full">
           <p className="text-sm font-semibold text-gray-700 mb-3">Upcoming</p>
           <div className="space-y-3">
             {events.map((event) => (
