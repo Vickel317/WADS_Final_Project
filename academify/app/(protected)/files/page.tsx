@@ -163,20 +163,20 @@ function FileRow({ file }: { file: FileItem }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 gap-3">
       <div className="flex items-center gap-3 min-w-0">
         {getFileIcon(file.type)}
         <div className="min-w-0">
           <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
           <p className="text-xs text-gray-400">
-            {file.size} • Uploaded {file.uploadedAt} • {file.downloads} downloads
+            <span className="hidden sm:inline">{file.size} • </span>Uploaded {file.uploadedAt} • {file.downloads} downloads
             {file.sharedWith && (
               <span className="text-indigo-500"> • Shared by {file.sharedWith}</span>
             )}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0 ml-4">
+      <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-4">
         <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors">
           <Download size={13} />
           Download
@@ -230,9 +230,9 @@ export default function FilesPage() {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+    <div className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">File Sharing</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -241,7 +241,7 @@ export default function FilesPage() {
         </div>
         <button
           onClick={() => setShowUploadModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+          className="flex items-center justify-center sm:justify-start gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors w-full sm:w-auto"
           style={{ backgroundColor: "#0d9488" }}
         >
           <Upload size={16} />
@@ -250,7 +250,7 @@ export default function FilesPage() {
       </div>
 
       {/* Search + Stats */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex-1 bg-white rounded-xl border border-gray-200 flex items-center gap-3 px-4 py-3">
           <Search size={16} className="text-gray-400 shrink-0" />
           <input
@@ -261,7 +261,7 @@ export default function FilesPage() {
             className="flex-1 text-sm text-gray-700 outline-none bg-transparent placeholder-gray-400"
           />
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 px-6 py-3 flex flex-col items-center justify-center min-w-[120px]">
+        <div className="bg-white rounded-xl border border-gray-200 px-4 sm:px-6 py-3 flex flex-col items-center justify-center sm:min-w-[120px]">
           <span className="text-2xl font-bold text-gray-900">142</span>
           <span className="text-xs text-gray-400">Total Files</span>
         </div>
@@ -270,7 +270,7 @@ export default function FilesPage() {
       {/* Folders */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Folders</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {FOLDERS.map((folder) => (
             <button
               key={folder.name}
@@ -291,7 +291,7 @@ export default function FilesPage() {
       {/* Tabs + File List */}
       <div className="bg-white rounded-xl border border-gray-200">
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 px-4">
+        <div className="flex border-b border-gray-100 px-3 sm:px-4 overflow-x-auto">
           {(
             [
               { key: "my", label: "My Files" },
@@ -302,7 +302,7 @@ export default function FilesPage() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
+              className={`py-3 px-3 sm:px-4 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.key
                   ? "border-teal-600 text-teal-600"
                   : "border-transparent text-gray-500 hover:text-gray-700"
@@ -327,11 +327,11 @@ export default function FilesPage() {
       {/* Upload Modal */}
       {showUploadModal && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
           onClick={() => setShowUploadModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold text-gray-900 mb-1">Upload File</h3>
