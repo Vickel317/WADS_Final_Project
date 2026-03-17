@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import { firebaseLookupByIdToken, firebaseRefresh } from "@/lib/firebase-auth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-const REFRESH_SECRET = process.env.REFRESH_SECRET || "your-refresh-secret";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,15 +16,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify refresh token
-    const decoded = jwt.verify(refreshToken, REFRESH_SECRET) as {
-      id: string;
-      email: string;
-    };
+    const refreshed = await firebaseRefresh(refreshToken);
+    const firebaseUser = await firebaseLookupByIdToken(refreshed.idToken);
 
-    // Create new access token
+    // Create new access token used by current app routes.
     const newToken = jwt.sign(
-      { id: decoded.id, email: decoded.email },
+      {
+        id: refreshed.userId,
+        email: firebaseUser?.email || "",
+        role: "student",
+        name: firebaseUser?.displayName || "",
+      },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -32,15 +34,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         token: newToken,
-        expiresIn: 3600,
+        refreshToken: refreshed.refreshToken,
+        firebaseIdToken: refreshed.idToken,
+        expiresIn: Number(refreshed.expiresIn),
       },
       { status: 200 }
     );
   } catch (error) {
     console.error("Refresh token error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 401;
+    const message =
+      error instanceof Error ? error.message : "Invalid or expired refresh token";
     return NextResponse.json(
-      { error: "Invalid or expired refresh token" },
-      { status: 401 }
+      { error: message || "Invalid or expired refresh token" },
+      { status: status || 401 }
     );
   }
 }

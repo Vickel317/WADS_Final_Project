@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { firebaseSignUp, firebaseUpdateProfile } from "@/lib/firebase-auth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-const REFRESH_SECRET = process.env.REFRESH_SECRET || "your-refresh-secret";
-
-// Mock user database (replace with real database)
-let users: Array<{
-  id: string;
-  email: string;
-  password: string;
-  name: string;
-  createdAt: Date;
-}> = [];
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,42 +17,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already exists
-    if (users.some((u) => u.email === email)) {
-      return NextResponse.json(
-        { error: "User already exists" },
-        { status: 400 }
-      );
+    const firebaseUser = await firebaseSignUp(email, password);
+
+    // Best effort profile update so display name is available in Firebase Console.
+    if (name) {
+      await firebaseUpdateProfile(firebaseUser.idToken, name);
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const newUser = {
-      id: `user_${Date.now()}`,
-      email,
-      password: hashedPassword,
-      name,
-      createdAt: new Date(),
-    };
-
-    users.push(newUser);
-
-    return NextResponse.json(
+    const token = jwt.sign(
       {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        createdAt: newUser.createdAt,
+        id: firebaseUser.localId,
+        email: firebaseUser.email,
+        role: "student",
+        name,
+      },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    const response = NextResponse.json(
+      {
+        token,
+        refreshToken: firebaseUser.refreshToken,
+        firebaseIdToken: firebaseUser.idToken,
+        user: {
+          id: firebaseUser.localId,
+          email: firebaseUser.email,
+          name,
+        },
       },
       { status: 201 }
     );
+
+    response.cookies.set("auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 3600,
+    });
+
+    return response;
   } catch (error) {
     console.error("Register error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 500;
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: message || "Internal server error" },
+      { status: status || 500 }
     );
   }
 }

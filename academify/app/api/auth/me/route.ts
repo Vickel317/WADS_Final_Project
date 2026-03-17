@@ -3,15 +3,6 @@ import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-// Mock user database (should match registration)
-let users: Array<{
-  id: string;
-  email: string;
-  password: string;
-  name: string;
-  createdAt: Date;
-}> = [];
-
 export async function GET(request: NextRequest) {
   try {
     // Get token from header
@@ -29,21 +20,20 @@ export async function GET(request: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as {
       id: string;
       email: string;
+      role?: string;
+      name?: string;
+      iat?: number;
     };
-
-    // Find user
-    const user = users.find((u) => u.id === decoded.id);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
 
     return NextResponse.json(
       {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: "student",
-        createdAt: user.createdAt,
+        id: decoded.id,
+        email: decoded.email,
+        name: decoded.name || "",
+        role: decoded.role || "student",
+        createdAt: decoded.iat
+          ? new Date(decoded.iat * 1000).toISOString()
+          : null,
         updatedAt: new Date(),
       },
       { status: 200 }

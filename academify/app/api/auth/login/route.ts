@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { firebaseSignIn } from "@/lib/firebase-auth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-
-// Mock user database (should match registration)
-let users: Array<{
-  id: string;
-  email: string;
-  password: string;
-  name: string;
-  createdAt: Date;
-}> = [];
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,24 +17,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user
-    const user = users.find((u) => u.email === email);
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Verify password
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      );
-    }
+    const firebaseUser = await firebaseSignIn(email, password);
+    const displayName = firebaseUser.displayName || "";
 
     // Create JWT token
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      {
+        id: firebaseUser.localId,
+        email: firebaseUser.email,
+        role: "student",
+        name: displayName,
+      },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -52,10 +36,12 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(
       {
         token,
+        refreshToken: firebaseUser.refreshToken,
+        firebaseIdToken: firebaseUser.idToken,
         user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          id: firebaseUser.localId,
+          email: firebaseUser.email,
+          name: displayName,
         },
       },
       { status: 200 }
@@ -72,9 +58,15 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 500;
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: message || "Internal server error" },
+      { status: status || 500 }
     );
   }
 }
