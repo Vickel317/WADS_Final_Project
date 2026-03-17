@@ -102,10 +102,23 @@ export async function firebaseSignIn(email: string, password: string) {
 }
 
 export async function firebaseUpdateProfile(idToken: string, displayName: string) {
-  return postToIdentityToolkit<{ displayName?: string }>("accounts:update", {
+  return postToIdentityToolkit<{
+    localId?: string;
+    email?: string;
+    displayName?: string;
+    idToken?: string;
+    refreshToken?: string;
+    expiresIn?: string;
+  }>("accounts:update", {
     idToken,
     displayName,
-    returnSecureToken: false,
+    returnSecureToken: true,
+  });
+}
+
+export async function firebaseDeleteAccount(idToken: string) {
+  return postToIdentityToolkit<{ kind?: string }>("accounts:delete", {
+    idToken,
   });
 }
 

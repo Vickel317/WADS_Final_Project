@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
 export async function GET(request: NextRequest) {
   try {
+    const jwtSecret = getJwtSecret();
     // Get token from header
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const token = authHeader.substring(7);
 
     // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, jwtSecret) as {
       id: string;
       email: string;
       role?: string;

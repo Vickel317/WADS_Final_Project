@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { firebaseSignIn } from "@/lib/firebase-auth";
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
 export async function POST(request: NextRequest) {
   try {
+    const jwtSecret = getJwtSecret();
     const body = await request.json();
     const { email, password } = body;
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         role: "student",
         name: displayName,
       },
-      JWT_SECRET,
+      jwtSecret,
       { expiresIn: "1h" }
     );
 

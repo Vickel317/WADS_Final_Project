@@ -1,172 +1,224 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import { getJwtSecret } from "@/lib/auth-jwt";
+import {
+  firebaseDeleteAccount,
+  firebaseLookupByIdToken,
+  firebaseUpdateProfile,
+} from "@/lib/firebase-auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+type DecodedToken = {
+  id: string;
+  email: string;
+  role?: string;
+  name?: string;
+};
 
-// Mock user database
-const mockUsers = [
-  {
-    id: "user_1",
-    email: "john@example.com",
-    name: "John Doe",
-    role: "student",
-    bio: "Computer Science student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
-    createdAt: new Date("2026-01-15"),
-    updatedAt: new Date("2026-03-10"),
-  },
-  {
-    id: "user_2",
-    email: "sarah@example.com",
-    name: "Sarah Chen",
-    role: "instructor",
-    bio: "Mathematics Instructor",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    createdAt: new Date("2026-01-10"),
-    updatedAt: new Date("2026-03-09"),
-  },
-];
-
-function verifyToken(request: NextRequest) {
+function verifyToken(request: NextRequest): DecodedToken | null {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return null;
   }
 
   const token = authHeader.substring(7);
+
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string };
+    return jwt.verify(token, getJwtSecret()) as DecodedToken;
   } catch {
     return null;
   }
 }
 
+function getProfilePayload(decoded: DecodedToken, overrides?: { name?: string }) {
+  const name = overrides?.name ?? decoded.name ?? "";
+  const seed = encodeURIComponent(decoded.email || decoded.id);
+
+  return {
+    id: decoded.id,
+    email: decoded.email,
+    name,
+    role: decoded.role || "student",
+    bio: "",
+    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`,
+    createdAt: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    const { userId } = params;
+    const { userId } = await Promise.resolve(params);
 
-    const user = mockUsers.find((u) => u.id === userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+    // Public profile read is allowed. If the requester is the owner,
+    // return token-derived identity details.
+    const decoded = verifyToken(request);
+    if (decoded && decoded.id === userId) {
+      return NextResponse.json(getProfilePayload(decoded), { status: 200 });
     }
 
-    const { ...userWithoutPassword } = user;
-    return NextResponse.json(userWithoutPassword, { status: 200 });
+    // Without a database yet, return a deterministic public profile shape.
+    return NextResponse.json(
+      {
+        id: userId,
+        name: "User",
+        role: "student",
+        bio: "",
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
+          userId
+        )}`,
+        createdAt: null,
+        updatedAt: new Date().toISOString(),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    // Verify authentication
     const decoded = verifyToken(request);
     if (!decoded) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { userId } = params;
-
-    // Users can only update their own profile
-    if (decoded.id !== userId) {
+    const { userId } = await Promise.resolve(params);
+    const isOwnerPath = userId === decoded.id || userId === "me";
+    if (!isOwnerPath) {
       return NextResponse.json(
-        { error: "Forbidden: You can only update your own profile" },
+        {
+          error:
+            "Forbidden: use your own userId (or 'me') in path when updating profile",
+          expectedUserId: decoded.id,
+        },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const { name, bio, avatar } = body;
+    const { name, bio, avatar, firebaseIdToken } = body as {
+      name?: string;
+      bio?: string;
+      avatar?: string;
+      firebaseIdToken?: string;
+    };
 
-    const userIndex = mockUsers.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
+    if (!firebaseIdToken) {
       return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
+        {
+          error:
+            "firebaseIdToken is required for profile updates until database integration is added",
+        },
+        { status: 400 }
       );
     }
 
-    // Update user
-    const updatedUser = {
-      ...mockUsers[userIndex],
-      ...(name && { name }),
-      ...(bio !== undefined && { bio }),
-      ...(avatar && { avatar }),
-      updatedAt: new Date(),
-    };
+    const firebaseUser = await firebaseLookupByIdToken(firebaseIdToken);
+    if (!firebaseUser || firebaseUser.localId !== decoded.id) {
+      return NextResponse.json(
+        { error: "Invalid firebaseIdToken for this user" },
+        { status: 401 }
+      );
+    }
 
-    mockUsers[userIndex] = updatedUser;
+    const updatedName = typeof name === "string" ? name.trim() : decoded.name || "";
+    const updateResult = await firebaseUpdateProfile(firebaseIdToken, updatedName);
 
-    return NextResponse.json(updatedUser, { status: 200 });
+    return NextResponse.json(
+      {
+        ...getProfilePayload(decoded, { name: updatedName }),
+        bio: typeof bio === "string" ? bio : "",
+        avatar:
+          typeof avatar === "string" && avatar.length > 0
+            ? avatar
+            : getProfilePayload(decoded, { name: updatedName }).avatar,
+        firebaseIdToken: updateResult.idToken,
+        refreshToken: updateResult.refreshToken,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Update user error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 500;
+    const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: message || "Internal server error" },
+      { status: status || 500 }
     );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    // Verify authentication
     const decoded = verifyToken(request);
     if (!decoded) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { userId } = params;
-
-    // Users can only delete their own account
-    if (decoded.id !== userId) {
+    const { userId } = await Promise.resolve(params);
+    const isOwnerPath = userId === decoded.id || userId === "me";
+    if (!isOwnerPath) {
       return NextResponse.json(
-        { error: "Forbidden: You can only delete your own account" },
+        {
+          error:
+            "Forbidden: use your own userId (or 'me') in path when deleting account",
+          expectedUserId: decoded.id,
+        },
         { status: 403 }
       );
     }
 
-    const userIndex = mockUsers.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
+    const body = await request.json().catch(() => ({}));
+    const firebaseIdTokenFromBody = (body as { firebaseIdToken?: string }).firebaseIdToken;
+    const firebaseIdTokenFromHeader =
+      request.headers.get("x-firebase-id-token") || undefined;
+    const firebaseIdToken = firebaseIdTokenFromBody || firebaseIdTokenFromHeader;
+
+    if (!firebaseIdToken) {
       return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
+        {
+          error:
+            "firebaseIdToken is required to delete account (send in JSON body or x-firebase-id-token header)",
+        },
+        { status: 400 }
       );
     }
 
-    // Delete user
-    mockUsers.splice(userIndex, 1);
+    const firebaseUser = await firebaseLookupByIdToken(firebaseIdToken);
+    if (!firebaseUser || firebaseUser.localId !== decoded.id) {
+      return NextResponse.json(
+        { error: "Invalid firebaseIdToken for this user" },
+        { status: 401 }
+      );
+    }
 
-    return NextResponse.json(
-      { message: "Account deleted successfully" },
-      { status: 200 }
-    );
+    await firebaseDeleteAccount(firebaseIdToken);
+
+    return NextResponse.json({ message: "Account deleted successfully" }, { status: 200 });
   } catch (error) {
     console.error("Delete user error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 500;
+    const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: message || "Internal server error" },
+      { status: status || 500 }
     );
   }
 }
