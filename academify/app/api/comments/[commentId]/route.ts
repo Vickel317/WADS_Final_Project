@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import { comments } from "@/app/api/posts/[postId]/comments/route";
+import { prisma } from "@/lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -102,33 +102,42 @@ export async function PUT(
       );
     }
 
-    const index = comments.findIndex((c) => c.id === commentId);
-    if (index === -1) {
+    const comment = await prisma.comment.findUnique({
+      where: { commentID: commentId },
+    });
+    if (!comment) {
       return NextResponse.json(
         { error: "Comment not found" },
         { status: 404 }
       );
     }
 
-    const comment = comments[index];
     const isModerator =
       decoded.role === "moderator" || decoded.role === "admin";
 
-    if (comment.authorId !== decoded.id && !isModerator) {
+    if (comment.authorID !== decoded.id && !isModerator) {
       return NextResponse.json(
         { error: "Forbidden: You can only edit your own comments" },
         { status: 403 }
       );
     }
 
-    comments[index] = {
-      ...comment,
-      content,
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = await prisma.comment.update({
+      where: { commentID: commentId },
+      data: { content },
+    });
 
     return NextResponse.json(
-      { message: "Comment updated successfully", comment: comments[index] },
+      {
+        message: "Comment updated successfully",
+        comment: {
+          id: updated.commentID,
+          postId: updated.postID,
+          authorId: updated.authorID,
+          content: updated.content,
+          createdAt: updated.createdAt.toISOString(),
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -151,26 +160,27 @@ export async function DELETE(
     }
 
     const { commentId } = params;
-    const index = comments.findIndex((c) => c.id === commentId);
-    if (index === -1) {
+    const comment = await prisma.comment.findUnique({
+      where: { commentID: commentId },
+    });
+    if (!comment) {
       return NextResponse.json(
         { error: "Comment not found" },
         { status: 404 }
       );
     }
 
-    const comment = comments[index];
     const isModerator =
       decoded.role === "moderator" || decoded.role === "admin";
 
-    if (comment.authorId !== decoded.id && !isModerator) {
+    if (comment.authorID !== decoded.id && !isModerator) {
       return NextResponse.json(
         { error: "Forbidden: You can only delete your own comments" },
         { status: 403 }
       );
     }
 
-    comments.splice(index, 1);
+    await prisma.comment.delete({ where: { commentID: commentId } });
 
     return NextResponse.json(
       { message: "Comment deleted successfully" },

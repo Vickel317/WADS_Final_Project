@@ -89,8 +89,6 @@ export default function ForumsPage() {
     );
   };
 
-  const activeCategoryObj = categories.find((c) => c.slug === activeCategory);
-
   const filteredThreads = mockThreads.filter((thread) => {
     const matchesCategory =
       activeCategory === "all" || thread.categorySlug === activeCategory;
