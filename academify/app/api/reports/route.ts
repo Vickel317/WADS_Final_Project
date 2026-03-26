@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // TODO: replace with Prisma in Week 7
-export let reports: Array<{
+export const reports: Array<{
   id: string;
   reportedBy: string;
   targetType: "post" | "comment" | "user";
