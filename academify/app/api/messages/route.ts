@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * @swagger
@@ -27,7 +27,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 // TODO: replace with Prisma in Week 7
-export let messages: Array<{
+export const messages: Array<{
   id: string;
   senderId: string;
   receiverId: string;
@@ -68,7 +68,7 @@ export const dummyUsers: Record<string, string> = {
   "current-user": "John Doe",
 };
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // TODO: get currentUserId from JWT token in Week 8
     const currentUserId = "current-user";

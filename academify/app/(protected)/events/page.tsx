@@ -421,10 +421,6 @@ export default function EventsPage() {
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
-                const isToday =
-                  day === today.getDate() &&
-                  viewMonth === today.getMonth() &&
-                  viewYear === today.getFullYear();
                 return (
                   <button
                     key={day}
