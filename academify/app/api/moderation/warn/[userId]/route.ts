@@ -5,7 +5,7 @@ import { moderationLogs } from "@/app/api/moderation/queue/route";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Shared user sanctions store (imported by suspend/ban routes)
-export let userSanctions: Array<{
+export const userSanctions: Array<{
   id: string;
   userId: string;
   type: "warn" | "suspend" | "ban";

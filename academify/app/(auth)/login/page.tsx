@@ -9,6 +9,11 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    return "Login failed";
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = "Enter a valid email";
@@ -30,8 +35,8 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Login failed");
       router.push("/dashboard");
-    } catch (err: any) {
-      setErrors({ general: err.message });
+    } catch (err: unknown) {
+      setErrors({ general: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -199,7 +204,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-gray-400 text-sm mt-6">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="text-teal-600 hover:text-teal-500 font-semibold transition">
               Sign up
             </Link>

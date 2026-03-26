@@ -142,7 +142,7 @@ export default function EditProfilePage() {
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="text-sm font-bold text-gray-800 mb-4">Profile Photo</h2>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center shrink-0">
               <svg className="w-8 h-8 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
