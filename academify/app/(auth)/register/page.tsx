@@ -9,6 +9,11 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    return "Registration failed";
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required";
@@ -33,8 +38,8 @@ export default function RegisterPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Registration failed");
       router.push("/login");
-    } catch (err: any) {
-      setErrors({ general: err.message });
+    } catch (err: unknown) {
+      setErrors({ general: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -47,7 +52,7 @@ export default function RegisterPage() {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
 
-      <div className="w-full max-w-7xl min-h-[650px] flex rounded-3xl overflow-hidden shadow-2xl shadow-teal-900/20">
+      <div className="w-full max-w-7xl min-h-162.5 flex rounded-3xl overflow-hidden shadow-2xl shadow-teal-900/20">
         {/* ── Left Panel ── */}
         <div
           className="hidden md:flex flex-col justify-between w-1/2 p-14 relative overflow-hidden"

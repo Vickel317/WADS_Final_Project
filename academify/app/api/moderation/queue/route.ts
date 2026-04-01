@@ -5,7 +5,7 @@ import { threads } from "@/app/api/posts/route";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Shared moderation log (imported by other moderation routes)
-export let moderationLogs: Array<{
+export const moderationLogs: Array<{
   id: string;
   action:
     | "approve"
