@@ -48,7 +48,8 @@ export default function LoginPage() {
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
     >
       {/* Google Font */}
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}
+      </style>
 
       <div className="w-screen h-screen flex rounded-none overflow-hidden shadow-2xl shadow-teal-900/20">
         {/* ── Left Panel ── */}
