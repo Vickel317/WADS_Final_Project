@@ -170,7 +170,7 @@ export default function MessagesPage() {
             {/* Messages area */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 flex flex-col">
               <div className="flex gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-teal-100 flex items-center justify-center text-sm font-medium text-teal-600 flex-shrink-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-teal-100 flex items-center justify-center text-sm font-medium text-teal-600 shrink-0">
                   {selectedConversation.name.charAt(0)}
                 </div>
                 <div>
