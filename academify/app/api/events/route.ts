@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Mock events database
-let mockEvents = [
+const mockEvents = [
   {
     id: "event_1",
     userId: "user_1",

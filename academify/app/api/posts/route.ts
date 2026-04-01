@@ -1,4 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import { ModerationStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { getJwtSecret } from "@/lib/auth-jwt";
+
+type DecodedToken = {
+  id: string;
+  email?: string;
+  role?: string;
+};
+
+function verifyToken(request: NextRequest): DecodedToken | null {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.substring(7);
+
+  try {
+    return jwt.verify(token, getJwtSecret()) as DecodedToken;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * @swagger
@@ -78,62 +103,6 @@ import { NextRequest, NextResponse } from "next/server";
  *         description: Internal server error
  */
 
-// TODO: replace with Prisma in Week 7
-export let threads: Array<{
-  id: string;
-  title: string;
-  content: string;
-  categoryId: string;
-  tag: string;
-  author: string;
-  replyCount: number;
-  replies: number;
-  views: number;
-  likes: number;
-  createdAt: string;
-  updatedAt?: string;
-}> = [
-  {
-    id: "1",
-    title: "Best resources for learning React?",
-    content: "Looking for good React learning resources.",
-    categoryId: "tech",
-    tag: "tech",
-    author: "Alex Turner",
-    replyCount: 24,
-    replies: 24,
-    views: 120,
-    likes: 120,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    title: "Tips for Data Structures exam",
-    content: "Any tips for the upcoming DS exam?",
-    categoryId: "academics",
-    tag: "academics",
-    author: "Sarah Chen",
-    replyCount: 15,
-    replies: 15,
-    views: 89,
-    likes: 89,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    title: "Anyone joining the hackathon?",
-    content: "Looking for teammates for the upcoming hackathon.",
-    categoryId: "general",
-    tag: "general",
-    author: "Mike Johnson",
-    replyCount: 8,
-    replies: 8,
-    views: 45,
-    likes: 45,
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -141,22 +110,46 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const trending = searchParams.get("trending") === "true";
 
-    let result = [...threads];
+    const where = categoryId
+      ? {
+          OR: [
+            { categoryID: categoryId },
+            { category: { name: { equals: categoryId, mode: "insensitive" as const } } },
+          ],
+        }
+      : {};
 
-    // Filter by category if provided
-    if (categoryId) {
-      result = result.filter((t) => t.categoryId === categoryId);
-    }
+    const result = await prisma.post.findMany({
+      where,
+      include: {
+        author: { select: { name: true } },
+        category: { select: { name: true } },
+        comments: { select: { commentID: true } },
+      },
+      orderBy: trending ? { comments: { _count: "desc" } } : { createdAt: "desc" },
+      take: Number.isFinite(limit) ? limit : 10,
+    });
 
-    // Sort by replies if trending
-    if (trending) {
-      result = result.sort((a, b) => b.replyCount - a.replyCount);
-    }
-
-    // Apply limit
-    result = result.slice(0, limit);
-
-    return NextResponse.json({ threads: result }, { status: 200 });
+    return NextResponse.json(
+      {
+        threads: result.map((p) => ({
+          id: p.postID,
+          title: p.title,
+          content: p.content,
+          categoryId: p.categoryID,
+          tag: p.category.name.toLowerCase(),
+          author: p.author.name,
+          replyCount: p.comments.length,
+          replies: p.comments.length,
+          views: 0,
+          likes: 0,
+          createdAt: p.createdAt.toISOString(),
+          updatedAt: p.updatedAt.toISOString(),
+          status: p.moderationStatus.toLowerCase(),
+        })),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get threads error:", error);
     return NextResponse.json(
@@ -168,6 +161,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const decoded = verifyToken(request);
+    if (!decoded) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const body = await request.json();
     const { title, content, categoryId } = body;
 
@@ -179,22 +177,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new thread
+    const category = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { categoryID: categoryId },
+          { name: { equals: categoryId, mode: "insensitive" } },
+        ],
+      },
+    });
+
+    if (!category) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    const author = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { userId: decoded.id },
+          ...(decoded.email ? [{ email: decoded.email }] : []),
+        ],
+      },
+    });
+    if (!author) {
+      return NextResponse.json(
+        { error: "User record not found in database for this token" },
+        { status: 401 }
+      );
+    }
+
+    const created = await prisma.post.create({
+      data: {
+        title,
+        content,
+        categoryID: category.categoryID,
+        authorID: author.userId,
+        moderationStatus: ModerationStatus.PENDING,
+      },
+      include: {
+        author: { select: { name: true } },
+      },
+    });
+
     const newThread = {
-      id: Date.now().toString(),
-      title,
-      content,
-      categoryId,
-      tag: categoryId,
-      author: "Current User", // TODO: get from JWT token in Week 8
+      id: created.postID,
+      title: created.title,
+      content: created.content,
+      categoryId: created.categoryID,
+      tag: category.name.toLowerCase(),
+      author: created.author.name,
       replyCount: 0,
       replies: 0,
       views: 0,
       likes: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: created.createdAt.toISOString(),
+      status: created.moderationStatus.toLowerCase(),
     };
-
-    threads.push(newThread);
 
     return NextResponse.json(
       { message: "Thread created successfully", thread: newThread },
