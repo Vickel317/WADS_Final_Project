@@ -1,40 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const jwtSecret = getJwtSecret();
-    // Get token from header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session) {
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
       );
     }
 
-    const token = authHeader.substring(7);
-
-    // Verify token
-    const decoded = jwt.verify(token, jwtSecret) as {
-      id: string;
-      email: string;
-      role?: string;
-      name?: string;
-      iat?: number;
-    };
-
     return NextResponse.json(
       {
-        id: decoded.id,
-        email: decoded.email,
-        name: decoded.name || "",
-        role: decoded.role || "student",
-        createdAt: decoded.iat
-          ? new Date(decoded.iat * 1000).toISOString()
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name || "",
+        role: "student",
+        createdAt: session.user.createdAt
+          ? new Date(session.user.createdAt).toISOString()
           : null,
-        updatedAt: new Date(),
+        updatedAt: session.user.updatedAt
+          ? new Date(session.user.updatedAt).toISOString()
+          : null,
       },
       { status: 200 }
     );

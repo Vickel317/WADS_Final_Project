@@ -1,29 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { ModerationStatus } from "@prisma/client";
+import { getSessionUser } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
-import { getJwtSecret } from "@/lib/auth-jwt";
-
-type DecodedToken = {
-  id: string;
-  email?: string;
-  role?: string;
-};
-
-function verifyToken(request: NextRequest): DecodedToken | null {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    return jwt.verify(token, getJwtSecret()) as DecodedToken;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * @swagger
@@ -52,15 +30,6 @@ function verifyToken(request: NextRequest): DecodedToken | null {
  *     responses:
  *       200:
  *         description: List of threads
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 threads:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Thread'
  *       500:
  *         description: Internal server error
  *   post:
@@ -88,15 +57,6 @@ function verifyToken(request: NextRequest): DecodedToken | null {
  *     responses:
  *       201:
  *         description: Thread created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 thread:
- *                   $ref: '#/components/schemas/Thread'
  *       400:
  *         description: Missing required fields
  *       500:
@@ -132,44 +92,40 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        threads: result.map((p) => ({
-          id: p.postID,
-          title: p.title,
-          content: p.content,
-          categoryId: p.categoryID,
-          tag: p.category.name.toLowerCase(),
-          author: p.author.name,
-          replyCount: p.comments.length,
-          replies: p.comments.length,
+        threads: result.map((post) => ({
+          id: post.postID,
+          title: post.title,
+          content: post.content,
+          categoryId: post.categoryID,
+          tag: post.category.name.toLowerCase(),
+          author: post.author.name,
+          replyCount: post.comments.length,
+          replies: post.comments.length,
           views: 0,
           likes: 0,
-          createdAt: p.createdAt.toISOString(),
-          updatedAt: p.updatedAt.toISOString(),
-          status: p.moderationStatus.toLowerCase(),
+          createdAt: post.createdAt.toISOString(),
+          updatedAt: post.updatedAt.toISOString(),
+          status: post.moderationStatus.toLowerCase(),
         })),
       },
       { status: 200 }
     );
   } catch (error) {
     console.error("Get threads error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
+    const sessionUser = await getSessionUser(request.headers);
+    if (!sessionUser) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await request.json();
     const { title, content, categoryId } = body;
 
-    // Validation
     if (!title || !content || !categoryId) {
       return NextResponse.json(
         { error: "Title, content, and categoryId are required" },
@@ -190,27 +146,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
-    const author = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { userId: decoded.id },
-          ...(decoded.email ? [{ email: decoded.email }] : []),
-        ],
-      },
-    });
-    if (!author) {
-      return NextResponse.json(
-        { error: "User record not found in database for this token" },
-        { status: 401 }
-      );
-    }
-
     const created = await prisma.post.create({
       data: {
         title,
         content,
         categoryID: category.categoryID,
-        authorID: author.userId,
+        authorID: sessionUser.user.userId,
         moderationStatus: ModerationStatus.PENDING,
       },
       include: {
@@ -218,30 +159,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const newThread = {
-      id: created.postID,
-      title: created.title,
-      content: created.content,
-      categoryId: created.categoryID,
-      tag: category.name.toLowerCase(),
-      author: created.author.name,
-      replyCount: 0,
-      replies: 0,
-      views: 0,
-      likes: 0,
-      createdAt: created.createdAt.toISOString(),
-      status: created.moderationStatus.toLowerCase(),
-    };
-
     return NextResponse.json(
-      { message: "Thread created successfully", thread: newThread },
+      {
+        message: "Thread created successfully",
+        thread: {
+          id: created.postID,
+          title: created.title,
+          content: created.content,
+          categoryId: created.categoryID,
+          author: created.author.name,
+          status: created.moderationStatus.toLowerCase(),
+          createdAt: created.createdAt.toISOString(),
+          updatedAt: created.updatedAt.toISOString(),
+        },
+      },
       { status: 201 }
     );
   } catch (error) {
     console.error("Create thread error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
