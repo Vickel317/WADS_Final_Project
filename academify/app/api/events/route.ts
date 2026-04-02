@@ -1,7 +1,6 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { getSessionUser } from "@/lib/auth-session";
 
-
-// Mock events database
 const mockEvents = [
   {
     id: "event_1",
@@ -50,53 +49,31 @@ const mockEvents = [
   },
 ];
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as { id: string; email: string };
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const filter = url.searchParams.get("filter"); // "upcoming" or "past"
+    const filter = url.searchParams.get("filter");
     const page = parseInt(url.searchParams.get("page") || "1");
     const pageSize = 10;
 
     let filteredEvents = [...mockEvents];
 
-    // Filter by status
     if (filter === "upcoming") {
-      filteredEvents = filteredEvents.filter(
-        (e) => new Date(e.date) > new Date()
-      );
+      filteredEvents = filteredEvents.filter((event) => new Date(event.date) > new Date());
     } else if (filter === "past") {
-      filteredEvents = filteredEvents.filter(
-        (e) => new Date(e.date) <= new Date()
-      );
+      filteredEvents = filteredEvents.filter((event) => new Date(event.date) <= new Date());
     }
 
-    // Sort by date
     filteredEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Pagination
     const total = filteredEvents.length;
     const totalPages = Math.ceil(total / pageSize);
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const paginatedEvents = filteredEvents.slice(start, end);
 
     return NextResponse.json(
       {
-        data: paginatedEvents,
+        data: filteredEvents.slice(start, end),
         pagination: {
           page,
           pageSize,
@@ -108,36 +85,20 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Get events error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const decoded = verifyToken(request);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+    const sessionUser = await getSessionUser(request.headers);
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await request.json();
-    const {
-      title,
-      description,
-      date,
-      duration,
-      location,
-      category,
-      maxAttendees,
-    } = body;
+    const { title, description, date, duration, location, category, maxAttendees } = body;
 
-    // Validation
     if (!title || !date || !location) {
       return NextResponse.json(
         { error: "Missing required fields: title, date, location" },
@@ -147,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     const newEvent = {
       id: `event_${Date.now()}`,
-      userId: decoded.id,
+      userId: sessionUser.user.userId,
       title,
       description: description || "",
       date: new Date(date),
@@ -155,7 +116,7 @@ export async function POST(request: NextRequest) {
       location,
       category: category || "General",
       maxAttendees: maxAttendees || 30,
-      attendees: [decoded.id],
+      attendees: [sessionUser.user.userId],
       status: "scheduled",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -166,9 +127,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newEvent, { status: 201 });
   } catch (error) {
     console.error("Create event error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

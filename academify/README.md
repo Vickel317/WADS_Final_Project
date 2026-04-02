@@ -20,6 +20,24 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment Setup
+
+Copy `.env.example` to `.env.local` and fill in the values before running the app.
+
+Minimum required for Better Auth (tutorial style):
+
+- `DATABASE_URL`
+- `BETTER_AUTH_URL`
+- `BETTER_AUTH_SECRET`
+- `NEXT_PUBLIC_BETTER_AUTH_URL`
+
+If you also use the tutorial's Firebase flow (`/api/auth/firebase`), configure:
+
+- `NEXT_PUBLIC_FIREBASE_*` variables
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

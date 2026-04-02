@@ -30,13 +30,17 @@ export default function RegisterPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/api/auth/sign-up/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Registration failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.message || "Registration failed");
       router.push("/login");
     } catch (err: unknown) {
       setErrors({ general: getErrorMessage(err) });
