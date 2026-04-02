@@ -1,20 +1,6 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
-
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getSessionUser, normalizeRole } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
 
 /**
  * @swagger
@@ -70,33 +56,30 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        categories: categories.map((c) => ({
-          id: c.categoryID,
-          name: c.name,
-          description: c.description ?? "",
-          slug: c.name.toLowerCase(),
-          createdAt: c.createdAt.toISOString(),
+        categories: categories.map((category) => ({
+          id: category.categoryID,
+          name: category.name,
+          description: category.description ?? "",
+          slug: category.name.toLowerCase(),
+          createdAt: category.createdAt.toISOString(),
         })),
       },
       { status: 200 }
     );
   } catch (error) {
     console.error("Get categories error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
+    const sessionUser = await getSessionUser(request.headers);
+    if (!sessionUser) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
+    if (normalizeRole(sessionUser.user.role) !== "admin") {
       return NextResponse.json(
         { error: "Forbidden: Admin access required" },
         { status: 403 }
@@ -144,9 +127,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Create category error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

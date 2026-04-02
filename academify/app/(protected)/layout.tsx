@@ -1,15 +1,13 @@
 import Sidebar from "@/components/sidebar";
 import Topbar from "@/components/topbar";
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { ACCESS_TOKEN_COOKIE, verifyAccessToken } from "@/lib/auth-jwt";
+import { auth } from "@/lib/auth";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
-  const decoded = token ? verifyAccessToken(token) : null;
+  const session = await auth.api.getSession({ headers: await headers() });
 
-  if (!decoded) {
+  if (!session) {
     redirect("/login");
   }
 

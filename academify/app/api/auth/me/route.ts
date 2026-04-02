@@ -1,34 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAccessTokenFromRequest, verifyAccessToken } from "@/lib/auth-jwt";
+import { auth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = getAccessTokenFromRequest(request);
-    if (!token) {
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session) {
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
       );
     }
 
-    const decoded = verifyAccessToken(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 }
-      );
-    }
-
     return NextResponse.json(
       {
-        id: decoded.id,
-        email: decoded.email,
-        name: decoded.name || "",
-        role: decoded.role || "student",
-        createdAt: decoded.iat
-          ? new Date(decoded.iat * 1000).toISOString()
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name || "",
+        role: "student",
+        createdAt: session.user.createdAt
+          ? new Date(session.user.createdAt).toISOString()
           : null,
-        updatedAt: new Date(),
+        updatedAt: session.user.updatedAt
+          ? new Date(session.user.updatedAt).toISOString()
+          : null,
       },
       { status: 200 }
     );
