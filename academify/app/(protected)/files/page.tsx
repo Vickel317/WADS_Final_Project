@@ -9,9 +9,6 @@ import {
   MoreVertical,
   FolderOpen,
   FileText,
-  Archive,
-  Presentation,
-  ImageIcon,
   ChevronDown,
 } from "lucide-react";
 

@@ -58,7 +58,7 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-800">
           Welcome back, <span style={{ color: "#0d9488" }}>JOHN</span>!
         </h1>
-        <p className="text-gray-400 text-sm mt-0.5">Here's what's happening in your community today</p>
+        <p className="text-gray-400 text-sm mt-0.5">Here&apos;s what&apos;s happening in your community today</p>
       </div>
 
       {/* Stat Cards */}

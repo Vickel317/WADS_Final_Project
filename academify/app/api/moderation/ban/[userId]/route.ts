@@ -1,16 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-import { moderationLogs } from "@/app/api/moderation/queue/route";
-import { userSanctions } from "@/app/api/moderation/warn/[userId]/route";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
   const token = authHeader.substring(7);
   try {
-    return jwt.verify(token, JWT_SECRET) as {
+    return jwt.verify(token, getJwtSecret()) as {
       id: string;
       email: string;
       role?: string;

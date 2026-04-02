@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { threads as posts } from "@/app/api/posts/route";
+import { prisma } from "@/lib/prisma";
 
 /**
  * @swagger
@@ -91,7 +91,13 @@ export async function GET(
   { params }: { params: { postId: string } }
 ) {
   try {
-    const post = posts.find((p) => p.id === params.postId);
+    const post = await prisma.post.findUnique({
+      where: { postID: params.postId },
+      include: {
+        author: { select: { name: true } },
+        comments: { select: { commentID: true } },
+      },
+    });
 
     if (!post) {
       return NextResponse.json(
@@ -100,7 +106,23 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ post }, { status: 200 });
+    return NextResponse.json(
+      {
+        post: {
+          id: post.postID,
+          title: post.title,
+          content: post.content,
+          categoryId: post.categoryID,
+          author: post.author.name,
+          replyCount: post.comments.length,
+          replies: post.comments.length,
+          createdAt: post.createdAt.toISOString(),
+          updatedAt: post.updatedAt.toISOString(),
+          status: post.moderationStatus.toLowerCase(),
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get post error:", error);
     return NextResponse.json(
@@ -125,25 +147,37 @@ export async function PUT(
       );
     }
 
-    const postIndex = posts.findIndex((p) => p.id === params.postId);
+    const existing = await prisma.post.findUnique({
+      where: { postID: params.postId },
+    });
 
-    if (postIndex === -1) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Post not found" },
         { status: 404 }
       );
     }
 
-    // TODO: verify post owner via JWT in Week 8
-    posts[postIndex] = {
-      ...posts[postIndex],
-      title,
-      content,
-      updatedAt: new Date().toISOString(),
-    };
+    const post = await prisma.post.update({
+      where: { postID: params.postId },
+      data: {
+        title,
+        content,
+      },
+    });
 
     return NextResponse.json(
-      { message: "Post updated successfully", post: posts[postIndex] },
+      {
+        message: "Post updated successfully",
+        post: {
+          id: post.postID,
+          title: post.title,
+          content: post.content,
+          categoryId: post.categoryID,
+          createdAt: post.createdAt.toISOString(),
+          updatedAt: post.updatedAt.toISOString(),
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -160,20 +194,21 @@ export async function DELETE(
   { params }: { params: { postId: string } }
 ) {
   try {
-    const postIndex = posts.findIndex((p) => p.id === params.postId);
+    const existing = await prisma.post.findUnique({
+      where: { postID: params.postId },
+    });
 
-    if (postIndex === -1) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Post not found" },
         { status: 404 }
       );
     }
 
-    // TODO: verify post owner OR moderator role via JWT in Week 8
-    const deleted = posts.splice(postIndex, 1)[0];
+    await prisma.post.delete({ where: { postID: params.postId } });
 
     return NextResponse.json(
-      { message: "Post deleted successfully", post: deleted },
+      { message: "Post deleted successfully" },
       { status: 200 }
     );
   } catch (error) {
