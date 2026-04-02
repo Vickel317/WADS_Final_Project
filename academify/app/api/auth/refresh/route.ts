@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { firebaseLookupByIdToken, firebaseRefresh } from "@/lib/firebase-auth";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import {
+  getRefreshTokenFromRequest,
+  setAuthCookies,
+  signAccessToken,
+} from "@/lib/auth-jwt";
 
 export async function POST(request: NextRequest) {
   try {
-    const jwtSecret = getJwtSecret();
-    const body = await request.json();
-    const { refreshToken } = body;
+    const body = await request.json().catch(() => ({}));
+    const refreshToken =
+      getRefreshTokenFromRequest(request) ||
+      (typeof body === "object" ? (body as { refreshToken?: string }).refreshToken : undefined);
 
     if (!refreshToken) {
       return NextResponse.json(
@@ -19,19 +23,14 @@ export async function POST(request: NextRequest) {
     const refreshed = await firebaseRefresh(refreshToken);
     const firebaseUser = await firebaseLookupByIdToken(refreshed.idToken);
 
-    // Create new access token used by current app routes.
-    const newToken = jwt.sign(
-      {
-        id: refreshed.userId,
-        email: firebaseUser?.email || "",
-        role: "student",
-        name: firebaseUser?.displayName || "",
-      },
-      jwtSecret,
-      { expiresIn: "1h" }
-    );
+    const newToken = signAccessToken({
+      id: refreshed.userId,
+      email: firebaseUser?.email || "",
+      role: "student",
+      name: firebaseUser?.displayName || "",
+    });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         token: newToken,
         refreshToken: refreshed.refreshToken,
@@ -40,6 +39,10 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
+
+    setAuthCookies(response, newToken, refreshed.refreshToken);
+
+    return response;
   } catch (error) {
     console.error("Refresh token error:", error);
     const status =

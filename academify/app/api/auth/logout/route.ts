@@ -1,29 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { clearAuthCookies } from "@/lib/auth-jwt";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    // Verify user is authenticated
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
-    }
-
     // Create response
     const response = NextResponse.json(
       { message: "Logged out successfully" },
       { status: 200 }
     );
 
-    // Clear the auth cookie
-    response.cookies.set("auth_token", "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 0,
-    });
+    clearAuthCookies(response);
 
     return response;
   } catch (error) {

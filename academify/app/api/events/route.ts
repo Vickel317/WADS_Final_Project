@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Mock events database
 const mockEvents = [
@@ -60,7 +58,7 @@ function verifyToken(request: NextRequest) {
 
   const token = authHeader.substring(7);
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string };
+    return jwt.verify(token, getJwtSecret()) as { id: string; email: string };
   } catch {
     return null;
   }
