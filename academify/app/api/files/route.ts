@@ -62,7 +62,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 
 // TODO: replace with Prisma + real file storage (e.g. S3) in Week 7
-export let files: Array<{
+export const files: Array<{
   id: string;
   name: string;
   size: number;

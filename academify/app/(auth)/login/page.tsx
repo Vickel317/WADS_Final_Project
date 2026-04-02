@@ -9,6 +9,11 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    return "Login failed";
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = "Enter a valid email";
@@ -22,16 +27,20 @@ export default function LoginPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/sign-in/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          rememberMe: form.remember,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Login failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.message || "Login failed");
       router.push("/dashboard");
-    } catch (err: any) {
-      setErrors({ general: err.message });
+    } catch (err: unknown) {
+      setErrors({ general: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -43,7 +52,8 @@ export default function LoginPage() {
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
     >
       {/* Google Font */}
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}
+      </style>
 
       <div className="w-screen h-screen flex rounded-none overflow-hidden shadow-2xl shadow-teal-900/20">
         {/* ── Left Panel ── */}
@@ -137,6 +147,7 @@ export default function LoginPage() {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="john.doe@university.edu"
+                  suppressHydrationWarning
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 transition ${
                     errors.email ? "border-red-300" : "border-gray-200"
                   }`}
@@ -155,6 +166,7 @@ export default function LoginPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••••"
+                  suppressHydrationWarning
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 transition ${
                     errors.password ? "border-red-300" : "border-gray-200"
                   }`}
@@ -183,6 +195,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
+              suppressHydrationWarning
               className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-60 mt-1"
               style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
             >
@@ -199,7 +212,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-gray-400 text-sm mt-6">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="text-teal-600 hover:text-teal-500 font-semibold transition">
               Sign up
             </Link>

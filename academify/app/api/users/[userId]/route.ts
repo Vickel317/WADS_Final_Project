@@ -1,172 +1,170 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/get-session";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-
-// Mock user database
-const mockUsers = [
-  {
-    id: "user_1",
-    email: "john@example.com",
-    name: "John Doe",
-    role: "student",
-    bio: "Computer Science student",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
-    createdAt: new Date("2026-01-15"),
-    updatedAt: new Date("2026-03-10"),
-  },
-  {
-    id: "user_2",
-    email: "sarah@example.com",
-    name: "Sarah Chen",
-    role: "instructor",
-    bio: "Mathematics Instructor",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    createdAt: new Date("2026-01-10"),
-    updatedAt: new Date("2026-03-09"),
-  },
-];
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string };
-  } catch {
-    return null;
-  }
+function mapProfile(user: {
+  userId: string;
+  email: string;
+  name: string;
+  role: string;
+  major: string | null;
+  bio: string | null;
+  createdAt: Date;
+}) {
+  return {
+    id: user.userId,
+    email: user.email,
+    name: user.name,
+    role: user.role.toLowerCase(),
+    major: user.major ?? "",
+    year: "",
+    bio: user.bio ?? "",
+    location: "",
+    website: "",
+    connections: 0,
+    posts: 0,
+    filesShared: 0,
+    skills: [] as string[],
+    isConnected: false,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    const { userId } = params;
+    const { userId } = await Promise.resolve(params);
+    const sessionData = await getSession();
 
-    const user = mockUsers.find((u) => u.id === userId);
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+    const resolvedUserId = userId === "me" ? sessionData?.user.userId : userId;
+    if (!resolvedUserId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { ...userWithoutPassword } = user;
-    return NextResponse.json(userWithoutPassword, { status: 200 });
+    const user = await prisma.user.findUnique({ where: { userId: resolvedUserId } });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const isOwn = sessionData?.user.userId === user.userId;
+    return NextResponse.json({ user: { ...mapProfile(user), isOwn } }, { status: 200 });
   } catch (error) {
     console.error("Get user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function PUT(
+async function updateUserProfile(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    // Verify authentication
-    const decoded = verifyToken(request);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+    const sessionData = await getSession();
+    if (!sessionData) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { userId } = params;
+    const { userId } = await Promise.resolve(params);
+    const targetUserId = userId === "me" ? sessionData.user.userId : userId;
+    const isOwnerPath = targetUserId === sessionData.user.userId;
 
-    // Users can only update their own profile
-    if (decoded.id !== userId) {
+    if (!isOwnerPath) {
       return NextResponse.json(
-        { error: "Forbidden: You can only update your own profile" },
+        { error: "Forbidden: you can only update your own profile" },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const { name, bio, avatar } = body;
-
-    const userIndex = mockUsers.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    // Update user
-    const updatedUser = {
-      ...mockUsers[userIndex],
-      ...(name && { name }),
-      ...(bio !== undefined && { bio }),
-      ...(avatar && { avatar }),
-      updatedAt: new Date(),
+    const { name, major, bio } = body as {
+      name?: string;
+      major?: string;
+      bio?: string;
     };
 
-    mockUsers[userIndex] = updatedUser;
+    const updates: { name?: string; major?: string; bio?: string } = {};
+    if (typeof name === "string") updates.name = name.trim();
+    if (typeof major === "string") updates.major = major.trim();
+    if (typeof bio === "string") updates.bio = bio.trim();
 
-    return NextResponse.json(updatedUser, { status: 200 });
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    const updated = await prisma.user.update({
+      where: { userId: targetUserId },
+      data: updates,
+    });
+
+    return NextResponse.json(
+      { message: "Profile updated successfully", user: { ...mapProfile(updated), isOwn: true } },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Update user error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 500;
+    const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: message || "Internal server error" },
+      { status: status || 500 }
     );
   }
 }
 
-export async function DELETE(
+export async function PATCH(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  context: { params: Promise<{ userId: string }> | { userId: string } }
+) {
+  return updateUserProfile(request, context);
+}
+
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ userId: string }> | { userId: string } }
+) {
+  return updateUserProfile(request, context);
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    // Verify authentication
-    const decoded = verifyToken(request);
-    if (!decoded) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+    const sessionData = await getSession();
+    if (!sessionData) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { userId } = params;
+    const { userId } = await Promise.resolve(params);
+    const targetUserId = userId === "me" ? sessionData.user.userId : userId;
+    const isOwnerPath = targetUserId === sessionData.user.userId;
 
-    // Users can only delete their own account
-    if (decoded.id !== userId) {
+    if (!isOwnerPath) {
       return NextResponse.json(
-        { error: "Forbidden: You can only delete your own account" },
+        { error: "Forbidden: you can only delete your own account" },
         { status: 403 }
       );
     }
 
-    const userIndex = mockUsers.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+    await prisma.user.delete({ where: { userId: targetUserId } });
 
-    // Delete user
-    mockUsers.splice(userIndex, 1);
-
-    return NextResponse.json(
-      { message: "Account deleted successfully" },
-      { status: 200 }
-    );
+    return NextResponse.json({ message: "Account deleted successfully" }, { status: 200 });
   } catch (error) {
     console.error("Delete user error:", error);
+    const status =
+      typeof error === "object" && error && "status" in error
+        ? Number((error as { status?: number }).status)
+        : 500;
+    const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: message || "Internal server error" },
+      { status: status || 500 }
     );
   }
 }

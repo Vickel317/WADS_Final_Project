@@ -1,42 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-
-// TODO: replace with Prisma in Week 7
-export let comments: Array<{
-  id: string;
-  postId: string;
-  content: string;
-  authorId: string;
-  authorName: string;
-  createdAt: string;
-  updatedAt?: string;
-}> = [
-  {
-    id: "c1",
-    postId: "1",
-    content: "Great question! I recommend the official React docs.",
-    authorId: "user_1",
-    authorName: "John Doe",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "c2",
-    postId: "1",
-    content: "Also check out the React course on Scrimba.",
-    authorId: "user_2",
-    authorName: "Sarah Chen",
-    createdAt: new Date().toISOString(),
-  },
-];
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
   const token = authHeader.substring(7);
   try {
-    return jwt.verify(token, JWT_SECRET) as {
+    return jwt.verify(token, getJwtSecret()) as {
       id: string;
       email: string;
       role?: string;
@@ -104,9 +74,25 @@ export async function GET(
 ) {
   try {
     const { postId } = params;
-    const postComments = comments.filter((c) => c.postId === postId);
+    const postComments = await prisma.comment.findMany({
+      where: { postID: postId },
+      include: { author: { select: { name: true } } },
+      orderBy: { createdAt: "asc" },
+    });
 
-    return NextResponse.json({ comments: postComments }, { status: 200 });
+    return NextResponse.json(
+      {
+        comments: postComments.map((c) => ({
+          id: c.commentID,
+          postId: c.postID,
+          content: c.content,
+          authorId: c.authorID,
+          authorName: c.author.name,
+          createdAt: c.createdAt.toISOString(),
+        })),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get comments error:", error);
     return NextResponse.json(
@@ -137,19 +123,47 @@ export async function POST(
       );
     }
 
-    const newComment = {
-      id: `c${Date.now()}`,
-      postId,
-      content,
-      authorId: decoded.id,
-      authorName: decoded.email,
-      createdAt: new Date().toISOString(),
-    };
+    const post = await prisma.post.findUnique({ where: { postID: postId } });
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
 
-    comments.push(newComment);
+    const author = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { userId: decoded.id },
+          ...(decoded.email ? [{ email: decoded.email }] : []),
+        ],
+      },
+    });
+    if (!author) {
+      return NextResponse.json(
+        { error: "User record not found in database for this token" },
+        { status: 401 }
+      );
+    }
+
+    const newComment = await prisma.comment.create({
+      data: {
+        postID: postId,
+        content,
+        authorID: author.userId,
+      },
+      include: { author: { select: { name: true } } },
+    });
 
     return NextResponse.json(
-      { message: "Comment created successfully", comment: newComment },
+      {
+        message: "Comment created successfully",
+        comment: {
+          id: newComment.commentID,
+          postId: newComment.postID,
+          content: newComment.content,
+          authorId: newComment.authorID,
+          authorName: newComment.author.name,
+          createdAt: newComment.createdAt.toISOString(),
+        },
+      },
       { status: 201 }
     );
   } catch (error) {

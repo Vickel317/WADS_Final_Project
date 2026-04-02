@@ -1,54 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-
-// TODO: replace with Prisma in Week 7
-export let categories: Array<{
-  id: string;
-  name: string;
-  description: string;
-  slug: string;
-  createdAt: string;
-  updatedAt?: string;
-}> = [
-  {
-    id: "cat_1",
-    name: "Technology",
-    description: "Discussions about tech topics",
-    slug: "tech",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "cat_2",
-    name: "Academics",
-    description: "Academic discussions and study tips",
-    slug: "academics",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "cat_3",
-    name: "General",
-    description: "General campus discussions",
-    slug: "general",
-    createdAt: new Date().toISOString(),
-  },
-];
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, JWT_SECRET) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+import { getSessionUser, normalizeRole } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
 
 /**
  * @swagger
@@ -98,24 +50,36 @@ function verifyToken(request: NextRequest) {
 
 export async function GET() {
   try {
-    return NextResponse.json({ categories }, { status: 200 });
+    const categories = await prisma.category.findMany({
+      orderBy: { createdAt: "asc" },
+    });
+
+    return NextResponse.json(
+      {
+        categories: categories.map((category) => ({
+          id: category.categoryID,
+          name: category.name,
+          description: category.description ?? "",
+          slug: category.name.toLowerCase(),
+          createdAt: category.createdAt.toISOString(),
+        })),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get categories error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
+    const sessionUser = await getSessionUser(request.headers);
+    if (!sessionUser) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    if (decoded.role !== "admin") {
+    if (normalizeRole(sessionUser.user.role) !== "admin") {
       return NextResponse.json(
         { error: "Forbidden: Admin access required" },
         { status: 403 }
@@ -132,23 +96,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const exists = categories.find((c) => c.slug === slug);
+    const exists = await prisma.category.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
     if (exists) {
       return NextResponse.json(
-        { error: "A category with this slug already exists" },
+        { error: "A category with this name already exists" },
         { status: 409 }
       );
     }
 
+    const created = await prisma.category.create({
+      data: {
+        name,
+        description,
+      },
+    });
+
     const newCategory = {
-      id: `cat_${Date.now()}`,
+      id: created.categoryID,
       name,
       description,
       slug,
-      createdAt: new Date().toISOString(),
+      createdAt: created.createdAt.toISOString(),
     };
-
-    categories.push(newCategory);
 
     return NextResponse.json(
       { message: "Category created successfully", category: newCategory },
@@ -156,9 +127,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Create category error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

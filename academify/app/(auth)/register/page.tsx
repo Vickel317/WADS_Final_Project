@@ -9,6 +9,11 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    return "Registration failed";
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Full name is required";
@@ -25,16 +30,20 @@ export default function RegisterPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/api/auth/sign-up/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Registration failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.message || "Registration failed");
       router.push("/login");
-    } catch (err: any) {
-      setErrors({ general: err.message });
+    } catch (err: unknown) {
+      setErrors({ general: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -42,12 +51,12 @@ export default function RegisterPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-[#f0fafa] px-4 py-8"
+      className="w-screen h-screen flex items-center justify-center bg-[#f0fafa]"
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
 
-      <div className="w-full max-w-7xl min-h-[650px] flex rounded-3xl overflow-hidden shadow-2xl shadow-teal-900/20">
+      <div className="w-screen h-screen flex rounded-none overflow-hidden shadow-2xl shadow-teal-900/20">
         {/* ── Left Panel ── */}
         <div
           className="hidden md:flex flex-col justify-between w-1/2 p-14 relative overflow-hidden"

@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  STUDENT
+  MODERATOR
+  ADMIN
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+  BLOCKED
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ActionType {
+  DELETE_POST
+  DELETE_COMMENT
+  APPROVE_POST
+  FLAG_POST
+  WARN_USER
+  SUSPEND_USER
+  BAN_USER
+  UNBAN_USER
+}
+
+// Models
+
+model User {
+  userId    String   @id @default(cuid()) @map("userID")
+  email     String   @unique
+  password  String
+  username  String   @unique
+  name      String
+  role      UserRole @default(STUDENT)
+  major     String?
+  bio       String?  @db.Text
+  createdAt DateTime @default(now())
+
+  // Relations
+  posts                Post[]                  @relation("UserPosts")
+  comments             Comment[]               @relation("UserComments")
+  files                File[]                  @relation("UserFiles")
+  createdEvents        Event[]                 @relation("EventCreator")
+  attendingEvents      EventAttendee[]         @relation("EventAttendees")
+  sentMessages         Message[]               @relation("MessageSender")
+  receivedMessages     Message[]               @relation("MessageReceiver")
+  reportsMade          ReportReview[]          @relation("Reporter")
+  reportsAgainstUser   ReportReview[]          @relation("ReportedUser")
+  moderationActions    ModerationActionLog[]   @relation("ModeratorActions")
+
+  @@map("User")
+}
+
+model Category {
+  categoryID  String   @id @default(cuid())
+  name        String   @unique
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relations
+  posts Post[]
+
+  @@map("Category")
+}
+
+model Post {
+  postID            String            @id @default(cuid())
+  authorID          String
+  categoryID        String
+  title             String
+  content           String            @db.Text
+  moderationStatus  ModerationStatus  @default(PENDING)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  author            User              @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)
+  category          Category          @relation(fields: [categoryID], references: [categoryID], onDelete: Restrict)
+  comments          Comment[]         @relation("PostComments")
+  file              File?             @relation("PostFile")
+  reports           ReportReview[]    @relation("ReportedPost")
+  moderationActions ModerationActionLog[] @relation("TargetPost")
+
+  @@index([authorID])
+  @@index([categoryID])
+  @@index([createdAt])
+  @@map("Post")
+}
+
+model Comment {
+  commentID String   @id @default(cuid())
+  postID    String
+  authorID  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  // Relations
+  post              Post              @relation("PostComments", fields: [postID], references: [postID], onDelete: Cascade)
+  author            User              @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
+  reports           ReportReview[]    @relation("ReportedComment")
+  moderationActions ModerationActionLog[] @relation("TargetComment")
+
+  @@index([postID])
+  @@index([authorID])
+  @@map("Comment")
+}
+
+model Event {
+  eventID     String   @id @default(cuid())
+  creatorID   String
+  title       String
+  description String   @db.Text
+  dateTime    DateTime
+  location    String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  creator   User            @relation("EventCreator", fields: [creatorID], references: [userId], onDelete: Cascade)
+  attendees EventAttendee[] @relation("EventAttendees")
+
+  @@index([creatorID])
+  @@index([dateTime])
+  @@map("Event")
+}
+
+model EventAttendee {
+  eventID String
+  userID  String
+
+  // Relations
+  event Event @relation("EventAttendees", fields: [eventID], references: [eventID], onDelete: Cascade)
+  user  User  @relation("EventAttendees", fields: [userID], references: [userId], onDelete: Cascade)
+
+  @@id([eventID, userID])
+  @@map("EventAttendee")
+}
+
+model File {
+  fileID       String   @id @default(cuid())
+  postID       String   @unique
+  uploadedByID String
+  fileName     String
+  fileUrl      String
+  fileType     String
+  fileSize     Int
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  post         Post @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
+  uploadedBy   User @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
+
+  @@index([uploadedByID])
+  @@map("File")
+}
+
+model Message {
+  messageID  String   @id @default(cuid())
+  senderID   String
+  receiverID String
+  content    String   @db.Text
+  read       Boolean  @default(false)
+  sentAt     DateTime @default(now())
+
+  // Relations
+  sender   User @relation("MessageSender", fields: [senderID], references: [userId], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverID], references: [userId], onDelete: Cascade)
+
+  @@index([senderID])
+  @@index([receiverID])
+  @@index([sentAt])
+  @@map("Message")
+}
+
+model ReportReview {
+  reportreviewID    String        @id @default(cuid())
+  reporterID        String
+  reportedUserID    String?
+  reportedPostID    String?
+  reportedCommentID String?
+  reason            String
+  description       String        @db.Text
+  status            ReportStatus  @default(PENDING)
+  reviewedAt        DateTime?
+  createdAt         DateTime      @default(now())
+
+  // Relations
+  reporter          User                  @relation("Reporter", fields: [reporterID], references: [userId], onDelete: Cascade)
+  reportedUser      User?                 @relation("ReportedUser", fields: [reportedUserID], references: [userId], onDelete: Cascade)
+  reportedPost      Post?                 @relation("ReportedPost", fields: [reportedPostID], references: [postID], onDelete: Cascade)
+  reportedComment   Comment?              @relation("ReportedComment", fields: [reportedCommentID], references: [commentID], onDelete: Cascade)
+  moderationActions ModerationActionLog[] @relation("RelatedReport")
+
+  @@index([reporterID])
+  @@index([status])
+  @@map("ReportReview")
+}
+
+model ModerationActionLog {
+  ModaiID           String     @id @default(cuid())
+  modID             String
+  targetUserID      String?
+  targetPostID      String?
+  targetCommentID   String?
+  relatedReportID   String?
+  actionType        ActionType
+  reason            String     @db.Text
+  details           String?    @db.Text
+  duration          Int?
+  timestamp         DateTime   @default(now())
+
+  // Relations
+  moderator       User          @relation("ModeratorActions", fields: [modID], references: [userId], onDelete: Cascade)
+  targetPost      Post?         @relation("TargetPost", fields: [targetPostID], references: [postID], onDelete: SetNull)
+  targetComment   Comment?      @relation("TargetComment", fields: [targetCommentID], references: [commentID], onDelete: SetNull)
+  relatedReport   ReportReview? @relation("RelatedReport", fields: [relatedReportID], references: [reportreviewID], onDelete: SetNull)
+
+  @@index([modID])
+  @@index([timestamp])
+  @@map("ModerationActionLog")
+}
+
+model AuthUser {
+  id            String         @id
+  name          String
+  email         String
+  emailVerified Boolean        @default(false)
+  image         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  authsessions  AuthSession[]
+  authaccounts  AuthAccount[]
+
+  @@unique([email])
+  @@map("AuthUser")
+}
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  authuser  AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("AuthSession")
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  authuser              AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("AuthAccount")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("AuthVerification")
+}

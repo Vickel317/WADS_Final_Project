@@ -1,10 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // TODO: replace with Prisma in Week 7
-export let adminUsers: Array<{
+export const adminUsers: Array<{
   id: string;
   email: string;
   name: string;
@@ -43,7 +41,7 @@ function verifyToken(request: NextRequest) {
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
   const token = authHeader.substring(7);
   try {
-    return jwt.verify(token, JWT_SECRET) as {
+    return jwt.verify(token, getJwtSecret()) as {
       id: string;
       email: string;
       role?: string;

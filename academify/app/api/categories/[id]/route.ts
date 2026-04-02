@@ -1,15 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-import { categories } from "@/app/api/categories/route";
+import { getJwtSecret } from "@/lib/auth-jwt";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
   const token = authHeader.substring(7);
   try {
-    return jwt.verify(token, JWT_SECRET) as {
+    return jwt.verify(token, getJwtSecret()) as {
       id: string;
       email: string;
       role?: string;
@@ -103,7 +100,14 @@ export async function GET(
 ) {
   try {
     const { id } = params;
-    const category = categories.find((c) => c.id === id || c.slug === id);
+    const category = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { categoryID: id },
+          { name: { equals: id, mode: "insensitive" } },
+        ],
+      },
+    });
 
     if (!category) {
       return NextResponse.json(
@@ -111,8 +115,18 @@ export async function GET(
         { status: 404 }
       );
     }
-
-    return NextResponse.json({ category }, { status: 200 });
+    return NextResponse.json(
+      {
+        category: {
+          id: category.categoryID,
+          name: category.name,
+          description: category.description ?? "",
+          slug: category.name.toLowerCase(),
+          createdAt: category.createdAt.toISOString(),
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get category error:", error);
     return NextResponse.json(
@@ -132,7 +146,7 @@ export async function PUT(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Forbidden: Admin access required" },
         { status: 403 }
@@ -140,8 +154,10 @@ export async function PUT(
     }
 
     const { id } = params;
-    const index = categories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const existing = await prisma.category.findUnique({
+      where: { categoryID: id },
+    });
+    if (!existing) {
       return NextResponse.json(
         { error: "Category not found" },
         { status: 404 }
@@ -151,16 +167,26 @@ export async function PUT(
     const body = await request.json();
     const { name, description, slug } = body;
 
-    categories[index] = {
-      ...categories[index],
-      ...(name && { name }),
-      ...(description && { description }),
-      ...(slug && { slug }),
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = await prisma.category.update({
+      where: { categoryID: id },
+      data: {
+        ...(name ? { name } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(slug ? { name: slug } : {}),
+      },
+    });
 
     return NextResponse.json(
-      { message: "Category updated successfully", category: categories[index] },
+      {
+        message: "Category updated successfully",
+        category: {
+          id: updated.categoryID,
+          name: updated.name,
+          description: updated.description ?? "",
+          slug: updated.name.toLowerCase(),
+          createdAt: updated.createdAt.toISOString(),
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -182,7 +208,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Forbidden: Admin access required" },
         { status: 403 }
@@ -190,15 +216,17 @@ export async function DELETE(
     }
 
     const { id } = params;
-    const index = categories.findIndex((c) => c.id === id);
-    if (index === -1) {
+    const existing = await prisma.category.findUnique({
+      where: { categoryID: id },
+    });
+    if (!existing) {
       return NextResponse.json(
         { error: "Category not found" },
         { status: 404 }
       );
     }
 
-    categories.splice(index, 1);
+    await prisma.category.delete({ where: { categoryID: id } });
 
     return NextResponse.json(
       { message: "Category deleted successfully" },
