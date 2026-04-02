@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 
 const navItems = [
@@ -29,6 +29,30 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userName, setUserName] = useState("Signed in user");
+  const [userMajor, setUserMajor] = useState("Member");
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch("/api/users/me", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!mounted || !data?.user) {
+          return;
+        }
+
+        setUserName(data.user.name || "Signed in user");
+        setUserMajor(data.user.major || "Member");
+      })
+      .catch(() => {
+        // Keep neutral fallback labels when user fetch fails.
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <>
@@ -109,8 +133,8 @@ export default function Sidebar() {
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <p className="text-gray-700 text-xs font-semibold truncate">John Doe</p>
-                <p className="text-gray-400 text-[10px] truncate">Computer Science</p>
+                <p className="text-gray-700 text-xs font-semibold truncate">{userName}</p>
+                <p className="text-gray-400 text-[10px] truncate">{userMajor}</p>
               </div>
             )}
           </div>

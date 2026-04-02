@@ -18,21 +18,25 @@ interface Profile {
   isConnected: boolean;
 }
 
-const mockProfile: Profile = {
-  id: "me",
-  name: "John Doe",
-  major: "Computer Science",
-  year: "3rd Year",
-  bio: "Passionate about algorithms, machine learning, and building things that matter. Always looking for study partners and collaborators!",
-  location: "Jakarta, Indonesia",
-  website: "johndoe.dev",
-  connections: 248,
-  posts: 67,
-  filesShared: 142,
-  skills: ["React", "TypeScript", "Python", "Machine Learning", "Data Structures", "Algorithms"],
-  isOwn: true,
-  isConnected: false,
-};
+function mapApiUserToProfile(user: Record<string, unknown>, isOwn: boolean): Profile {
+  return {
+    id: String(user.id ?? ""),
+    name: String(user.name ?? "User"),
+    major: String(user.major ?? ""),
+    year: String(user.year ?? ""),
+    bio: String(user.bio ?? ""),
+    location: String(user.location ?? ""),
+    website: String(user.website ?? ""),
+    connections: Number(user.connections ?? 0),
+    posts: Number(user.posts ?? 0),
+    filesShared: Number(user.filesShared ?? 0),
+    skills: Array.isArray(user.skills)
+      ? user.skills.map((skill) => String(skill))
+      : [],
+    isOwn,
+    isConnected: Boolean(user.isConnected ?? false),
+  };
+}
 
 export default function ProfilePage() {
   const { userId } = useParams<{ userId: string }>();
@@ -45,11 +49,17 @@ export default function ProfilePage() {
     fetch(`/api/users/${userId}`)
       .then((r) => r.json())
       .then((d) => {
-        setProfile(d.user ?? { ...mockProfile, isOwn: userId === "me" });
-        setConnected(d.user?.isConnected ?? false);
+        if (!d?.user) {
+          setProfile(null);
+          return;
+        }
+
+        const mapped = mapApiUserToProfile(d.user as Record<string, unknown>, userId === "me");
+        setProfile(mapped);
+        setConnected(mapped.isConnected);
       })
       .catch(() => {
-        setProfile({ ...mockProfile, isOwn: userId === "me" });
+        setProfile(null);
       })
       .finally(() => setLoading(false));
   }, [userId]);
@@ -62,7 +72,16 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-gray-100 p-6">
+        <h1 className="text-lg font-semibold text-gray-900">Profile not found</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          This user profile is unavailable or you are not authenticated.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">

@@ -1,148 +1,106 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-import { getJwtSecret } from "@/lib/auth-jwt";
-import {
-  firebaseDeleteAccount,
-  firebaseLookupByIdToken,
-  firebaseUpdateProfile,
-} from "@/lib/firebase-auth";
+import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/get-session";
 
-type DecodedToken = {
-  id: string;
+function mapProfile(user: {
+  userId: string;
   email: string;
-  role?: string;
-  name?: string;
-};
-
-function verifyToken(request: NextRequest): DecodedToken | null {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-
-  try {
-    return jwt.verify(token, getJwtSecret()) as DecodedToken;
-  } catch {
-    return null;
-  }
-}
-
-function getProfilePayload(decoded: DecodedToken, overrides?: { name?: string }) {
-  const name = overrides?.name ?? decoded.name ?? "";
-  const seed = encodeURIComponent(decoded.email || decoded.id);
-
+  name: string;
+  role: string;
+  major: string | null;
+  bio: string | null;
+  createdAt: Date;
+}) {
   return {
-    id: decoded.id,
-    email: decoded.email,
-    name,
-    role: decoded.role || "student",
-    bio: "",
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`,
-    createdAt: null,
+    id: user.userId,
+    email: user.email,
+    name: user.name,
+    role: user.role.toLowerCase(),
+    major: user.major ?? "",
+    year: "",
+    bio: user.bio ?? "",
+    location: "",
+    website: "",
+    connections: 0,
+    posts: 0,
+    filesShared: 0,
+    skills: [] as string[],
+    isConnected: false,
+    createdAt: user.createdAt.toISOString(),
     updatedAt: new Date().toISOString(),
   };
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
     const { userId } = await Promise.resolve(params);
+    const sessionData = await getSession();
 
-    // Public profile read is allowed. If the requester is the owner,
-    // return token-derived identity details.
-    const decoded = verifyToken(request);
-    if (decoded && decoded.id === userId) {
-      return NextResponse.json(getProfilePayload(decoded), { status: 200 });
+    const resolvedUserId = userId === "me" ? sessionData?.user.userId : userId;
+    if (!resolvedUserId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Without a database yet, return a deterministic public profile shape.
-    return NextResponse.json(
-      {
-        id: userId,
-        name: "User",
-        role: "student",
-        bio: "",
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(
-          userId
-        )}`,
-        createdAt: null,
-        updatedAt: new Date().toISOString(),
-      },
-      { status: 200 }
-    );
+    const user = await prisma.user.findUnique({ where: { userId: resolvedUserId } });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const isOwn = sessionData?.user.userId === user.userId;
+    return NextResponse.json({ user: { ...mapProfile(user), isOwn } }, { status: 200 });
   } catch (error) {
     console.error("Get user error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-export async function PUT(
+async function updateUserProfile(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
+    const sessionData = await getSession();
+    if (!sessionData) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { userId } = await Promise.resolve(params);
-    const isOwnerPath = userId === decoded.id || userId === "me";
+    const targetUserId = userId === "me" ? sessionData.user.userId : userId;
+    const isOwnerPath = targetUserId === sessionData.user.userId;
+
     if (!isOwnerPath) {
       return NextResponse.json(
-        {
-          error:
-            "Forbidden: use your own userId (or 'me') in path when updating profile",
-          expectedUserId: decoded.id,
-        },
+        { error: "Forbidden: you can only update your own profile" },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const { name, bio, avatar, firebaseIdToken } = body as {
+    const { name, major, bio } = body as {
       name?: string;
+      major?: string;
       bio?: string;
-      avatar?: string;
-      firebaseIdToken?: string;
     };
 
-    if (!firebaseIdToken) {
-      return NextResponse.json(
-        {
-          error:
-            "firebaseIdToken is required for profile updates until database integration is added",
-        },
-        { status: 400 }
-      );
+    const updates: { name?: string; major?: string; bio?: string } = {};
+    if (typeof name === "string") updates.name = name.trim();
+    if (typeof major === "string") updates.major = major.trim();
+    if (typeof bio === "string") updates.bio = bio.trim();
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    const firebaseUser = await firebaseLookupByIdToken(firebaseIdToken);
-    if (!firebaseUser || firebaseUser.localId !== decoded.id) {
-      return NextResponse.json(
-        { error: "Invalid firebaseIdToken for this user" },
-        { status: 401 }
-      );
-    }
-
-    const updatedName = typeof name === "string" ? name.trim() : decoded.name || "";
-    const updateResult = await firebaseUpdateProfile(firebaseIdToken, updatedName);
+    const updated = await prisma.user.update({
+      where: { userId: targetUserId },
+      data: updates,
+    });
 
     return NextResponse.json(
-      {
-        ...getProfilePayload(decoded, { name: updatedName }),
-        bio: typeof bio === "string" ? bio : "",
-        avatar:
-          typeof avatar === "string" && avatar.length > 0
-            ? avatar
-            : getProfilePayload(decoded, { name: updatedName }).avatar,
-        firebaseIdToken: updateResult.idToken,
-        refreshToken: updateResult.refreshToken,
-      },
+      { message: "Profile updated successfully", user: { ...mapProfile(updated), isOwn: true } },
       { status: 200 }
     );
   } catch (error) {
@@ -159,54 +117,42 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+export async function PATCH(
   request: NextRequest,
+  context: { params: Promise<{ userId: string }> | { userId: string } }
+) {
+  return updateUserProfile(request, context);
+}
+
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ userId: string }> | { userId: string } }
+) {
+  return updateUserProfile(request, context);
+}
+
+export async function DELETE(
+  _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> | { userId: string } }
 ) {
   try {
-    const decoded = verifyToken(request);
-    if (!decoded) {
+    const sessionData = await getSession();
+    if (!sessionData) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { userId } = await Promise.resolve(params);
-    const isOwnerPath = userId === decoded.id || userId === "me";
+    const targetUserId = userId === "me" ? sessionData.user.userId : userId;
+    const isOwnerPath = targetUserId === sessionData.user.userId;
+
     if (!isOwnerPath) {
       return NextResponse.json(
-        {
-          error:
-            "Forbidden: use your own userId (or 'me') in path when deleting account",
-          expectedUserId: decoded.id,
-        },
+        { error: "Forbidden: you can only delete your own account" },
         { status: 403 }
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-    const firebaseIdTokenFromBody = (body as { firebaseIdToken?: string }).firebaseIdToken;
-    const firebaseIdTokenFromHeader =
-      request.headers.get("x-firebase-id-token") || undefined;
-    const firebaseIdToken = firebaseIdTokenFromBody || firebaseIdTokenFromHeader;
-
-    if (!firebaseIdToken) {
-      return NextResponse.json(
-        {
-          error:
-            "firebaseIdToken is required to delete account (send in JSON body or x-firebase-id-token header)",
-        },
-        { status: 400 }
-      );
-    }
-
-    const firebaseUser = await firebaseLookupByIdToken(firebaseIdToken);
-    if (!firebaseUser || firebaseUser.localId !== decoded.id) {
-      return NextResponse.json(
-        { error: "Invalid firebaseIdToken for this user" },
-        { status: 401 }
-      );
-    }
-
-    await firebaseDeleteAccount(firebaseIdToken);
+    await prisma.user.delete({ where: { userId: targetUserId } });
 
     return NextResponse.json({ message: "Account deleted successfully" }, { status: 200 });
   } catch (error) {

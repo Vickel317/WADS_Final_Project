@@ -16,13 +16,13 @@ interface FormState {
 }
 
 const defaultForm: FormState = {
-  name: "John Doe",
-  major: "Computer Science",
-  year: "3rd Year",
-  bio: "Passionate about algorithms, machine learning, and building things that matter. Always looking for study partners and collaborators!",
-  location: "Jakarta, Indonesia",
-  website: "johndoe.dev",
-  skills: "React, TypeScript, Python, Machine Learning, Data Structures, Algorithms",
+  name: "",
+  major: "",
+  year: "1st Year",
+  bio: "",
+  location: "",
+  website: "",
+  skills: "",
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
