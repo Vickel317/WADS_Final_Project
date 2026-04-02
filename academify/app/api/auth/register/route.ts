@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { firebaseSignUp, firebaseUpdateProfile } from "@/lib/firebase-auth";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { setAuthCookies, signAccessToken } from "@/lib/auth-jwt";
 
 export async function POST(request: NextRequest) {
   try {
-    const jwtSecret = getJwtSecret();
     const body = await request.json();
     const { email, password, name } = body;
 
@@ -24,16 +22,12 @@ export async function POST(request: NextRequest) {
       await firebaseUpdateProfile(firebaseUser.idToken, name);
     }
 
-    const token = jwt.sign(
-      {
-        id: firebaseUser.localId,
-        email: firebaseUser.email,
-        role: "student",
-        name,
-      },
-      jwtSecret,
-      { expiresIn: "1h" }
-    );
+    const token = signAccessToken({
+      id: firebaseUser.localId,
+      email: firebaseUser.email,
+      role: "student",
+      name,
+    });
 
     const response = NextResponse.json(
       {
@@ -49,12 +43,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
 
-    response.cookies.set("auth_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 3600,
-    });
+    setAuthCookies(response, token, firebaseUser.refreshToken);
 
     return response;
   } catch (error) {

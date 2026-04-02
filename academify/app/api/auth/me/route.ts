@@ -1,29 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getAccessTokenFromRequest, verifyAccessToken } from "@/lib/auth-jwt";
 
 export async function GET(request: NextRequest) {
   try {
-    const jwtSecret = getJwtSecret();
-    // Get token from header
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const token = getAccessTokenFromRequest(request);
+    if (!token) {
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
       );
     }
 
-    const token = authHeader.substring(7);
-
-    // Verify token
-    const decoded = jwt.verify(token, jwtSecret) as {
-      id: string;
-      email: string;
-      role?: string;
-      name?: string;
-      iat?: number;
-    };
+    const decoded = verifyAccessToken(token);
+    if (!decoded) {
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
 
     return NextResponse.json(
       {
