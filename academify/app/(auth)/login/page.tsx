@@ -27,13 +27,17 @@ export default function LoginPage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/sign-in/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          rememberMe: form.remember,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Login failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || data.message || "Login failed");
       router.push("/dashboard");
     } catch (err: unknown) {
       setErrors({ general: getErrorMessage(err) });
@@ -143,6 +147,7 @@ export default function LoginPage() {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="john.doe@university.edu"
+                  suppressHydrationWarning
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 transition ${
                     errors.email ? "border-red-300" : "border-gray-200"
                   }`}
@@ -161,6 +166,7 @@ export default function LoginPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••••"
+                  suppressHydrationWarning
                   className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 transition ${
                     errors.password ? "border-red-300" : "border-gray-200"
                   }`}
@@ -189,6 +195,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
+              suppressHydrationWarning
               className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-60 mt-1"
               style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
             >
