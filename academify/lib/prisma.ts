@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient as BasePrismaClient } from "@prisma/client/edge";
 
 const connectionString =
   process.env.DIRECT_URL ||
@@ -8,12 +8,12 @@ const connectionString =
 
 const adapter = new PrismaPg({ connectionString });
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: BasePrismaClient | undefined;
 };
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
+  new BasePrismaClient({
     adapter,
     log: ["query"],
   });

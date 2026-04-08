@@ -1,5 +1,8 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
-
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+// Import your data sources or database queries here
+// Example: import { getAdminUsers, getReports, getThreads, getModerationLogs } from "@/lib/db";
 
 function verifyToken(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
