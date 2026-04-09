@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleApiError } from "@/lib/error-handler";
+import { validateUpdatePostPayload } from "@/lib/security";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -124,11 +126,7 @@ export async function GET(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Get post error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Get post error:", error);
   }
 }
 
@@ -138,14 +136,12 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { title, content } = body;
-
-    if (!title || !content) {
-      return NextResponse.json(
-        { error: "Title and content are required" },
-        { status: 400 }
-      );
+    const validationResult = validateUpdatePostPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { title, content } = validationResult.data;
 
     const existing = await prisma.post.findUnique({
       where: { postID: params.postId },
@@ -181,11 +177,7 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Update post error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Update post error:", error);
   }
 }
 
@@ -212,10 +204,6 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Delete post error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Delete post error:", error);
   }
 }

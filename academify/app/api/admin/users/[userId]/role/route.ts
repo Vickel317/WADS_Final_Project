@@ -1,4 +1,6 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
+import { validateRoleUpdatePayload } from "@/lib/security";
 
 
 const VALID_ROLES = ["student", "instructor", "moderator", "admin"];
@@ -78,16 +80,12 @@ export async function PUT(
 
     const { userId } = params;
     const body = await request.json();
-    const { role } = body;
-
-    if (!role || !VALID_ROLES.includes(role)) {
-      return NextResponse.json(
-        {
-          error: `Role must be one of: ${VALID_ROLES.join(", ")}`,
-        },
-        { status: 400 }
-      );
+    const validationResult = validateRoleUpdatePayload(body, VALID_ROLES);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { role } = validationResult.data;
 
     const index = adminUsers.findIndex((u) => u.id === userId);
     if (index === -1) {
@@ -107,10 +105,6 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Admin update role error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Admin update role error:", error);
   }
 }
