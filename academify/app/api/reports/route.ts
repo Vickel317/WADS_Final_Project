@@ -1,5 +1,8 @@
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
-
+import { handleApiError } from "@/lib/error-handler";
+import { validateCreateReportPayload } from "@/lib/security";
+import jwt from "jsonwebtoken";
 
 // TODO: replace with Prisma in Week 7
 export const reports: Array<{
@@ -125,11 +128,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ reports: filtered }, { status: 200 });
   } catch (error) {
-    console.error("Get reports error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Get reports error:", error);
   }
 }
 
@@ -141,26 +140,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { targetType, targetId, reason } = body;
-
-    if (!targetType || !targetId || !reason) {
-      return NextResponse.json(
-        { error: "targetType, targetId, and reason are required" },
-        { status: 400 }
-      );
+    const validationResult = validateCreateReportPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
 
-    if (!["post", "comment", "user"].includes(targetType)) {
-      return NextResponse.json(
-        { error: "targetType must be post, comment, or user" },
-        { status: 400 }
-      );
-    }
+    const { targetType, targetId, reason } = validationResult.data;
 
     const newReport = {
       id: `rep_${Date.now()}`,
       reportedBy: decoded.id,
-      targetType: targetType as "post" | "comment" | "user",
+      targetType,
       targetId,
       reason,
       status: "pending" as const,
@@ -174,10 +164,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Submit report error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Submit report error:", error);
   }
 }

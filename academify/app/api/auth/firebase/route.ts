@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyFirebaseIdToken } from "@/lib/firebase-admin";
+import { handleApiError } from "@/lib/error-handler";
+import { validateFirebaseSyncPayload } from "@/lib/security";
 
 const DEFAULT_PASSWORD = "firebase-managed";
 
@@ -12,11 +14,12 @@ function buildUsername(email: string, userId: string) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const idToken = body?.idToken as string | undefined;
-
-    if (!idToken) {
-      return NextResponse.json({ error: "idToken is required" }, { status: 400 });
+    const validationResult = validateFirebaseSyncPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { idToken } = validationResult.data;
 
     const decoded = await verifyFirebaseIdToken(idToken);
     if (!decoded?.uid || !decoded.email) {
@@ -59,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ message: "Firebase user synced" });
-  } catch {
-    return NextResponse.json({ error: "Failed to sync Firebase user" }, { status: 500 });
+  } catch (error) {
+    return handleApiError("Failed to sync Firebase user", error);
   }
 }

@@ -1,4 +1,6 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
+import { validateCreateCommentPayload } from "@/lib/security";
 
 
 function verifyToken(request: NextRequest) {
@@ -94,11 +96,7 @@ export async function GET(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Get comments error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Get comments error:", error);
   }
 }
 
@@ -114,14 +112,12 @@ export async function POST(
 
     const { postId } = params;
     const body = await request.json();
-    const { content } = body;
-
-    if (!content) {
-      return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
-      );
+    const validationResult = validateCreateCommentPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { content } = validationResult.data;
 
     const post = await prisma.post.findUnique({ where: { postID: postId } });
     if (!post) {
@@ -167,10 +163,6 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
-    console.error("Create comment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Create comment error:", error);
   }
 }

@@ -1,4 +1,6 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
+import { validateModerationReasonPayload } from "@/lib/security";
 
 
 function verifyToken(request: NextRequest) {
@@ -76,11 +78,12 @@ export async function POST(
 
     const { userId } = params;
     const body = await request.json();
-    const { reason, durationDays } = body;
-
-    if (!reason) {
-      return NextResponse.json({ error: "Reason is required" }, { status: 400 });
+    const validationResult = validateModerationReasonPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { reason, durationDays } = validationResult.data;
 
     const expiresAt = durationDays
       ? new Date(
@@ -115,10 +118,6 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Suspend user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Suspend user error:", error);
   }
 }

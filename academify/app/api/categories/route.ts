@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, normalizeRole } from "@/lib/auth-session";
+import { handleApiError } from "@/lib/error-handler";
+import { validateCreateCategoryPayload } from "@/lib/security";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -56,7 +58,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        categories: categories.map((category) => ({
+        categories: categories.map((category: any) => ({
           id: category.categoryID,
           name: category.name,
           description: category.description ?? "",
@@ -67,8 +69,7 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Get categories error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Get categories error:", error);
   }
 }
 
@@ -87,14 +88,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, description, slug } = body;
-
-    if (!name || !description || !slug) {
-      return NextResponse.json(
-        { error: "name, description, and slug are required" },
-        { status: 400 }
-      );
+    const validationResult = validateCreateCategoryPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { name, description, slug } = validationResult.data;
 
     const exists = await prisma.category.findFirst({
       where: { name: { equals: name, mode: "insensitive" } },
@@ -126,7 +125,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Create category error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Create category error:", error);
   }
 }
