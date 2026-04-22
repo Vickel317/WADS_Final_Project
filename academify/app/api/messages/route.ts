@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * @swagger
@@ -115,3 +115,4 @@ export async function GET() {
     );
   }
 }
+

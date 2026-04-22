@@ -53,10 +53,11 @@ import { files } from "@/app/api/files/route";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
-    const file = files.find((f) => f.id === params.fileId);
+    const { fileId } = await params;
+    const file = files.find((f) => f.id === fileId);
 
     if (!file) {
       return NextResponse.json(
@@ -77,10 +78,11 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
-    const fileIndex = files.findIndex((f) => f.id === params.fileId);
+    const { fileId } = await params;
+    const fileIndex = files.findIndex((f) => f.id === fileId);
 
     if (fileIndex === -1) {
       return NextResponse.json(
@@ -105,3 +107,4 @@ export async function DELETE(
     );
   }
 }
+

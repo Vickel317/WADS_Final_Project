@@ -1,4 +1,8 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { moderationLogs } from "../../queue/route";
+import { userSanctions } from "../../warn/[userId]/route";
 
 
 function verifyToken(request: NextRequest) {
@@ -56,7 +60,7 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -71,7 +75,7 @@ export async function POST(
       );
     }
 
-    const { userId } = params;
+    const { userId  } = await params;
     const body = await request.json();
     const { reason } = body;
 
@@ -112,3 +116,6 @@ export async function POST(
     );
   }
 }
+
+
+

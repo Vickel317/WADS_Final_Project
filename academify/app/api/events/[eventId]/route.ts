@@ -1,3 +1,5 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
 
 
@@ -66,10 +68,10 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    const { eventId } = params;
+    const { eventId  } = await params;
 
     const event = mockEvents.find((e) => e.id === eventId);
     if (!event) {
@@ -91,7 +93,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     // Verify authentication
@@ -103,7 +105,7 @@ export async function PUT(
       );
     }
 
-    const { eventId } = params;
+    const { eventId  } = await params;
 
     const eventIndex = mockEvents.findIndex((e) => e.id === eventId);
     if (eventIndex === -1) {
@@ -161,7 +163,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     // Verify authentication
@@ -173,7 +175,7 @@ export async function DELETE(
       );
     }
 
-    const { eventId } = params;
+    const { eventId  } = await params;
 
     const eventIndex = mockEvents.findIndex((e) => e.id === eventId);
     if (eventIndex === -1) {
@@ -205,3 +207,6 @@ export async function DELETE(
     );
   }
 }
+
+
+

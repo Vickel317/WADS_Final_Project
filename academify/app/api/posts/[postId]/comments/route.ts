@@ -1,3 +1,6 @@
+import { prisma } from "@/lib/prisma";
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
 
 
@@ -70,10 +73,10 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
-    const { postId } = params;
+    const { postId  } = await params;
     const postComments = await prisma.comment.findMany({
       where: { postID: postId },
       include: { author: { select: { name: true } } },
@@ -104,7 +107,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -112,7 +115,7 @@ export async function POST(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { postId } = params;
+    const { postId  } = await params;
     const body = await request.json();
     const { content } = body;
 
@@ -174,3 +177,7 @@ export async function POST(
     );
   }
 }
+
+
+
+

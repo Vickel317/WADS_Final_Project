@@ -1,4 +1,8 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { prisma } from "@/lib/prisma";
+import { moderationLogs } from "../../queue/route";
 
 
 function verifyToken(request: NextRequest) {
@@ -54,7 +58,7 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -69,17 +73,17 @@ export async function POST(
       );
     }
 
-    const { postId } = params;
-    const index = threads.findIndex((t) => t.id === postId);
+    const { postId } = await params;
+    const existing = await prisma.post.findUnique({ where: { postID: postId } });
 
-    if (index === -1) {
+    if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
     const body = await request.json().catch(() => ({}));
     const { reason } = body;
 
-    threads.splice(index, 1);
+    await prisma.post.delete({ where: { postID: postId } });
 
     moderationLogs.push({
       id: `log_${Date.now()}`,
@@ -103,3 +107,6 @@ export async function POST(
     );
   }
 }
+
+
+
