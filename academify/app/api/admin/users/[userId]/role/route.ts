@@ -1,4 +1,7 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { adminUsers } from "../../route";
 
 
 const VALID_ROLES = ["student", "instructor", "moderator", "admin"];
@@ -61,7 +64,7 @@ function verifyToken(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -76,7 +79,7 @@ export async function PUT(
       );
     }
 
-    const { userId } = params;
+    const { userId  } = await params;
     const body = await request.json();
     const { role } = body;
 
@@ -114,3 +117,6 @@ export async function PUT(
     );
   }
 }
+
+
+

@@ -1,4 +1,7 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { reports } from "../route";
 
 
 function verifyToken(request: NextRequest) {
@@ -45,7 +48,7 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { reportId: string } }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -53,7 +56,7 @@ export async function GET(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { reportId } = params;
+    const { reportId  } = await params;
     const report = reports.find((r) => r.id === reportId);
 
     if (!report) {
@@ -79,3 +82,6 @@ export async function GET(
     );
   }
 }
+
+
+

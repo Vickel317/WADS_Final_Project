@@ -88,11 +88,12 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
+    const { postId } = await params;
     const post = await prisma.post.findUnique({
-      where: { postID: params.postId },
+      where: { postID: postId },
       include: {
         author: { select: { name: true } },
         comments: { select: { commentID: true } },
@@ -134,9 +135,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
+    const { postId } = await params;
     const body = await request.json();
     const { title, content } = body;
 
@@ -148,7 +150,7 @@ export async function PUT(
     }
 
     const existing = await prisma.post.findUnique({
-      where: { postID: params.postId },
+      where: { postID: postId },
     });
 
     if (!existing) {
@@ -159,7 +161,7 @@ export async function PUT(
     }
 
     const post = await prisma.post.update({
-      where: { postID: params.postId },
+      where: { postID: postId },
       data: {
         title,
         content,
@@ -191,11 +193,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
+    const { postId } = await params;
     const existing = await prisma.post.findUnique({
-      where: { postID: params.postId },
+      where: { postID: postId },
     });
 
     if (!existing) {
@@ -205,7 +208,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.post.delete({ where: { postID: params.postId } });
+    await prisma.post.delete({ where: { postID: postId } });
 
     return NextResponse.json(
       { message: "Post deleted successfully" },
@@ -219,3 +222,4 @@ export async function DELETE(
     );
   }
 }
+

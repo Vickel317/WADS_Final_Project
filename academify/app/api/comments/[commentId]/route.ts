@@ -1,3 +1,6 @@
+import { prisma } from "@/lib/prisma";
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
 
 
@@ -80,7 +83,7 @@ function verifyToken(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { commentId: string } }
+  { params }: { params: Promise<{ commentId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -88,7 +91,7 @@ export async function PUT(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { commentId } = params;
+    const { commentId  } = await params;
     const body = await request.json();
     const { content } = body;
 
@@ -148,7 +151,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { commentId: string } }
+  { params }: { params: Promise<{ commentId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -156,7 +159,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const { commentId } = params;
+    const { commentId  } = await params;
     const comment = await prisma.comment.findUnique({
       where: { commentID: commentId },
     });
@@ -191,3 +194,7 @@ export async function DELETE(
     );
   }
 }
+
+
+
+

@@ -1,3 +1,5 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
 
 
@@ -66,7 +68,7 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     // Verify authentication
@@ -78,7 +80,7 @@ export async function POST(
       );
     }
 
-    const { eventId } = params;
+    const { eventId  } = await params;
 
     const eventIndex = mockEvents.findIndex((e) => e.id === eventId);
     if (eventIndex === -1) {
@@ -128,7 +130,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     // Verify authentication
@@ -140,7 +142,7 @@ export async function DELETE(
       );
     }
 
-    const { eventId } = params;
+    const { eventId  } = await params;
 
     const eventIndex = mockEvents.findIndex((e) => e.id === eventId);
     if (eventIndex === -1) {
@@ -180,3 +182,6 @@ export async function DELETE(
     );
   }
 }
+
+
+

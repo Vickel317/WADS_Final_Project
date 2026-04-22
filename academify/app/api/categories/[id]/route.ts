@@ -1,3 +1,6 @@
+import { prisma } from "@/lib/prisma";
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
 
 
@@ -96,10 +99,10 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id  } = await params;
     const category = await prisma.category.findFirst({
       where: {
         OR: [
@@ -138,7 +141,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -153,7 +156,7 @@ export async function PUT(
       );
     }
 
-    const { id } = params;
+    const { id  } = await params;
     const existing = await prisma.category.findUnique({
       where: { categoryID: id },
     });
@@ -200,7 +203,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -215,7 +218,7 @@ export async function DELETE(
       );
     }
 
-    const { id } = params;
+    const { id  } = await params;
     const existing = await prisma.category.findUnique({
       where: { categoryID: id },
     });
@@ -240,3 +243,7 @@ export async function DELETE(
     );
   }
 }
+
+
+
+

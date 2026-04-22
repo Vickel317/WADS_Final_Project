@@ -1,4 +1,10 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { prisma } from "@/lib/prisma";
+import { adminUsers } from "../users/route";
+import { reports } from "../../reports/route";
+import { moderationLogs } from "../../moderation/queue/route";
 
 
 function verifyToken(request: NextRequest) {
@@ -50,6 +56,11 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+        const [totalPosts, totalComments] = await Promise.all([
+          prisma.post.count(),
+          prisma.comment.count(),
+        ]);
+
     const decoded = verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -101,9 +112,8 @@ export async function GET(request: NextRequest) {
         byStatus: usersByStatus,
       },
       posts: {
-        total: threads.length,
-        totalViews: threads.reduce((sum, t) => sum + t.views, 0),
-        totalReplies: threads.reduce((sum, t) => sum + t.replyCount, 0),
+        total: totalPosts,
+        totalReplies: totalComments,
       },
       reports: {
         total: reports.length,

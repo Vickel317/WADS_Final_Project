@@ -95,10 +95,10 @@ const mockUsers = [
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { eventId: string } }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    const { eventId } = params;
+    const { eventId  } = await params;
 
     const event = mockEvents.find((e) => e.id === eventId);
     if (!event) {
@@ -131,3 +131,4 @@ export async function GET(
     );
   }
 }
+

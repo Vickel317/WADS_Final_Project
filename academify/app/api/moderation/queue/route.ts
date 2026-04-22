@@ -1,4 +1,8 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { ModerationStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 
 // Shared moderation log (imported by other moderation routes)
@@ -67,13 +71,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return posts flagged for review (status === "pending")
-    const queue = threads.filter(
-      (t) => (t as { status?: string }).status === "pending"
-    );
+    const queue = await prisma.post.findMany({
+      where: { moderationStatus: ModerationStatus.PENDING },
+      include: {
+        author: { select: { name: true } },
+        category: { select: { name: true } },
+        comments: { select: { commentID: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     return NextResponse.json(
-      { queue, total: queue.length },
+      {
+        queue: queue.map((post) => ({
+          id: post.postID,
+          title: post.title,
+          content: post.content,
+          categoryId: post.categoryID,
+          category: post.category.name,
+          author: post.author.name,
+          replyCount: post.comments.length,
+          createdAt: post.createdAt.toISOString(),
+          status: post.moderationStatus.toLowerCase(),
+        })),
+        total: queue.length,
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -84,3 +106,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+

@@ -1,4 +1,7 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { adminUsers } from "../route";
 
 
 function verifyToken(request: NextRequest) {
@@ -45,7 +48,7 @@ function verifyToken(request: NextRequest) {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -60,7 +63,7 @@ export async function DELETE(
       );
     }
 
-    const { userId } = params;
+    const { userId  } = await params;
 
     // Prevent self-deletion
     if (userId === decoded.id) {
@@ -89,3 +92,6 @@ export async function DELETE(
     );
   }
 }
+
+
+

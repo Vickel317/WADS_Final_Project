@@ -1,4 +1,7 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { reports } from "../../route";
 
 
 function verifyToken(request: NextRequest) {
@@ -62,7 +65,7 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { reportId: string } }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -77,7 +80,7 @@ export async function POST(
       );
     }
 
-    const { reportId } = params;
+    const { reportId  } = await params;
     const index = reports.findIndex((r) => r.id === reportId);
 
     if (index === -1) {
@@ -119,3 +122,6 @@ export async function POST(
     );
   }
 }
+
+
+

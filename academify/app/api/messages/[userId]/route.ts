@@ -67,12 +67,12 @@ import { messages, dummyUsers } from "@/app/api/messages/route";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // TODO: get currentUserId from JWT token in Week 8
     const currentUserId = "current-user";
-    const partnerId = params.userId;
+    const { userId: partnerId } = await params;
 
     if (!dummyUsers[partnerId]) {
       return NextResponse.json(
@@ -112,7 +112,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const body = await request.json();
@@ -125,7 +125,7 @@ export async function POST(
       );
     }
 
-    const receiverId = params.userId;
+    const { userId: receiverId } = await params;
 
     if (!dummyUsers[receiverId]) {
       return NextResponse.json(
@@ -158,3 +158,4 @@ export async function POST(
     );
   }
 }
+

@@ -1,4 +1,9 @@
+import jwt from "jsonwebtoken";
+import { NextRequest, NextResponse } from "next/server";
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { ModerationStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { moderationLogs } from "../../queue/route";
 
 
 function verifyToken(request: NextRequest) {
@@ -45,7 +50,7 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
     const decoded = verifyToken(request);
@@ -60,14 +65,17 @@ export async function POST(
       );
     }
 
-    const { postId } = params;
-    const index = threads.findIndex((t) => t.id === postId);
+    const { postId } = await params;
+    const existing = await prisma.post.findUnique({ where: { postID: postId } });
 
-    if (index === -1) {
+    if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    (threads[index] as { status?: string }).status = "approved";
+    const updatedPost = await prisma.post.update({
+      where: { postID: postId },
+      data: { moderationStatus: ModerationStatus.APPROVED },
+    });
 
     moderationLogs.push({
       id: `log_${Date.now()}`,
@@ -79,7 +87,15 @@ export async function POST(
     });
 
     return NextResponse.json(
-      { message: "Post approved successfully", post: threads[index] },
+      {
+        message: "Post approved successfully",
+        post: {
+          id: updatedPost.postID,
+          title: updatedPost.title,
+          status: updatedPost.moderationStatus.toLowerCase(),
+          updatedAt: updatedPost.updatedAt.toISOString(),
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -90,3 +106,6 @@ export async function POST(
     );
   }
 }
+
+
+
