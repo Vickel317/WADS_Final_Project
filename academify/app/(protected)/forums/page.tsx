@@ -200,7 +200,7 @@ export default function ForumsPage() {
             ) : (
               filteredThreads.map((thread) => (
                 <div key={thread.id} className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 px-3 sm:px-4 py-4 hover:bg-gray-50/50 transition cursor-pointer">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 hidden sm:flex">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 shrink-0 hidden sm:inline-flex sm:items-center sm:justify-center">
                     <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>

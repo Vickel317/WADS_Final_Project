@@ -1,6 +1,5 @@
-import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
 import { moderationLogs } from "../../queue/route";
 
 
@@ -15,20 +14,7 @@ export const userSanctions: Array<{
   createdAt: string;
 }> = [];
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -37,7 +23,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Issue a warning to a user (Moderator/Admin only)
  *     tags: [Moderation]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: userId
@@ -73,7 +59,7 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -126,6 +112,7 @@ export async function POST(
     );
   }
 }
+
 
 
 

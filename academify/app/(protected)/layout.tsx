@@ -2,9 +2,10 @@ import Sidebar from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const mod = await import("@/lib/auth");
+	const auth = await mod.getAuth();
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {

@@ -2,14 +2,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import MessagesPage from "@/app/(protected)/messages/page";
 
-const mockPush = jest.fn();
-
-jest.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
-}));
-
-beforeEach(() => jest.clearAllMocks());
-
 describe("MessagesPage – rendering", () => {
   it("renders the Messages heading", () => {
     render(<MessagesPage />);
@@ -18,7 +10,7 @@ describe("MessagesPage – rendering", () => {
 
   it("renders the search input", () => {
     render(<MessagesPage />);
-    expect(screen.getByPlaceholderText(/search conversations/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
   });
 
   it("renders all mock conversations", () => {
@@ -61,7 +53,7 @@ describe("MessagesPage – search filtering", () => {
     const user = userEvent.setup();
     render(<MessagesPage />);
 
-    await user.type(screen.getByPlaceholderText(/search conversations/i), "Sarah");
+    await user.type(screen.getByPlaceholderText(/search/i), "Sarah");
 
     expect(screen.getByText("Sarah Chen")).toBeInTheDocument();
     expect(screen.queryByText("Mike Johnson")).not.toBeInTheDocument();
@@ -71,7 +63,7 @@ describe("MessagesPage – search filtering", () => {
     const user = userEvent.setup();
     render(<MessagesPage />);
 
-    await user.type(screen.getByPlaceholderText(/search conversations/i), "emma");
+    await user.type(screen.getByPlaceholderText(/search/i), "emma");
 
     expect(screen.getByText("Emma Wilson")).toBeInTheDocument();
   });
@@ -80,27 +72,29 @@ describe("MessagesPage – search filtering", () => {
     const user = userEvent.setup();
     render(<MessagesPage />);
 
-    await user.type(screen.getByPlaceholderText(/search conversations/i), "zzzzzzzzz");
+    await user.type(screen.getByPlaceholderText(/search/i), "zzzzzzzzz");
 
     expect(screen.queryByText("Sarah Chen")).not.toBeInTheDocument();
     expect(screen.queryByText("Mike Johnson")).not.toBeInTheDocument();
   });
 });
 
-describe("MessagesPage – navigation", () => {
-  it("navigates to the correct conversation when clicked", async () => {
+describe("MessagesPage – conversation selection", () => {
+  it("opens the selected conversation when clicked", async () => {
     const user = userEvent.setup();
     render(<MessagesPage />);
 
     await user.click(screen.getByText("Sarah Chen"));
-    expect(mockPush).toHaveBeenCalledWith("/messages/sarah-chen");
+    expect(screen.getByRole("heading", { name: "Sarah Chen" })).toBeInTheDocument();
+    expect(screen.getByText(/active now/i)).toBeInTheDocument();
   });
 
-  it("navigates to group conversation when clicked", async () => {
+  it("opens group conversation details when clicked", async () => {
     const user = userEvent.setup();
     render(<MessagesPage />);
 
     await user.click(screen.getByText("Study Group - CS30"));
-    expect(mockPush).toHaveBeenCalledWith("/messages/study-group-cs30");
+    expect(screen.getByRole("heading", { name: "Study Group - CS30" })).toBeInTheDocument();
+    expect(screen.getByText(/group chat/i)).toBeInTheDocument();
   });
 });

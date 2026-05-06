@@ -1,23 +1,9 @@
-import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
 import { reports } from "../../route";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -26,7 +12,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Take action on a report (Moderator/Admin only)
  *     tags: [Reports]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: reportId
@@ -68,7 +54,7 @@ export async function POST(
   { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -122,6 +108,7 @@ export async function POST(
     );
   }
 }
+
 
 
 

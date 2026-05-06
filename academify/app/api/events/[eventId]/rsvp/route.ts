@@ -1,6 +1,5 @@
-import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
 
 
 // Mock events database
@@ -52,19 +51,7 @@ const mockEvents = [
   },
 ];
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
-  }
 
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as { id: string; email: string };
-  } catch {
-    return null;
-  }
-}
 
 export async function POST(
   request: NextRequest,
@@ -72,7 +59,7 @@ export async function POST(
 ) {
   try {
     // Verify authentication
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json(
         { error: "Not authenticated" },
@@ -134,7 +121,7 @@ export async function DELETE(
 ) {
   try {
     // Verify authentication
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json(
         { error: "Not authenticated" },
@@ -182,6 +169,7 @@ export async function DELETE(
     );
   }
 }
+
 
 
 
