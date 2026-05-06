@@ -1,25 +1,9 @@
-import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getSessionUser, verifyToken } from "@/lib/auth-session";
 import { adminUsers } from "../../route";
 
 
 const VALID_ROLES = ["student", "instructor", "moderator", "admin"];
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * @swagger
@@ -28,7 +12,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Update a user's role (Admin only)
  *     tags: [Admin]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: userId
@@ -67,12 +51,12 @@ export async function PUT(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    if (decoded.role !== "admin") {
+    if (decoded.role.toLowerCase() !== "admin") {
       return NextResponse.json(
         { error: "Forbidden: Admin access required" },
         { status: 403 }

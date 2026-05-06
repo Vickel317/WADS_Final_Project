@@ -7,6 +7,10 @@ jest.mock("next/navigation", () => ({
   usePathname: () => mockPathname(),
 }));
 
+beforeEach(() => {
+  global.fetch = jest.fn().mockImplementation(() => new Promise(() => {}));
+});
+
 describe("Sidebar – rendering", () => {
   it("renders the Academify brand name", () => {
     render(<Sidebar />);
@@ -34,8 +38,8 @@ describe("Sidebar – rendering", () => {
 
   it("renders the user section at the bottom", () => {
     render(<Sidebar />);
-    expect(screen.getByText("John Doe")).toBeInTheDocument();
-    expect(screen.getByText("Computer Science")).toBeInTheDocument();
+    expect(screen.getByText("Signed in user")).toBeInTheDocument();
+    expect(screen.getByText("Member")).toBeInTheDocument();
   });
 
   it("renders the tagline", () => {

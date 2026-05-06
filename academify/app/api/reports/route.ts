@@ -1,6 +1,5 @@
-import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
 
 
 // TODO: replace with Prisma in Week 7
@@ -27,20 +26,7 @@ export const reports: Array<{
   },
 ];
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 function isModOrAdmin(role?: string) {
   return role === "moderator" || role === "admin";
@@ -53,7 +39,7 @@ function isModOrAdmin(role?: string) {
  *     summary: Get all reports (Moderator/Admin only)
  *     tags: [Reports]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: query
  *         name: status
@@ -74,7 +60,7 @@ function isModOrAdmin(role?: string) {
  *     summary: Submit a new report
  *     tags: [Reports]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -106,7 +92,7 @@ function isModOrAdmin(role?: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -137,7 +123,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -183,5 +169,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 

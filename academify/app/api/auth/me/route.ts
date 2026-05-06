@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+
 
 export async function GET(request: NextRequest) {
   try {
+    const mod = await import("@/lib/auth");
+    const auth = await mod.getAuth();
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) {
       return NextResponse.json(

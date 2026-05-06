@@ -34,7 +34,7 @@ describe("ForumsPage – rendering", () => {
 
   it("renders the search input", () => {
     render(<ForumsPage />);
-    expect(screen.getByPlaceholderText(/search discussions/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
   });
 
   it("renders all mock threads by default", () => {
@@ -60,7 +60,7 @@ describe("ForumsPage – search filtering", () => {
     const user = userEvent.setup();
     render(<ForumsPage />);
 
-    await user.type(screen.getByPlaceholderText(/search discussions/i), "react");
+    await user.type(screen.getByPlaceholderText(/search/i), "react");
 
     expect(screen.getByText(/best practices for react state management/i)).toBeInTheDocument();
     expect(screen.queryByText(/help with dynamic programming/i)).not.toBeInTheDocument();
@@ -70,7 +70,7 @@ describe("ForumsPage – search filtering", () => {
     const user = userEvent.setup();
     render(<ForumsPage />);
 
-    await user.type(screen.getByPlaceholderText(/search discussions/i), "Emma Wilson");
+    await user.type(screen.getByPlaceholderText(/search/i), "Emma Wilson");
 
     expect(screen.getByText(/study partners for machine learning final/i)).toBeInTheDocument();
     expect(screen.queryByText(/best practices for react/i)).not.toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("ForumsPage – search filtering", () => {
     const user = userEvent.setup();
     render(<ForumsPage />);
 
-    await user.type(screen.getByPlaceholderText(/search discussions/i), "zzzzzzz");
+    await user.type(screen.getByPlaceholderText(/search/i), "zzzzzzz");
 
     expect(screen.getByText(/no threads found/i)).toBeInTheDocument();
   });

@@ -1,23 +1,9 @@
-import jwt from "jsonwebtoken";
 import { NextRequest, NextResponse } from "next/server";
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
 import { moderationLogs } from "../queue/route";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -26,7 +12,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Get moderation action logs (Moderator/Admin only)
  *     tags: [Moderation]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: query
  *         name: limit
@@ -46,7 +32,7 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
@@ -72,5 +58,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 

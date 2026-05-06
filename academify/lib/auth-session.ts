@@ -1,5 +1,4 @@
 import { UserRole } from "@prisma/client";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const DEFAULT_PASSWORD = "better-auth-managed";
@@ -39,6 +38,8 @@ async function createAppUser(sessionUser: { id: string; email: string; name?: st
 }
 
 export async function getSessionUser(headers: Headers) {
+  const mod = await import("@/lib/auth");
+  const auth = await mod.getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user?.id || !session.user.email) {
     return null;
@@ -57,6 +58,19 @@ export async function getSessionUser(headers: Headers) {
 
 export function normalizeRole(role: string) {
   return role.toLowerCase();
+}
+
+export async function verifyToken(request: import("next/server").NextRequest) {
+  const sessionUser = await getSessionUser(request.headers);
+  if (!sessionUser) {
+    return null;
+  }
+
+  return {
+    id: sessionUser.user.userId,
+    email: sessionUser.user.email,
+    role: normalizeRole(sessionUser.user.role),
+  };
 }
 
 export function hasRole(role: string, allowedRoles: string[]) {
