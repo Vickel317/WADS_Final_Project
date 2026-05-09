@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 
 
 
@@ -99,10 +101,7 @@ export async function GET(
     });
 
     if (!category) {
-      return NextResponse.json(
-        { error: "Category not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Category not found", "NOT_FOUND");
     }
     return NextResponse.json(
       {
@@ -118,10 +117,7 @@ export async function GET(
     );
   } catch (error) {
     console.error("Get category error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -132,14 +128,11 @@ export async function PUT(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
     const { id  } = await params;
@@ -147,21 +140,43 @@ export async function PUT(
       where: { categoryID: id },
     });
     if (!existing) {
-      return NextResponse.json(
-        { error: "Category not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Category not found", "NOT_FOUND");
     }
 
-    const body = await request.json();
-    const { name, description, slug } = body;
+    const body = await parseJson<{
+      name?: unknown;
+      description?: unknown;
+      slug?: unknown;
+    }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
+
+    const name = parseOptionalString(body.name);
+    const description = parseOptionalString(body.description);
+    const slug = parseOptionalString(body.slug);
+    const errors = [] as Array<{ field?: string; message: string }>;
+
+    if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
+    if (description.error) {
+      errors.push({ field: "description", message: `description ${description.error}` });
+    }
+    if (slug.error) errors.push({ field: "slug", message: `slug ${slug.error}` });
+
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
+    }
+
+    if (!name.value && !description.value && !slug.value) {
+      return apiError(400, "No valid fields to update", "BAD_REQUEST");
+    }
 
     const updated = await prisma.category.update({
       where: { categoryID: id },
       data: {
-        ...(name ? { name } : {}),
-        ...(description !== undefined ? { description } : {}),
-        ...(slug ? { name: slug } : {}),
+        ...(name.value ? { name: name.value } : {}),
+        ...(description.value !== undefined ? { description: description.value } : {}),
+        ...(slug.value ? { name: slug.value } : {}),
       },
     });
 
@@ -180,10 +195,7 @@ export async function PUT(
     );
   } catch (error) {
     console.error("Update category error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -194,14 +206,11 @@ export async function DELETE(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
     const { id  } = await params;
@@ -209,10 +218,7 @@ export async function DELETE(
       where: { categoryID: id },
     });
     if (!existing) {
-      return NextResponse.json(
-        { error: "Category not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Category not found", "NOT_FOUND");
     }
 
     await prisma.category.delete({ where: { categoryID: id } });
@@ -223,10 +229,7 @@ export async function DELETE(
     );
   } catch (error) {
     console.error("Delete category error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

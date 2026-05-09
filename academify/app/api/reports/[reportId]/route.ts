@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
-import { reports } from "../route";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { ReportStatus } from "@prisma/client";
+import { apiError } from "@/lib/api-response";
 
 
 
@@ -39,33 +41,61 @@ export async function GET(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const { reportId  } = await params;
-    const report = reports.find((r) => r.id === reportId);
+    const report = await prisma.reportReview.findUnique({
+      where: { reportreviewID: reportId },
+    });
 
     if (!report) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      return apiError(404, "Report not found", "NOT_FOUND");
     }
 
     // Reporter can view their own report; moderators/admins can view all
     const isModOrAdmin =
       decoded.role === "moderator" || decoded.role === "admin";
-    if (report.reportedBy !== decoded.id && !isModOrAdmin) {
-      return NextResponse.json(
-        { error: "Forbidden: You can only view your own reports" },
-        { status: 403 }
+    if (report.reporterID !== decoded.id && !isModOrAdmin) {
+      return apiError(
+        403,
+        "Forbidden: You can only view your own reports",
+        "FORBIDDEN"
       );
     }
 
-    return NextResponse.json({ report }, { status: 200 });
+    const targetType = report.reportedPostID
+      ? "post"
+      : report.reportedCommentID
+        ? "comment"
+        : "user";
+    const targetId =
+      report.reportedPostID || report.reportedCommentID || report.reportedUserID || "";
+    const status =
+      report.status === ReportStatus.UNDER_REVIEW
+        ? "reviewed"
+        : report.status.toLowerCase();
+
+    return NextResponse.json(
+      {
+        report: {
+          id: report.reportreviewID,
+          reportedBy: report.reporterID,
+          targetType,
+          targetId,
+          reason: report.reason,
+          status,
+          reviewNote: null,
+          reviewedBy: null,
+          createdAt: report.createdAt.toISOString(),
+          updatedAt: report.reviewedAt ? report.reviewedAt.toISOString() : undefined,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get report error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

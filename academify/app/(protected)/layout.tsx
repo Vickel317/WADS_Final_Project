@@ -2,6 +2,7 @@ import Sidebar from "@/components/sidebar";
 import Topbar from "@/components/topbar";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSession } from "@/lib/get-session";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const mod = await import("@/lib/auth");
@@ -10,6 +11,22 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   if (!session) {
     redirect("/login");
+  }
+
+  const currentHeaders = await headers();
+  const pathname = currentHeaders.get("x-pathname") || "";
+  const profileSession = await getSession();
+  const profileUser = profileSession?.user;
+
+  const isProfileComplete = Boolean(
+    profileUser?.name?.trim() &&
+      profileUser?.major?.trim() &&
+      profileUser?.bio?.trim()
+  );
+  const isProfileEditRoute = pathname.startsWith("/profile/edit");
+
+  if (!isProfileComplete && !isProfileEditRoute) {
+    redirect("/profile/edit");
   }
 
   return (
