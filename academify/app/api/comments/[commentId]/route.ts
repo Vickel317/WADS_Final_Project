@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
 
@@ -74,43 +76,43 @@ export async function PUT(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const { commentId  } = await params;
-    const body = await request.json();
-    const { content } = body;
+    const body = await parseJson<{ content?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-    if (!content) {
-      return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
-      );
+    const content = parseRequiredString(body.content);
+    if (content.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "content", message: `content ${content.error}` },
+      ]);
     }
 
     const comment = await prisma.comment.findUnique({
       where: { commentID: commentId },
     });
     if (!comment) {
-      return NextResponse.json(
-        { error: "Comment not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Comment not found", "NOT_FOUND");
     }
 
     const isModerator =
       decoded.role === "moderator" || decoded.role === "admin";
 
     if (comment.authorID !== decoded.id && !isModerator) {
-      return NextResponse.json(
-        { error: "Forbidden: You can only edit your own comments" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: You can only edit your own comments",
+        "FORBIDDEN"
       );
     }
 
     const updated = await prisma.comment.update({
       where: { commentID: commentId },
-      data: { content },
+      data: { content: content.value! },
     });
 
     return NextResponse.json(
@@ -128,10 +130,7 @@ export async function PUT(
     );
   } catch (error) {
     console.error("Update comment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -142,7 +141,7 @@ export async function DELETE(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const { commentId  } = await params;
@@ -150,19 +149,17 @@ export async function DELETE(
       where: { commentID: commentId },
     });
     if (!comment) {
-      return NextResponse.json(
-        { error: "Comment not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Comment not found", "NOT_FOUND");
     }
 
     const isModerator =
       decoded.role === "moderator" || decoded.role === "admin";
 
     if (comment.authorID !== decoded.id && !isModerator) {
-      return NextResponse.json(
-        { error: "Forbidden: You can only delete your own comments" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: You can only delete your own comments",
+        "FORBIDDEN"
       );
     }
 
@@ -174,10 +171,7 @@ export async function DELETE(
     );
   } catch (error) {
     console.error("Delete comment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

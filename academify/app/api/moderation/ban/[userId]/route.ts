@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
 import { moderationLogs } from "../../queue/route";
 import { userSanctions } from "../../warn/[userId]/route";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
 
@@ -51,29 +53,35 @@ export async function POST(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
     const { userId  } = await params;
-    const body = await request.json();
-    const { reason } = body;
+    const body = await parseJson<{ reason?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-    if (!reason) {
-      return NextResponse.json({ error: "Reason is required" }, { status: 400 });
+    const reason = parseRequiredString(body.reason);
+    if (reason.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "reason", message: `reason ${reason.error}` },
+      ]);
     }
 
     const sanction = {
       id: `sanc_${Date.now()}`,
       userId,
       type: "ban" as const,
-      reason,
+      reason: reason.value!,
       issuedBy: decoded.id,
       createdAt: new Date().toISOString(),
     };
@@ -86,7 +94,7 @@ export async function POST(
       targetType: "user",
       targetId: userId,
       performedBy: decoded.id,
-      reason,
+      reason: reason.value!,
       createdAt: new Date().toISOString(),
     });
 
@@ -96,10 +104,7 @@ export async function POST(
     );
   } catch (error) {
     console.error("Ban user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
-import { reports } from "../../route";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { ReportStatus } from "@prisma/client";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 
 
 
@@ -49,44 +52,75 @@ export async function PUT(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
     const { reportId  } = await params;
-    const index = reports.findIndex((r) => r.id === reportId);
+    const existing = await prisma.reportReview.findUnique({
+      where: { reportreviewID: reportId },
+    });
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    if (!existing) {
+      return apiError(404, "Report not found", "NOT_FOUND");
     }
 
-    const body = await request.json();
-    const { reviewNote } = body;
+    const body = await parseJson<{ reviewNote?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-    reports[index] = {
-      ...reports[index],
-      status: "reviewed",
-      reviewNote: reviewNote || "",
-      reviewedBy: decoded.id,
-      updatedAt: new Date().toISOString(),
-    };
+    const reviewNote = parseOptionalString(body.reviewNote);
+    if (reviewNote.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "reviewNote", message: `reviewNote ${reviewNote.error}` },
+      ]);
+    }
+
+    const updated = await prisma.reportReview.update({
+      where: { reportreviewID: reportId },
+      data: {
+        status: ReportStatus.UNDER_REVIEW,
+        reviewedAt: new Date(),
+      },
+    });
 
     return NextResponse.json(
-      { message: "Report marked as reviewed", report: reports[index] },
+      {
+        message: "Report marked as reviewed",
+        report: {
+          id: updated.reportreviewID,
+          reportedBy: updated.reporterID,
+          targetType: updated.reportedPostID
+            ? "post"
+            : updated.reportedCommentID
+              ? "comment"
+              : "user",
+          targetId:
+            updated.reportedPostID ||
+            updated.reportedCommentID ||
+            updated.reportedUserID ||
+            "",
+          reason: updated.reason,
+          status: "reviewed",
+          reviewNote: reviewNote.value || "",
+          reviewedBy: decoded.id,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.reviewedAt ? updated.reviewedAt.toISOString() : undefined,
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
     console.error("Review report error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
