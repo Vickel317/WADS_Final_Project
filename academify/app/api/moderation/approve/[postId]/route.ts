@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
 import { ModerationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { moderationLogs } from "../../queue/route";
+import { apiError } from "@/lib/api-response";
 
 
 
@@ -41,13 +42,14 @@ export async function POST(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
@@ -55,7 +57,7 @@ export async function POST(
     const existing = await prisma.post.findUnique({ where: { postID: postId } });
 
     if (!existing) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+      return apiError(404, "Post not found", "NOT_FOUND");
     }
 
     const updatedPost = await prisma.post.update({
@@ -86,10 +88,7 @@ export async function POST(
     );
   } catch (error) {
     console.error("Approve post error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

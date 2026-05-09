@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { moderationLogs } from "../../queue/route";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 
 
 
@@ -49,13 +51,14 @@ export async function POST(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
@@ -63,11 +66,22 @@ export async function POST(
     const existing = await prisma.post.findUnique({ where: { postID: postId } });
 
     if (!existing) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+      return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { reason } = body;
+    const contentLength = request.headers.get("content-length");
+    const hasBody = contentLength !== null && contentLength !== "0";
+    const body = hasBody ? await parseJson<{ reason?: unknown }>(request) : {};
+    if (hasBody && !body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
+
+    const reason = parseOptionalString(body?.reason);
+    if (reason.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "reason", message: `reason ${reason.error}` },
+      ]);
+    }
 
     await prisma.post.delete({ where: { postID: postId } });
 
@@ -77,7 +91,7 @@ export async function POST(
       targetType: "post",
       targetId: postId,
       performedBy: decoded.id,
-      reason: reason || "No reason provided",
+      reason: reason.value || "No reason provided",
       createdAt: new Date().toISOString(),
     });
 
@@ -87,10 +101,7 @@ export async function POST(
     );
   } catch (error) {
     console.error("Delete post (moderation) error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

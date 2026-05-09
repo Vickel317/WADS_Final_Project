@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { files } from "@/app/api/files/route";
+import { verifyToken } from "@/lib/auth-session";
+import { apiError } from "@/lib/api-response";
 
 /**
  * @swagger
@@ -43,6 +45,8 @@ import { files } from "@/app/api/files/route";
  *     responses:
  *       200:
  *         description: File deleted successfully
+ *       401:
+ *         description: Not authenticated
  *       403:
  *         description: Forbidden - not the file owner
  *       404:
@@ -60,19 +64,13 @@ export async function GET(
     const file = files.find((f) => f.id === fileId);
 
     if (!file) {
-      return NextResponse.json(
-        { error: "File not found" },
-        { status: 404 }
-      );
+      return apiError(404, "File not found", "NOT_FOUND");
     }
 
     return NextResponse.json({ file }, { status: 200 });
   } catch (error) {
     console.error("Get file error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -81,17 +79,26 @@ export async function DELETE(
   { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
+    const decoded = await verifyToken(request);
+    if (!decoded) {
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    }
+
     const { fileId } = await params;
     const fileIndex = files.findIndex((f) => f.id === fileId);
 
     if (fileIndex === -1) {
-      return NextResponse.json(
-        { error: "File not found" },
-        { status: 404 }
+      return apiError(404, "File not found", "NOT_FOUND");
+    }
+
+    if (files[fileIndex].uploadedBy.id !== decoded.id) {
+      return apiError(
+        403,
+        "Forbidden: You can only delete your own files",
+        "FORBIDDEN"
       );
     }
 
-    // TODO: verify file owner via JWT in Week 8
     // TODO: delete from real storage in Week 7
     const deleted = files.splice(fileIndex, 1)[0];
 
@@ -101,10 +108,7 @@ export async function DELETE(
     );
   } catch (error) {
     console.error("Delete file error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

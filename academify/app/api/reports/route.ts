@@ -1,35 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
-
-
-// TODO: replace with Prisma in Week 7
-export const reports: Array<{
-  id: string;
-  reportedBy: string;
-  targetType: "post" | "comment" | "user";
-  targetId: string;
-  reason: string;
-  status: "pending" | "reviewed" | "resolved" | "dismissed";
-  reviewNote?: string;
-  reviewedBy?: string;
-  createdAt: string;
-  updatedAt?: string;
-}> = [
-  {
-    id: "rep_1",
-    reportedBy: "user_1",
-    targetType: "post",
-    targetId: "2",
-    reason: "Spam content",
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  },
-];
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { ReportStatus } from "@prisma/client";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
 
 function isModOrAdmin(role?: string) {
   return role === "moderator" || role === "admin";
+}
+
+const REPORT_STATUS_MAP: Record<string, ReportStatus> = {
+  pending: ReportStatus.PENDING,
+  reviewed: ReportStatus.UNDER_REVIEW,
+  resolved: ReportStatus.RESOLVED,
+  dismissed: ReportStatus.DISMISSED,
+};
+
+function toResponseStatus(status: ReportStatus) {
+  if (status === ReportStatus.UNDER_REVIEW) return "reviewed";
+  return status.toLowerCase();
+}
+
+function resolveReportTarget(report: {
+  reportedPostID: string | null;
+  reportedCommentID: string | null;
+  reportedUserID: string | null;
+}) {
+  if (report.reportedPostID) {
+    return { targetType: "post" as const, targetId: report.reportedPostID };
+  }
+  if (report.reportedCommentID) {
+    return { targetType: "comment" as const, targetId: report.reportedCommentID };
+  }
+  if (report.reportedUserID) {
+    return { targetType: "user" as const, targetId: report.reportedUserID };
+  }
+  return { targetType: "post" as const, targetId: "" };
 }
 
 /**
@@ -94,30 +102,62 @@ export async function GET(request: NextRequest) {
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (!isModOrAdmin(decoded.role)) {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const filtered = status
-      ? reports.filter((r) => r.status === status)
-      : reports;
+    const where = status
+      ? REPORT_STATUS_MAP[status]
+        ? { status: REPORT_STATUS_MAP[status] }
+        : null
+      : undefined;
 
-    return NextResponse.json({ reports: filtered }, { status: 200 });
+    if (status && !where) {
+      return apiError(
+        400,
+        "status must be pending, reviewed, resolved, or dismissed",
+        "BAD_REQUEST"
+      );
+    }
+
+    const results = await prisma.reportReview.findMany({
+      where: where || undefined,
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json(
+      {
+        reports: results.map((report) => {
+          const target = resolveReportTarget(report);
+          return {
+            id: report.reportreviewID,
+            reportedBy: report.reporterID,
+            targetType: target.targetType,
+            targetId: target.targetId,
+            reason: report.reason,
+            status: toResponseStatus(report.status),
+            reviewNote: null,
+            reviewedBy: null,
+            createdAt: report.createdAt.toISOString(),
+            updatedAt: report.reviewedAt ? report.reviewedAt.toISOString() : undefined,
+          };
+        }),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get reports error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -125,48 +165,73 @@ export async function POST(request: NextRequest) {
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const body = await request.json();
-    const { targetType, targetId, reason } = body;
-
-    if (!targetType || !targetId || !reason) {
-      return NextResponse.json(
-        { error: "targetType, targetId, and reason are required" },
-        { status: 400 }
-      );
+    const body = await parseJson<{
+      targetType?: unknown;
+      targetId?: unknown;
+      reason?: unknown;
+    }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-    if (!["post", "comment", "user"].includes(targetType)) {
-      return NextResponse.json(
-        { error: "targetType must be post, comment, or user" },
-        { status: 400 }
-      );
+    const errors = [] as Array<{ field?: string; message: string }>;
+    const targetType = parseRequiredString(body.targetType);
+    const targetId = parseRequiredString(body.targetId);
+    const reason = parseRequiredString(body.reason);
+
+    if (targetType.error) {
+      errors.push({ field: "targetType", message: `targetType ${targetType.error}` });
+    }
+    if (targetId.error) {
+      errors.push({ field: "targetId", message: `targetId ${targetId.error}` });
+    }
+    if (reason.error) {
+      errors.push({ field: "reason", message: `reason ${reason.error}` });
     }
 
-    const newReport = {
-      id: `rep_${Date.now()}`,
-      reportedBy: decoded.id,
-      targetType: targetType as "post" | "comment" | "user",
-      targetId,
-      reason,
-      status: "pending" as const,
-      createdAt: new Date().toISOString(),
-    };
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
+    }
 
-    reports.push(newReport);
+    if (!targetType.value || !["post", "comment", "user"].includes(targetType.value)) {
+      return apiError(400, "targetType must be post, comment, or user", "BAD_REQUEST");
+    }
+
+    const report = await prisma.reportReview.create({
+      data: {
+        reporterID: decoded.id,
+        reason: reason.value!,
+        description: reason.value!,
+        status: ReportStatus.PENDING,
+        reportedPostID: targetType.value === "post" ? targetId.value! : null,
+        reportedCommentID: targetType.value === "comment" ? targetId.value! : null,
+        reportedUserID: targetType.value === "user" ? targetId.value! : null,
+      },
+    });
 
     return NextResponse.json(
-      { message: "Report submitted successfully", report: newReport },
+      {
+        message: "Report submitted successfully",
+        report: {
+          id: report.reportreviewID,
+          reportedBy: report.reporterID,
+          targetType: targetType.value,
+          targetId: targetId.value!,
+          reason: report.reason,
+          status: toResponseStatus(report.status),
+          reviewNote: null,
+          reviewedBy: null,
+          createdAt: report.createdAt.toISOString(),
+        },
+      },
       { status: 201 }
     );
   } catch (error) {
     console.error("Submit report error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

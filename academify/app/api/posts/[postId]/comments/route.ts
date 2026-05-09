@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
 
@@ -84,10 +86,7 @@ export async function GET(
     );
   } catch (error) {
     console.error("Get comments error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -98,23 +97,25 @@ export async function POST(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const { postId  } = await params;
-    const body = await request.json();
-    const { content } = body;
+    const body = await parseJson<{ content?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-    if (!content) {
-      return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
-      );
+    const content = parseRequiredString(body.content);
+    if (content.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "content", message: `content ${content.error}` },
+      ]);
     }
 
     const post = await prisma.post.findUnique({ where: { postID: postId } });
     if (!post) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+      return apiError(404, "Post not found", "NOT_FOUND");
     }
 
     const author = await prisma.user.findFirst({
@@ -126,16 +127,13 @@ export async function POST(
       },
     });
     if (!author) {
-      return NextResponse.json(
-        { error: "User record not found in database for this token" },
-        { status: 401 }
-      );
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const newComment = await prisma.comment.create({
       data: {
         postID: postId,
-        content,
+        content: content.value!,
         authorID: author.userId,
       },
       include: { author: { select: { name: true } } },
@@ -157,10 +155,7 @@ export async function POST(
     );
   } catch (error) {
     console.error("Create comment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
