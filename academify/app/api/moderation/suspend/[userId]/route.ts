@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
 import { moderationLogs } from "../../queue/route";
 import { userSanctions } from "../../warn/[userId]/route";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalNumber, parseRequiredString } from "@/lib/validation";
 
 
 
@@ -54,27 +56,39 @@ export async function POST(
   try {
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
     const { userId  } = await params;
-    const body = await request.json();
-    const { reason, durationDays } = body;
-
-    if (!reason) {
-      return NextResponse.json({ error: "Reason is required" }, { status: 400 });
+    const body = await parseJson<{ reason?: unknown; durationDays?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-    const expiresAt = durationDays
+    const reason = parseRequiredString(body.reason);
+    const durationDays = parseOptionalNumber(body.durationDays);
+    const errors = [] as Array<{ field?: string; message: string }>;
+
+    if (reason.error) errors.push({ field: "reason", message: `reason ${reason.error}` });
+    if (durationDays.error) {
+      errors.push({ field: "durationDays", message: `durationDays ${durationDays.error}` });
+    }
+
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
+    }
+
+    const expiresAt = durationDays.value
       ? new Date(
-          Date.now() + durationDays * 24 * 60 * 60 * 1000
+          Date.now() + durationDays.value * 24 * 60 * 60 * 1000
         ).toISOString()
       : undefined;
 
@@ -82,7 +96,7 @@ export async function POST(
       id: `sanc_${Date.now()}`,
       userId,
       type: "suspend" as const,
-      reason,
+      reason: reason.value!,
       issuedBy: decoded.id,
       expiresAt,
       createdAt: new Date().toISOString(),
@@ -96,7 +110,7 @@ export async function POST(
       targetType: "user",
       targetId: userId,
       performedBy: decoded.id,
-      reason,
+      reason: reason.value!,
       createdAt: new Date().toISOString(),
     });
 
@@ -106,10 +120,7 @@ export async function POST(
     );
   } catch (error) {
     console.error("Suspend user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

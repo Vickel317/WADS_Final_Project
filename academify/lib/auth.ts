@@ -24,6 +24,7 @@ export async function getAuth() {
   const prisma = (prismaModule as any).prisma;
 
   console.log(`[auth.ts] Configuring betterAuth...`);
+  const isProd = process.env.NODE_ENV === "production";
   const options: any = {
     trustedOrigins,
     user: { modelName: "AuthUser" },
@@ -33,6 +34,14 @@ export async function getAuth() {
     database: prismaAdapter(prisma, { provider: "postgresql" }),
     emailAndPassword: { enabled: true, autoSignIn: false },
     plugins: [nextCookies()],
+    advanced: {
+      useSecureCookies: isProd,
+      defaultCookieAttributes: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: isProd,
+      },
+    },
   };
 
   if (envBaseURL) options.baseURL = envBaseURL;

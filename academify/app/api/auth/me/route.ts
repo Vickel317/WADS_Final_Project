@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-response";
 
 
 export async function GET(request: NextRequest) {
@@ -7,10 +8,7 @@ export async function GET(request: NextRequest) {
     const auth = await mod.getAuth();
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     return NextResponse.json(
@@ -30,9 +28,6 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Get user error:", error);
-    return NextResponse.json(
-      { error: "Invalid or expired token" },
-      { status: 401 }
-    );
+    return apiError(401, "Not authenticated", "UNAUTHORIZED");
   }
 }

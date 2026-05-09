@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole, verifyToken } from "@/lib/auth-session";
+import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
-import { adminUsers } from "../users/route";
-import { reports } from "../../reports/route";
-import { moderationLogs } from "../../moderation/queue/route";
+import { apiError } from "@/lib/api-response";
 
 
 
@@ -42,58 +40,58 @@ import { moderationLogs } from "../../moderation/queue/route";
 
 export async function GET(request: NextRequest) {
   try {
-        const [totalPosts, totalComments] = await Promise.all([
-          prisma.post.count(),
-          prisma.comment.count(),
-        ]);
-
     const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const usersByRole = adminUsers.reduce<Record<string, number>>(
+    const [totalPosts, totalComments, users, reportStatuses, moderationActions] =
+      await Promise.all([
+        prisma.post.count(),
+        prisma.comment.count(),
+        prisma.user.findMany({ select: { role: true } }),
+        prisma.reportReview.findMany({ select: { status: true } }),
+        prisma.moderationActionLog.findMany({ select: { actionType: true } }),
+      ]);
+
+    const usersByRole = (users as Array<{ role: string }>).reduce<Record<string, number>>(
       (acc, user) => {
-        acc[user.role] = (acc[user.role] || 0) + 1;
+        const role = String(user.role).toLowerCase();
+        acc[role] = (acc[role] || 0) + 1;
         return acc;
       },
       {}
     );
 
-    const usersByStatus = adminUsers.reduce<Record<string, number>>(
-      (acc, user) => {
-        acc[user.status] = (acc[user.status] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const usersByStatus = { active: users.length };
 
-    const reportsByStatus = reports.reduce<Record<string, number>>(
-      (acc, report) => {
-        acc[report.status] = (acc[report.status] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const reportsByStatus = (reportStatuses as Array<{ status: string }>).reduce<
+      Record<string, number>
+    >((acc, report) => {
+      const statusValue = String(report.status);
+      const status =
+        statusValue === "UNDER_REVIEW"
+          ? "reviewed"
+          : statusValue.toLowerCase();
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
 
-    const moderationActionCounts = moderationLogs.reduce<Record<string, number>>(
-      (acc, log) => {
-        acc[log.action] = (acc[log.action] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const moderationActionCounts = (moderationActions as Array<{ actionType: string }>).reduce<
+      Record<string, number>
+    >((acc, log) => {
+      const action = String(log.actionType).toLowerCase();
+      acc[action] = (acc[action] || 0) + 1;
+      return acc;
+    }, {});
 
     const analytics = {
       users: {
-        total: adminUsers.length,
+        total: users.length,
         byRole: usersByRole,
         byStatus: usersByStatus,
       },
@@ -102,11 +100,11 @@ export async function GET(request: NextRequest) {
         totalReplies: totalComments,
       },
       reports: {
-        total: reports.length,
+        total: reportStatuses.length,
         byStatus: reportsByStatus,
       },
       moderation: {
-        totalActions: moderationLogs.length,
+        totalActions: moderationActions.length,
         byAction: moderationActionCounts,
       },
     };
@@ -114,10 +112,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ analytics }, { status: 200 });
   } catch (error) {
     console.error("Admin analytics error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 

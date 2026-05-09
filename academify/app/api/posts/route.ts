@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ModerationStatus } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 /**
  * @swagger
@@ -112,7 +114,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error("Get threads error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -120,17 +122,33 @@ export async function POST(request: NextRequest) {
   try {
     const sessionUser = await getSessionUser(request.headers);
     if (!sessionUser) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const body = await request.json();
-    const { title, content, categoryId } = body;
+    const body = await parseJson<{
+      title?: unknown;
+      content?: unknown;
+      categoryId?: unknown;
+    }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-    if (!title || !content || !categoryId) {
-      return NextResponse.json(
-        { error: "Title, content, and categoryId are required" },
-        { status: 400 }
-      );
+    const errors = [] as Array<{ field?: string; message: string }>;
+    const title = parseRequiredString(body.title);
+    const content = parseRequiredString(body.content);
+    const categoryId = parseRequiredString(body.categoryId);
+
+    if (title.error) errors.push({ field: "title", message: `title ${title.error}` });
+    if (content.error) {
+      errors.push({ field: "content", message: `content ${content.error}` });
+    }
+    if (categoryId.error) {
+      errors.push({ field: "categoryId", message: `categoryId ${categoryId.error}` });
+    }
+
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
     const category = await prisma.category.findFirst({
@@ -143,13 +161,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (!category) {
-      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return apiError(404, "Category not found", "NOT_FOUND");
     }
 
     const created = await prisma.post.create({
       data: {
-        title,
-        content,
+        title: title.value!,
+        content: content.value!,
         categoryID: category.categoryID,
         authorID: sessionUser.user.userId,
         moderationStatus: ModerationStatus.PENDING,
@@ -177,6 +195,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Create thread error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

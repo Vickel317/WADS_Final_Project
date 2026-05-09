@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-response";
 
 /**
  * @swagger
@@ -123,10 +124,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ files: result }, { status: 200 });
   } catch (error) {
     console.error("Get files error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -136,17 +134,11 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json(
-        { error: "No file provided" },
-        { status: 400 }
-      );
+      return apiError(400, "No file provided", "BAD_REQUEST");
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File exceeds 50MB limit" },
-        { status: 400 }
-      );
+      return apiError(400, "File exceeds 50MB limit", "BAD_REQUEST");
     }
 
     // TODO: upload to real storage (S3, Cloudinary, etc.) in Week 7
@@ -168,9 +160,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Upload file error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
