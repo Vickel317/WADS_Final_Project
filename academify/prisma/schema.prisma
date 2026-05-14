@@ -16,8 +16,29 @@ datasource db {
 // Enums
 enum UserRole {
   STUDENT
+  LECTURER
   MODERATOR
   ADMIN
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum DMRestriction {
+  ALL
+  CONNECTIONS
+  LECTURERS
+  NONE
+}
+
+enum UserStatus {
+  ACTIVE
+  WARNED
+  SUSPENDED
+  BANNED
 }
 
 enum ModerationStatus {
@@ -58,19 +79,61 @@ model User {
   bio       String?  @db.Text
   createdAt DateTime @default(now())
 
+  // -- Setup & Profile Attributes --
+  profileSetupComplete Boolean  @default(false)
+  academicLevel        String?
+  skillTags            String[]
+  portfolioLinks       String[]
+
+  // Lecturer Attributes
+  department           String?
+  specializations      String[]
+  consultationHours    String?
+  verifiedPublications String[]
+  askMeAbout           String[]
+
+  // -- Collaboration & Networking --
+  activeProjects     String[]
+  availabilityStatus AvailabilityStatus @default(AVAILABLE)
+
+  // -- Privacy & Safety --
+  showEmail         Boolean       @default(true)
+  showAcademicLevel Boolean       @default(true)
+  showLastSeen      Boolean       @default(true)
+  dmRestriction     DMRestriction @default(ALL)
+
+  // -- Admin Controls --
+  accountStatus  UserStatus @default(ACTIVE)
+  isShadowBanned Boolean    @default(false)
+
   // Relations
-  posts                Post[]                  @relation("UserPosts")
-  comments             Comment[]               @relation("UserComments")
-  files                File[]                  @relation("UserFiles")
-  createdEvents        Event[]                 @relation("EventCreator")
-  attendingEvents      EventAttendee[]         @relation("EventAttendees")
-  sentMessages         Message[]               @relation("MessageSender")
-  receivedMessages     Message[]               @relation("MessageReceiver")
-  reportsMade          ReportReview[]          @relation("Reporter")
-  reportsAgainstUser   ReportReview[]          @relation("ReportedUser")
-  moderationActions    ModerationActionLog[]   @relation("ModeratorActions")
+  posts              Post[]                @relation("UserPosts")
+  comments           Comment[]             @relation("UserComments")
+  files              File[]                @relation("UserFiles")
+  createdEvents      Event[]               @relation("EventCreator")
+  attendingEvents    EventAttendee[]       @relation("EventAttendees")
+  sentMessages       Message[]             @relation("MessageSender")
+  receivedMessages   Message[]             @relation("MessageReceiver")
+  reportsMade        ReportReview[]        @relation("Reporter")
+  reportsAgainstUser ReportReview[]        @relation("ReportedUser")
+  moderationActions  ModerationActionLog[] @relation("ModeratorActions")
+  followers          Follow[]              @relation("Follower")
+  following          Follow[]              @relation("Following")
 
   @@map("User")
+}
+
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Following", fields: [followerId], references: [userId], onDelete: Cascade)
+  following User @relation("Follower", fields: [followingId], references: [userId], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("Follow")
 }
 
 model Category {
@@ -86,21 +149,21 @@ model Category {
 }
 
 model Post {
-  postID            String            @id @default(cuid())
-  authorID          String
-  categoryID        String
-  title             String
-  content           String            @db.Text
-  moderationStatus  ModerationStatus  @default(PENDING)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  postID           String           @id @default(cuid())
+  authorID         String
+  categoryID       String
+  title            String
+  content          String           @db.Text
+  moderationStatus ModerationStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   // Relations
-  author            User              @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)
-  category          Category          @relation(fields: [categoryID], references: [categoryID], onDelete: Restrict)
-  comments          Comment[]         @relation("PostComments")
-  file              File?             @relation("PostFile")
-  reports           ReportReview[]    @relation("ReportedPost")
+  author            User                  @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)
+  category          Category              @relation(fields: [categoryID], references: [categoryID], onDelete: Restrict)
+  comments          Comment[]             @relation("PostComments")
+  file              File?                 @relation("PostFile")
+  reports           ReportReview[]        @relation("ReportedPost")
   moderationActions ModerationActionLog[] @relation("TargetPost")
 
   @@index([authorID])
@@ -117,9 +180,9 @@ model Comment {
   createdAt DateTime @default(now())
 
   // Relations
-  post              Post              @relation("PostComments", fields: [postID], references: [postID], onDelete: Cascade)
-  author            User              @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
-  reports           ReportReview[]    @relation("ReportedComment")
+  post              Post                  @relation("PostComments", fields: [postID], references: [postID], onDelete: Cascade)
+  author            User                  @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
+  reports           ReportReview[]        @relation("ReportedComment")
   moderationActions ModerationActionLog[] @relation("TargetComment")
 
   @@index([postID])
@@ -168,8 +231,8 @@ model File {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  post         Post @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
-  uploadedBy   User @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
+  post       Post @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
+  uploadedBy User @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
 
   @@index([uploadedByID])
   @@map("File")
@@ -194,16 +257,16 @@ model Message {
 }
 
 model ReportReview {
-  reportreviewID    String        @id @default(cuid())
+  reportreviewID    String       @id @default(cuid())
   reporterID        String
   reportedUserID    String?
   reportedPostID    String?
   reportedCommentID String?
   reason            String
-  description       String        @db.Text
-  status            ReportStatus  @default(PENDING)
+  description       String       @db.Text
+  status            ReportStatus @default(PENDING)
   reviewedAt        DateTime?
-  createdAt         DateTime      @default(now())
+  createdAt         DateTime     @default(now())
 
   // Relations
   reporter          User                  @relation("Reporter", fields: [reporterID], references: [userId], onDelete: Cascade)
@@ -218,23 +281,23 @@ model ReportReview {
 }
 
 model ModerationActionLog {
-  ModaiID           String     @id @default(cuid())
-  modID             String
-  targetUserID      String?
-  targetPostID      String?
-  targetCommentID   String?
-  relatedReportID   String?
-  actionType        ActionType
-  reason            String     @db.Text
-  details           String?    @db.Text
-  duration          Int?
-  timestamp         DateTime   @default(now())
+  ModaiID         String     @id @default(cuid())
+  modID           String
+  targetUserID    String?
+  targetPostID    String?
+  targetCommentID String?
+  relatedReportID String?
+  actionType      ActionType
+  reason          String     @db.Text
+  details         String?    @db.Text
+  duration        Int?
+  timestamp       DateTime   @default(now())
 
   // Relations
-  moderator       User          @relation("ModeratorActions", fields: [modID], references: [userId], onDelete: Cascade)
-  targetPost      Post?         @relation("TargetPost", fields: [targetPostID], references: [postID], onDelete: SetNull)
-  targetComment   Comment?      @relation("TargetComment", fields: [targetCommentID], references: [commentID], onDelete: SetNull)
-  relatedReport   ReportReview? @relation("RelatedReport", fields: [relatedReportID], references: [reportreviewID], onDelete: SetNull)
+  moderator     User          @relation("ModeratorActions", fields: [modID], references: [userId], onDelete: Cascade)
+  targetPost    Post?         @relation("TargetPost", fields: [targetPostID], references: [postID], onDelete: SetNull)
+  targetComment Comment?      @relation("TargetComment", fields: [targetCommentID], references: [commentID], onDelete: SetNull)
+  relatedReport ReportReview? @relation("RelatedReport", fields: [relatedReportID], references: [reportreviewID], onDelete: SetNull)
 
   @@index([modID])
   @@index([timestamp])
@@ -242,13 +305,13 @@ model ModerationActionLog {
 }
 
 model AuthUser {
-  id            String         @id
+  id            String        @id
   name          String
   email         String
-  emailVerified Boolean        @default(false)
+  emailVerified Boolean       @default(false)
   image         String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   authsessions  AuthSession[]
   authaccounts  AuthAccount[]
 
@@ -297,8 +360,8 @@ model AuthVerification {
   identifier String
   value      String
   expiresAt  DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([identifier])
   @@map("AuthVerification")
