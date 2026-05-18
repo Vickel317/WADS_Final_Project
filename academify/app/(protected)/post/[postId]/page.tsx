@@ -2,6 +2,8 @@ import { formatDistanceToNow } from "date-fns";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
+import CommentForm from "./comment-form";
+import LikeButton from "./like-button";
 
 export default async function PostDetailPage({
 	params,
@@ -71,8 +73,11 @@ export default async function PostDetailPage({
 							<span className="uppercase">{post.moderationStatus}</span>
 						</div>
 					</div>
-					<div className="text-xs text-gray-400">
-						Updated {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
+					<div className="flex flex-col items-start gap-2 text-xs text-gray-400 sm:items-end">
+						<LikeButton postId={post.postID} />
+						<span>
+							Updated {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
+						</span>
 					</div>
 				</div>
 
@@ -102,6 +107,9 @@ export default async function PostDetailPage({
 				<h2 className="text-sm font-semibold text-gray-700">
 					Comments ({comments.length})
 				</h2>
+				<div className="mt-4">
+					<CommentForm postId={post.postID} />
+				</div>
 				<div className="mt-4 space-y-4">
 					{comments.length === 0 ? (
 						<p className="text-sm text-gray-400">No comments yet.</p>
