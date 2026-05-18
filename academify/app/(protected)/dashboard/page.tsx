@@ -32,7 +32,7 @@ export default async function DashboardPage() {
     prisma.post.findMany({
       orderBy: { comments: { _count: "desc" } },
       take: 3,
-      include: { author: true, category: true, _count: { select: { comments: true } } }
+      include: { author: true, forum: true, _count: { select: { comments: true } } }
     }),
     prisma.comment.findMany({
       take: 4,
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
                       </span>
                     </div>
                   </div>
-                  <span className="mt-3 sm:mt-0 sm:ml-4 px-3 py-1 text-xs font-medium text-teal-700 bg-teal-50 rounded-full shrink-0">{t.category.name}</span>
+                  <span className="mt-3 sm:mt-0 sm:ml-4 px-3 py-1 text-xs font-medium text-teal-700 bg-teal-50 rounded-full shrink-0">{t.forum.name}</span>
                 </Link>
               ))
             )}
