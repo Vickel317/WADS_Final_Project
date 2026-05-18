@@ -50,20 +50,28 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
  *         description: Internal server error
  */
 
+const slugify = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
+    const forums = await prisma.forumHub.findMany({
       orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json(
       {
-        categories: categories.map((category) => ({
-          id: category.categoryID,
-          name: category.name,
-          description: category.description ?? "",
-          slug: category.name.toLowerCase(),
-          createdAt: category.createdAt.toISOString(),
+        categories: forums.map((forum) => ({
+          id: forum.forumID,
+          name: forum.name,
+          description: forum.description ?? "",
+          slug: slugify(forum.name),
+          createdAt: forum.createdAt.toISOString(),
         })),
       },
       { status: 200 }
@@ -109,7 +117,7 @@ export async function POST(request: NextRequest) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const exists = await prisma.category.findFirst({
+    const exists = await prisma.forumHub.findFirst({
       where: { name: { equals: name, mode: "insensitive" } },
     });
     if (exists) {
@@ -120,7 +128,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const created = await prisma.category.create({
+    const created = await prisma.forumHub.create({
       data: {
         name: name.value!,
         description: description.value!,
@@ -128,7 +136,7 @@ export async function POST(request: NextRequest) {
     });
 
     const newCategory = {
-      id: created.categoryID,
+      id: created.forumID,
       name: name.value!,
       description: description.value!,
       slug: slug.value!,
