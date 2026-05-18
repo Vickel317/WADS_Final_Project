@@ -5,6 +5,40 @@ import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 
+const slugify = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
+const resolveForum = async (value: string) => {
+  const direct = await prisma.forumHub.findFirst({
+    where: {
+      OR: [
+        { forumID: value },
+        { name: { equals: value, mode: "insensitive" as const } },
+      ],
+    },
+  });
+
+  if (direct) return direct;
+
+  const forums = await prisma.forumHub.findMany();
+  return forums.find((forum) => slugify(forum.name) === value.toLowerCase()) ?? null;
+};
+
+const toForumName = (value: string) =>
+  value
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join(" ");
+
 /**
  * @swagger
  * /api/posts:
@@ -15,10 +49,15 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: categoryId
+ *         name: forumId
  *         schema:
  *           type: string
- *         description: Filter threads by category
+ *         description: Filter threads by forum ID
+ *       - in: query
+ *         name: forum
+ *         schema:
+ *           type: string
+ *         description: Filter threads by forum name or slug
  *       - in: query
  *         name: limit
  *         schema:
@@ -45,7 +84,7 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
  *         application/json:
  *           schema:
  *             type: object
- *             required: [title, content, categoryId]
+ *             required: [title, content, forumId]
  *             properties:
  *               title:
  *                 type: string
@@ -53,9 +92,24 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
  *               content:
  *                 type: string
  *                 example: Looking for good React learning resources.
- *               categoryId:
+ *               forumId:
  *                 type: string
- *                 example: tech
+ *                 example: forum_cuid
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [title, content, forum]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *               forum:
+ *                 type: string
+ *                 description: Forum name or slug
+ *               file:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       201:
  *         description: Thread created successfully
@@ -69,15 +123,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get("categoryId");
+    const forumId = searchParams.get("forumId");
+    const category = searchParams.get("category");
+    const forum = searchParams.get("forum");
     const limit = parseInt(searchParams.get("limit") || "10");
     const trending = searchParams.get("trending") === "true";
 
-    const where = categoryId
+    const forumQuery = forumId || categoryId || forum || category;
+    const resolvedForum = forumQuery ? await resolveForum(forumQuery) : null;
+
+    const where = resolvedForum
       ? {
-          OR: [
-            { categoryID: categoryId },
-            { category: { name: { equals: categoryId, mode: "insensitive" as const } } },
-          ],
+          forumID: resolvedForum.forumID,
         }
       : {};
 
@@ -85,8 +142,8 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         author: { select: { name: true } },
-        category: { select: { name: true } },
-        comments: { select: { commentID: true } },
+        forum: { select: { forumID: true, name: true } },
+        _count: { select: { comments: true } },
       },
       orderBy: trending ? { comments: { _count: "desc" } } : { createdAt: "desc" },
       take: Number.isFinite(limit) ? limit : 10,
@@ -98,11 +155,12 @@ export async function GET(request: NextRequest) {
           id: post.postID,
           title: post.title,
           content: post.content,
-          categoryId: post.categoryID,
-          tag: post.category.name.toLowerCase(),
+          forumId: post.forumID,
+          forumName: post.forum.name,
+          forumSlug: slugify(post.forum.name),
           author: post.author.name,
-          replyCount: post.comments.length,
-          replies: post.comments.length,
+          replyCount: post._count.comments,
+          replies: post._count.comments,
           views: 0,
           likes: 0,
           createdAt: post.createdAt.toISOString(),
@@ -125,11 +183,41 @@ export async function POST(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const body = await parseJson<{
+    const contentType = request.headers.get("content-type") || "";
+    const isMultipart = contentType.includes("multipart/form-data");
+
+    let body: {
       title?: unknown;
       content?: unknown;
+      forumId?: unknown;
       categoryId?: unknown;
-    }>(request);
+      forum?: unknown;
+      category?: unknown;
+      file?: File | null;
+    } | null = null;
+
+    if (isMultipart) {
+      const formData = await request.formData();
+      body = {
+        title: formData.get("title"),
+        content: formData.get("content"),
+        forumId: formData.get("forumId"),
+        categoryId: formData.get("categoryId"),
+        forum: formData.get("forum"),
+        category: formData.get("category"),
+        file: (formData.get("file") as File | null) ?? null,
+      };
+    } else {
+      body = await parseJson<{
+        title?: unknown;
+        content?: unknown;
+        forumId?: unknown;
+        categoryId?: unknown;
+        forum?: unknown;
+        category?: unknown;
+      }>(request);
+    }
+
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
@@ -137,38 +225,37 @@ export async function POST(request: NextRequest) {
     const errors = [] as Array<{ field?: string; message: string }>;
     const title = parseRequiredString(body.title);
     const content = parseRequiredString(body.content);
-    const categoryId = parseRequiredString(body.categoryId);
+    const forumField =
+      body.forumId ?? body.categoryId ?? body.forum ?? body.category ?? "";
+    const forumId = parseRequiredString(forumField);
 
     if (title.error) errors.push({ field: "title", message: `title ${title.error}` });
     if (content.error) {
       errors.push({ field: "content", message: `content ${content.error}` });
     }
-    if (categoryId.error) {
-      errors.push({ field: "categoryId", message: `categoryId ${categoryId.error}` });
+    if (forumId.error) {
+      errors.push({ field: "forumId", message: `forumId ${forumId.error}` });
     }
 
     if (errors.length) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const category = await prisma.category.findFirst({
-      where: {
-        OR: [
-          { categoryID: categoryId },
-          { name: { equals: categoryId, mode: "insensitive" } },
-        ],
-      },
-    });
-
-    if (!category) {
-      return apiError(404, "Category not found", "NOT_FOUND");
+    let forum = await resolveForum(forumId.value!);
+    if (!forum) {
+      forum = await prisma.forumHub.create({
+        data: {
+          name: toForumName(forumId.value!),
+          description: "Auto-created forum",
+        },
+      });
     }
 
     const created = await prisma.post.create({
       data: {
         title: title.value!,
         content: content.value!,
-        categoryID: category.categoryID,
+        forumID: forum.forumID,
         authorID: sessionUser.user.userId,
         moderationStatus: ModerationStatus.PENDING,
       },
@@ -177,6 +264,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const file = body.file ?? null;
+    if (file && file.size > 0) {
+      await prisma.file.create({
+        data: {
+          postID: created.postID,
+          uploadedByID: sessionUser.user.userId,
+          fileName: file.name,
+          fileUrl: `/uploads/${file.name}`,
+          fileType: file.type || "application/octet-stream",
+          fileSize: file.size,
+        },
+      });
+    }
+
     return NextResponse.json(
       {
         message: "Thread created successfully",
@@ -184,7 +285,7 @@ export async function POST(request: NextRequest) {
           id: created.postID,
           title: created.title,
           content: created.content,
-          categoryId: created.categoryID,
+          forumId: created.forumID,
           author: created.author.name,
           status: created.moderationStatus.toLowerCase(),
           createdAt: created.createdAt.toISOString(),
