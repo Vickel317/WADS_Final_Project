@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 const DEFAULT_PASSWORD = "better-auth-managed";
 
@@ -35,8 +36,6 @@ async function ensureAppUser(userId: string, email: string, name?: string | null
 export async function getSession() {
   const requestHeaders = await headers();
 
-  const mod = await import("@/lib/auth");
-  const auth = await mod.getAuth();
   const betterSession = await auth.api.getSession({ headers: requestHeaders });
   if (betterSession?.user?.id && betterSession.user.email) {
     const user = await ensureAppUser(

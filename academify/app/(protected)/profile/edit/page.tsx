@@ -102,7 +102,7 @@ export default function EditProfilePage() {
       if (!res.ok) throw new Error(data.message || "Failed to save");
       setSaved(true);
       setTimeout(() => {
-        router.push("/profile/me");
+        router.push("/dashboard?profileId=me");
       }, 1200);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to save";
