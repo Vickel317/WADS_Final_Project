@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         forum: { select: { name: true } },
         comments: { select: { commentID: true } },
       },
-      orderBy: trending ? { _count: { comments: "desc" } } : { createdAt: "desc" },
+      orderBy: trending ? { comments: { _count: 'desc' } } : { createdAt: 'desc' } as any,
       take: Number.isFinite(limit) ? limit : 10,
     });
 
@@ -154,8 +154,8 @@ export async function POST(request: NextRequest) {
     const category = await prisma.forumHub.findFirst({
       where: {
         OR: [
-          { forumID: categoryId },
-          { name: { equals: categoryId, mode: "insensitive" } },
+          { forumID: categoryId.value as string },
+          { name: { equals: categoryId.value as string, mode: "insensitive" } },
         ],
       },
     });
@@ -198,3 +198,5 @@ export async function POST(request: NextRequest) {
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
