@@ -37,9 +37,9 @@ async function createAppUser(sessionUser: { id: string; email: string; name?: st
   }
 }
 
+import { auth } from "@/lib/auth";
+
 export async function getSessionUser(headers: Headers) {
-  const mod = await import("@/lib/auth");
-  const auth = await mod.getAuth();
   const session = await auth.api.getSession({ headers });
   if (!session?.user?.id || !session.user.email) {
     return null;

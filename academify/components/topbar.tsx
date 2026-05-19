@@ -1,6 +1,44 @@
 "use client";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Topbar() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (query.trim().length > 0) {
+        searchUsers(query);
+      } else {
+        setResults([]);
+        setShowDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [query]);
+
+  const searchUsers = async (searchTerm: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/users?q=${encodeURIComponent(searchTerm)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data.users || []);
+        setShowDropdown(true);
+      }
+    } catch (error) {
+      console.error("Failed to search users", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <header className="fixed top-0 left-0 md:left-56 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-4 z-30 transition-all duration-300"
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
@@ -10,9 +48,51 @@ export default function Topbar() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
         <input
-          placeholder="Search..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => {
+            if (results.length > 0 || loading) setShowDropdown(true);
+          }}
+          onBlur={() => {
+            setTimeout(() => setShowDropdown(false), 200);
+          }}
+          placeholder="Search for people..."
           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
         />
+
+        {/* Dropdown Results */}
+        {showDropdown && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-xl shadow-teal-900/5 max-h-80 overflow-y-auto z-50">
+            {loading && (
+              <div className="p-4 text-center text-sm text-gray-500">Searching...</div>
+            )}
+            {!loading && results.length === 0 && (
+              <div className="p-4 text-center text-sm text-gray-500">No users found.</div>
+            )}
+            {!loading && results.length > 0 && (
+              <ul className="py-2">
+                {results.map((user) => (
+                  <li key={user.userId}>
+                    <Link
+                      href={`?profileId=${user.userId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition"
+                    >
+                      <div className="w-8 h-8 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center font-bold text-xs">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-800">{user.name}</span>
+                        <span className="text-xs text-gray-500">@{user.username} {user.isConnected ? "• Connected" : ""}</span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="ml-auto flex items-center gap-3">

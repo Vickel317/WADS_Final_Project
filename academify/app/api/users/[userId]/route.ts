@@ -46,13 +46,30 @@ export async function GET(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const user = await prisma.user.findUnique({ where: { userId: resolvedUserId } });
+    const user = await prisma.user.findUnique({ 
+      where: { userId: resolvedUserId },
+      include: {
+        followers: { where: { followerId: sessionData?.user.userId } },
+        following: { where: { followingId: sessionData?.user.userId } }
+      }
+    });
     if (!user) {
       return apiError(404, "User not found", "NOT_FOUND");
     }
 
     const isOwn = sessionData?.user.userId === user.userId;
-    return NextResponse.json({ user: { ...mapProfile(user), isOwn } }, { status: 200 });
+    const isFollowing = !isOwn && user.followers.length > 0;
+    const isFollower = !isOwn && user.following.length > 0;
+
+    return NextResponse.json({ 
+      user: { 
+        ...mapProfile({ ...user, role: user.role }), 
+        isOwn,
+        isFollowing,
+        isFollower,
+        isConnected: isFollowing && isFollower
+      } 
+    }, { status: 200 });
   } catch (error) {
     console.error("Get user error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
