@@ -122,19 +122,27 @@ export default function EditProfilePage() {
   return (
     <div className="max-w-2xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => router.back()}
-          className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition"
-        >
-          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Profile</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Update your personal information</p>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Edit Profile</h1>
+            <p className="text-sm text-gray-400 mt-0.5">Update your personal information</p>
+          </div>
         </div>
+        <button
+          onClick={() => router.push("/profile/me")}
+          className="px-4 py-2 rounded-xl text-sm font-medium text-teal-600 border border-teal-200 hover:bg-teal-50 transition"
+        >
+          View public profile
+        </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
