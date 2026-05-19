@@ -58,7 +58,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        categories: categories.map((category) => ({
+        categories: categories.map((category: any) => ({
           id: category.forumID,
           name: category.name,
           description: category.description ?? "",

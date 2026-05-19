@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
+import { getPresignedGetUrl } from "@/lib/storage";
 
 /**
  * @swagger
@@ -64,8 +65,7 @@ import { getSessionUser } from "@/lib/auth-session";
  *         description: Internal server error
  */
 
-// TODO: replace with Prisma + real file storage (e.g. S3) in Week 7
-export const files: Array<{
+export type FileRecord = {
   id: string;
   name: string;
   size: number;
@@ -74,38 +74,7 @@ export const files: Array<{
   uploadedBy: { id: string; name: string };
   spaceId?: string | null;
   createdAt: string;
-}> = [
-  {
-    id: "1",
-    name: "Binary_Trees_Notes.pdf",
-    size: 204800,
-    type: "application/pdf",
-    url: "/uploads/Binary_Trees_Notes.pdf",
-    uploadedBy: { id: "user2", name: "Sarah Chen" },
-    spaceId: null,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "React_Cheatsheet.pdf",
-    size: 102400,
-    type: "application/pdf",
-    url: "/uploads/React_Cheatsheet.pdf",
-    uploadedBy: { id: "user1", name: "Alex Turner" },
-    spaceId: "Capstone Sprint",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Algorithm_Diagrams.png",
-    size: 512000,
-    type: "image/png",
-    url: "/uploads/Algorithm_Diagrams.png",
-    uploadedBy: { id: "user3", name: "Mike Johnson" },
-    spaceId: "Data Structures Lab",
-    createdAt: new Date().toISOString(),
-  },
-];
+};
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
@@ -115,50 +84,45 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const type = searchParams.get("type");
     const spaceId = searchParams.get("spaceId");
-    // Try DB first (persistent files). If DB unavailable, fallback to in-memory mock.
-    try {
-      const where: any = {};
-      if (search) where.fileName = { contains: search, mode: "insensitive" };
-      if (type) where.fileType = { contains: type };
-      if (spaceId) where.spaceID = spaceId;
+    const where: any = {};
+    if (search) where.fileName = { contains: search, mode: "insensitive" };
+    if (type) where.fileType = { contains: type };
+    if (spaceId) where.spaceID = spaceId;
 
+    try {
       const dbFiles = await prisma.file.findMany({
         where,
         include: { uploadedBy: true, space: true },
         orderBy: { updatedAt: "desc" },
       });
 
-      const mapped = dbFiles.map((f) => ({
-        id: f.fileID,
-        name: f.fileName,
-        size: f.fileSize,
-        type: f.fileType,
-        url: f.fileUrl,
-        uploadedBy: { id: f.uploadedBy.userId, name: f.uploadedBy.name },
-        spaceId: f.spaceID ?? null,
-        createdAt: f.updatedAt.toISOString(),
-      }));
+      const mapped: FileRecord[] = await Promise.all(
+        dbFiles.map(async (f) => {
+          const url = await getPresignedGetUrl(f.fileUrl);
+          return {
+            id: f.fileID,
+            name: f.fileName,
+            size: f.fileSize,
+            type: f.fileType,
+            url,
+            uploadedBy: { id: f.uploadedBy.userId, name: f.uploadedBy.name },
+            spaceId: f.spaceID ?? null,
+            createdAt: f.updatedAt.toISOString(),
+          } as FileRecord;
+        })
+      );
 
       return NextResponse.json({ files: mapped }, { status: 200 });
-    } catch (err) {
-      // fallback to in-memory
-      let result = [...files];
-
-      if (search) {
-        result = result.filter((f) =>
-          f.name.toLowerCase().includes(search.toLowerCase())
+    } catch (pErr: any) {
+      // If the schema is not migrated (missing File.spaceID column), avoid returning 500
+      if (pErr && pErr.code === "P2022" && /spaceID/i.test(pErr.message)) {
+        console.warn(
+          "Prisma schema mismatch: File.spaceID column missing. Returning empty file list. Run prisma migrate to update the database.",
+          pErr.message
         );
+        return NextResponse.json({ files: [] }, { status: 200 });
       }
-
-      if (type) {
-        result = result.filter((f) => f.type.includes(type));
-      }
-
-      if (spaceId) {
-        result = result.filter((f) => f.spaceId === spaceId);
-      }
-
-      return NextResponse.json({ files: result }, { status: 200 });
+      throw pErr;
     }
   } catch (error) {
     console.error("Get files error:", error);
@@ -168,68 +132,48 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    const spaceId = (formData.get("spaceId") as string) || null;
+    // MinIO-only flow: client uploads directly to MinIO and calls this endpoint with JSON { objectKey, fileName, fileType, fileSize, spaceId }
 
-    if (!file) {
-      return apiError(400, "No file provided", "BAD_REQUEST");
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return apiError(400, "File exceeds 50MB limit", "BAD_REQUEST");
-    }
+    const contentType = request.headers.get("content-type") || "";
     const sessionUser = await getSessionUser(request.headers);
-    if (!sessionUser) {
-      return apiError(401, "Unauthorized", "UNAUTHORIZED");
+    if (!sessionUser) return apiError(401, "Unauthorized", "UNAUTHORIZED");
+
+    let created: any;
+
+    if (!contentType.includes("application/json")) {
+      return apiError(400, "MinIO upload metadata must be sent as JSON", "BAD_REQUEST");
     }
 
-    // TODO: upload to real storage (S3, Cloudinary, etc.) in Week 7
-    const fileUrl = `/uploads/${file.name}`;
+    const body = (await request.json().catch(() => null)) as
+      | { objectKey?: string; fileName?: string; fileType?: string; fileSize?: number; spaceId?: string | null }
+      | null;
+    if (!body || !body.objectKey || !body.fileName) return apiError(400, "Missing objectKey/fileName", "BAD_REQUEST");
 
-    try {
-      const created = await prisma.file.create({
-        data: {
-          uploadedByID: sessionUser.user.userId,
-          fileName: file.name,
-          fileUrl,
-          fileType: file.type,
-          fileSize: file.size,
-          spaceID: spaceId ?? null,
-        },
-      });
+    const data: any = {
+      uploadedByID: sessionUser.user.userId,
+      fileName: body.fileName,
+      fileUrl: body.objectKey,
+      fileType: body.fileType || "application/octet-stream",
+      fileSize: body.fileSize || 0,
+    };
+    if (body.spaceId) data.spaceID = body.spaceId;
 
-      const resp = {
-        id: created.fileID,
-        name: created.fileName,
-        size: created.fileSize,
-        type: created.fileType,
-        url: created.fileUrl,
-        uploadedBy: { id: sessionUser.user.userId, name: sessionUser.user.name },
-        spaceId: created.spaceID ?? null,
-        createdAt: created.updatedAt.toISOString(),
-      };
+    created = await prisma.file.create({ data });
 
-      return NextResponse.json({ message: "File uploaded successfully", file: resp }, { status: 201 });
-    } catch (err) {
-      // fallback: in-memory mock
-      const newFile = {
-        id: Date.now().toString(),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: fileUrl,
-        uploadedBy: { id: sessionUser.user.userId, name: sessionUser.user.name },
-        spaceId,
-        createdAt: new Date().toISOString(),
-      };
+    const resp: FileRecord = {
+      id: created.fileID,
+      name: created.fileName,
+      size: created.fileSize,
+      type: created.fileType,
+      url: created.fileUrl,
+      uploadedBy: { id: sessionUser.user.userId, name: sessionUser.user.name },
+      spaceId: created.spaceID ?? null,
+      createdAt: created.updatedAt.toISOString(),
+    };
 
-      files.push(newFile);
-
-      return NextResponse.json({ message: "File uploaded successfully (mock)", file: newFile }, { status: 201 });
-    }
-  } catch (error) {
+    return NextResponse.json({ message: "File uploaded successfully", file: resp }, { status: 201 });
+  } catch (error: any) {
     console.error("Upload file error:", error);
-    return apiError(500, "Internal server error", "INTERNAL_ERROR");
+    return apiError(500, error?.message || "Internal server error", "INTERNAL_ERROR");
   }
 }
