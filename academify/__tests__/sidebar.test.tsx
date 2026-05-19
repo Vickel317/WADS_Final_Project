@@ -23,6 +23,7 @@ describe("Sidebar – rendering", () => {
     expect(screen.getByRole("link", { name: /profile/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /forums/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /chat/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /collab space/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /files/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /events/i })).toBeInTheDocument();
   });
@@ -32,6 +33,7 @@ describe("Sidebar – rendering", () => {
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: /forums/i })).toHaveAttribute("href", "/forums");
     expect(screen.getByRole("link", { name: /chat/i })).toHaveAttribute("href", "/messages");
+    expect(screen.getByRole("link", { name: /collab space/i })).toHaveAttribute("href", "/collaboration");
     expect(screen.getByRole("link", { name: /files/i })).toHaveAttribute("href", "/files");
     expect(screen.getByRole("link", { name: /events/i })).toHaveAttribute("href", "/events");
   });

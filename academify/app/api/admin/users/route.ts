@@ -3,7 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 
-const VALID_ROLES = new Set(["student", "moderator", "admin"]);
+import { UserRole } from "@prisma/client";
 
 
 
@@ -56,12 +56,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const role = searchParams.get("role");
+    const role = searchParams.get("role")?.toUpperCase();
     const status = searchParams.get("status");
     const search = searchParams.get("search")?.toLowerCase();
 
-    if (role && !VALID_ROLES.has(role)) {
-      return apiError(400, "role must be student, moderator, or admin", "BAD_REQUEST");
+    if (role && !Object.values(UserRole).includes(role as UserRole)) {
+      return apiError(400, "Invalid role", "BAD_REQUEST");
     }
 
     if (status && status !== "active") {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     const where = {
-      ...(role ? { role: role.toUpperCase() } : {}),
+      ...(role ? { role: role as UserRole } : {}),
       ...(search
         ? {
             OR: [
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
             ],
           }
         : {}),
-    } as const;
+    };
 
     const users = await prisma.user.findMany({ where });
 
@@ -101,6 +101,8 @@ export async function GET(request: NextRequest) {
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
 
 
 

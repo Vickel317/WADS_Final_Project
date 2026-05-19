@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   Upload,
@@ -29,11 +30,53 @@ interface Folder {
   color: string;
   bgColor: string;
 }
+
+interface CollaborationSpace {
+  name: string;
+  members: string[];
+  files: number;
+  focus: string;
+}
+
+interface CollaborationActivity {
+  actor: string;
+  action: string;
+  time: string;
+}
+
 const FOLDERS: Folder[] = [
   { name: "Computer Science", count: 24, color: "#6366f1", bgColor: "#eef2ff" },
   { name: "Mathematics", count: 18, color: "#8b5cf6", bgColor: "#f5f3ff" },
   { name: "Projects", count: 12, color: "#06b6d4", bgColor: "#ecfeff" },
   { name: "Study Materials", count: 31, color: "#10b981", bgColor: "#ecfdf5" },
+];
+
+const COLLABORATION_SPACES: CollaborationSpace[] = [
+  {
+    name: "Capstone Sprint",
+    members: ["Alya", "Rafi", "Mira"],
+    files: 18,
+    focus: "Shared specs, design notes, and weekly checkpoints.",
+  },
+  {
+    name: "Data Structures Lab",
+    members: ["Sarah", "Kevin", "Diana"],
+    files: 11,
+    focus: "Lecture notes, diagrams, and practice problem solutions.",
+  },
+  {
+    name: "Study Group Hub",
+    members: ["Alex", "Nadia", "Hugo"],
+    files: 9,
+    focus: "Fast updates, revision packs, and meeting reminders.",
+  },
+];
+
+const COLLABORATION_ACTIVITY: CollaborationActivity[] = [
+  { actor: "Sarah", action: "uploaded a revised UML diagram", time: "2 min ago" },
+  { actor: "Alya", action: "pinned the sprint checklist", time: "17 min ago" },
+  { actor: "Rafi", action: "commented on the thesis outline", time: "42 min ago" },
+  { actor: "Mira", action: "shared meeting notes with the team", time: "1h ago" },
 ];
 
 const MY_FILES: FileItem[] = [
@@ -214,6 +257,8 @@ export default function FilesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [selectedSpace, setSelectedSpace] = useState<string | "">("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const tabFiles =
     activeTab === "my"
@@ -258,9 +303,87 @@ export default function FilesPage() {
             className="flex-1 text-sm text-gray-700 outline-none bg-transparent placeholder-gray-400"
           />
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 px-4 sm:px-6 py-3 flex flex-col items-center justify-center sm:min-w-[120px]">
+        <div
+          className="bg-white rounded-xl border border-gray-200 px-4 sm:px-6 py-3 flex flex-col items-center justify-center"
+          style={{ minWidth: 120 }}
+        >
           <span className="text-2xl font-bold text-gray-900">142</span>
           <span className="text-xs text-gray-400">Total Files</span>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1.4fr_0.9fr] mb-5">
+        <div
+          className="relative overflow-hidden rounded-2xl border border-teal-100 p-5 text-white shadow-sm"
+          style={{ backgroundImage: "linear-gradient(135deg, #0f766e, #14b8a6, #06b6d4)" }}
+        >
+          <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-2xl" />
+          <div className="relative flex flex-col gap-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-white/70">Collaboration Space</p>
+                <h2 className="mt-1 text-xl font-bold">Keep files, notes, and team progress in one place</h2>
+                <p className="mt-1.5 max-w-2xl text-sm text-white/80">
+                  Build shared workspaces for assignments, track who is editing what, and keep every upload connected to the right team.
+                </p>
+              </div>
+              <Link
+                href="/collaboration"
+                className="inline-flex items-center justify-center rounded-full border border-white/20 bg-white/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/25"
+              >
+                Open collaboration hub
+              </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {COLLABORATION_SPACES.map((space) => (
+                <div key={space.name} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                  <p className="text-sm font-semibold">{space.name}</p>
+                  <p className="mt-1 text-xs text-white/75">{space.focus}</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {space.members.map((member) => (
+                      <span key={member} className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium text-white/90">
+                        {member}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/70">
+                    {space.files} shared files
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">Live collaboration feed</h3>
+              <p className="text-xs text-gray-400 mt-1">Recent activity from shared spaces</p>
+            </div>
+            <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700">8 active today</span>
+          </div>
+
+          <div className="space-y-3">
+            {COLLABORATION_ACTIVITY.map((item) => (
+              <div key={`${item.actor}-${item.time}`} className="flex items-start gap-3 rounded-xl border border-gray-100 px-3 py-3">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-700">
+                  {item.actor.slice(0, 1)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold text-gray-900">{item.actor}</span> {item.action}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">{item.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            Tip: attach files directly to a space so every team member sees the same version history and discussion trail.
+          </div>
         </div>
       </div>
 
@@ -358,12 +481,12 @@ export default function FilesPage() {
               <p className="text-sm font-medium text-gray-600">
                 Drag & drop files here
               </p>
-              <p className="text-xs text-gray-400 mt-1">
-                or{" "}
-                <span className="text-teal-600 cursor-pointer font-medium">
-                  browse files
-                </span>
-              </p>
+              <p className="text-xs text-gray-400 mt-1">or</p>
+              <input
+                type="file"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                className="mt-2"
+              />
               <p className="text-xs text-gray-400 mt-3">
                 PDF, DOCX, PNG, ZIP, PPTX • Max 50 MB
               </p>
@@ -388,6 +511,22 @@ export default function FilesPage() {
               </div>
             </div>
 
+            <div className="mb-4">
+              <label className="text-xs font-medium text-gray-600 block mb-1">Attach to collaboration space (optional)</label>
+              <select
+                value={selectedSpace}
+                onChange={(e) => setSelectedSpace(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
+              >
+                <option value="">— none —</option>
+                {COLLABORATION_SPACES.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowUploadModal(false)}
@@ -396,6 +535,26 @@ export default function FilesPage() {
                 Cancel
               </button>
               <button
+                onClick={async () => {
+                  if (!selectedFile) return;
+                  const fd = new FormData();
+                  fd.append("file", selectedFile);
+                  if (selectedSpace) fd.append("spaceId", selectedSpace);
+
+                  try {
+                    const res = await fetch("/api/files", { method: "POST", body: fd });
+                    if (res.ok) {
+                      setShowUploadModal(false);
+                      setSelectedFile(null);
+                      setSelectedSpace("");
+                    } else {
+                      // handle error (simple alert for now)
+                      alert("Upload failed");
+                    }
+                  } catch (e) {
+                    alert("Upload failed");
+                  }
+                }}
                 className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition-colors"
                 style={{ backgroundColor: "#0d9488" }}
               >

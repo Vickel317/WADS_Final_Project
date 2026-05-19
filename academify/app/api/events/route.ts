@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       location?: unknown;
       category?: unknown;
       maxAttendees?: unknown;
+      forumID?: unknown;
     }>(request);
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
     const category = parseOptionalString(body.category);
     const duration = parseOptionalNumber(body.duration);
     const maxAttendees = parseOptionalNumber(body.maxAttendees);
+    const forumID = parseRequiredString(body.forumID);
 
     if (title.error) errors.push({ field: "title", message: `title ${title.error}` });
     if (location.error) {
@@ -129,6 +131,7 @@ export async function POST(request: NextRequest) {
     const createdEvent = await prisma.event.create({
       data: {
         creatorID: sessionUser.user.userId,
+        forumID: forumID.value!,
         title: title.value!,
         description: description.value || "",
         dateTime: date.value!,

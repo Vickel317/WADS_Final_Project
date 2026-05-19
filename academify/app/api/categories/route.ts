@@ -52,14 +52,14 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
 
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await prisma.forumHub.findMany({
       orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json(
       {
         categories: categories.map((category) => ({
-          id: category.categoryID,
+          id: category.forumID,
           name: category.name,
           description: category.description ?? "",
           slug: category.name.toLowerCase(),
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const exists = await prisma.category.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
+    const exists = await prisma.forumHub.findFirst({
+      where: { name: { equals: name.value, mode: "insensitive" } },
     });
     if (exists) {
       return apiError(
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const created = await prisma.category.create({
+    const created = await prisma.forumHub.create({
       data: {
         name: name.value!,
         description: description.value!,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     });
 
     const newCategory = {
-      id: created.categoryID,
+      id: created.forumID,
       name: name.value!,
       description: description.value!,
       slug: slug.value!,

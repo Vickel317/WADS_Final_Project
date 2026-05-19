@@ -75,8 +75,8 @@ export async function GET(request: NextRequest) {
     const where = categoryId
       ? {
           OR: [
-            { categoryID: categoryId },
-            { category: { name: { equals: categoryId, mode: "insensitive" as const } } },
+            { forumID: categoryId },
+            { forum: { name: { equals: categoryId, mode: "insensitive" as const } } },
           ],
         }
       : {};
@@ -85,10 +85,10 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         author: { select: { name: true } },
-        category: { select: { name: true } },
+        forum: { select: { name: true } },
         comments: { select: { commentID: true } },
       },
-      orderBy: trending ? { comments: { _count: "desc" } } : { createdAt: "desc" },
+      orderBy: trending ? { _count: { comments: "desc" } } : { createdAt: "desc" },
       take: Number.isFinite(limit) ? limit : 10,
     });
 
@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
           id: post.postID,
           title: post.title,
           content: post.content,
-          categoryId: post.categoryID,
-          tag: post.category.name.toLowerCase(),
+          forumId: post.forumID,
+          tag: post.forum.name.toLowerCase(),
           author: post.author.name,
           replyCount: post.comments.length,
           replies: post.comments.length,
@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const category = await prisma.category.findFirst({
+    const category = await prisma.forumHub.findFirst({
       where: {
         OR: [
-          { categoryID: categoryId },
+          { forumID: categoryId },
           { name: { equals: categoryId, mode: "insensitive" } },
         ],
       },
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       data: {
         title: title.value!,
         content: content.value!,
-        categoryID: category.categoryID,
+        forumID: category.forumID,
         authorID: sessionUser.user.userId,
         moderationStatus: ModerationStatus.PENDING,
       },
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
           id: created.postID,
           title: created.title,
           content: created.content,
-          categoryId: created.categoryID,
+          forumId: created.forumID,
           author: created.author.name,
           status: created.moderationStatus.toLowerCase(),
           createdAt: created.createdAt.toISOString(),
