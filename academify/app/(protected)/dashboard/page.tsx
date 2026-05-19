@@ -15,6 +15,7 @@ export default async function DashboardPage() {
     eventsCount,
     postsCount,
     filesCount,
+    connectionsCount,
     upcomingEvents,
     trendingPosts,
     recentComments
@@ -23,6 +24,16 @@ export default async function DashboardPage() {
     prisma.eventAttendee.count({ where: { userID: session.user.userId } }),
     prisma.post.count({ where: { authorID: session.user.userId } }),
     prisma.file.count({ where: { uploadedByID: session.user.userId } }),
+    prisma.follow.count({
+      where: {
+        followerId: session.user.userId,
+        following: {
+          following: {
+            some: { followingId: session.user.userId },
+          },
+        },
+      },
+    }),
     prisma.event.findMany({
       where: { dateTime: { gte: new Date() } },
       orderBy: { dateTime: "asc" },
@@ -42,7 +53,7 @@ export default async function DashboardPage() {
   ]);
 
   const statCards = [
-    { label: "Connections",     value: "2",    icon: ( // Placeholder until friends schema is implemented
+    { label: "Connections",     value: connectionsCount,    icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
     ), color: "text-blue-500", bg: "bg-blue-50" },
     { label: "Forum Posts",     value: postsCount,     icon: (
@@ -105,7 +116,7 @@ export default async function DashboardPage() {
                         {comment.post.title}
                       </Link>
                     </p>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">"{comment.content}"</p>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">&quot;{comment.content}&quot;</p>
                     <div className="flex items-center gap-1 mt-1.5">
                       <span className="text-[11px] text-gray-400">
                         {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
