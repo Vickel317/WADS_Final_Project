@@ -30,7 +30,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getSessionUser(request.headers);
-    if (!session) return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    if (!session) {
+      console.warn("Create collaboration: no session (unauthenticated)");
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    }
 
     const body = await request.json();
     const { name, description, forumID } = body as {
@@ -43,13 +46,32 @@ export async function POST(request: NextRequest) {
       return apiError(400, "Missing required field: name", "BAD_REQUEST");
     }
 
-    const space = await prisma.collabSpace.create({
-      data: {
-        name,
-        description: description ?? null,
-        forumID: forumID ?? "",
-      },
-    });
+    console.log("Create collaboration payload:", { name, description, forumID, user: session.user.userId });
+    let space;
+    try {
+      let finalForumID = forumID ?? "";
+      if (!finalForumID || finalForumID.trim() === "") {
+        // No forum provided — create a lightweight ForumHub to satisfy FK
+        const forum = await prisma.forumHub.create({
+          data: {
+            name: `forum-for-${Date.now()}`,
+            description: `Auto-created for space ${name}`,
+          },
+        });
+        finalForumID = forum.forumID;
+      }
+
+      space = await prisma.collabSpace.create({
+        data: {
+          name,
+          description: description ?? null,
+          forumID: finalForumID,
+        },
+      });
+    } catch (err: any) {
+      console.error("Prisma create collabSpace error:", err);
+      return apiError(500, err?.message || "Internal server error", "INTERNAL_ERROR");
+    }
 
     // Add creator as a member
     await prisma.spaceMember.create({

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Upload,
   Search,
@@ -22,6 +22,7 @@ interface FileItem {
   uploadedAt: string;
   downloads: number;
   sharedWith?: string;
+  url: string;
 }
 
 interface Folder {
@@ -32,122 +33,34 @@ interface Folder {
 }
 
 interface CollaborationSpace {
+  id: string;
   name: string;
-  members: string[];
-  files: number;
-  focus: string;
+  description: string | null;
+  forumID: string;
+  createdAt: string;
+}
+type FileApiRecord = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  createdAt: string;
+  spaceId?: string | null;
+};
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${size} B`;
 }
 
-interface CollaborationActivity {
-  actor: string;
-  action: string;
-  time: string;
+function normalizeFileType(type: string): FileItem["type"] {
+  if (type.includes("pdf")) return "pdf";
+  if (type.includes("zip")) return "zip";
+  if (type.includes("presentation")) return "pptx";
+  if (type.includes("png")) return "png";
+  return "docx";
 }
-
-const FOLDERS: Folder[] = [
-  { name: "Computer Science", count: 24, color: "#6366f1", bgColor: "#eef2ff" },
-  { name: "Mathematics", count: 18, color: "#8b5cf6", bgColor: "#f5f3ff" },
-  { name: "Projects", count: 12, color: "#06b6d4", bgColor: "#ecfeff" },
-  { name: "Study Materials", count: 31, color: "#10b981", bgColor: "#ecfdf5" },
-];
-
-const COLLABORATION_SPACES: CollaborationSpace[] = [
-  {
-    name: "Capstone Sprint",
-    members: ["Alya", "Rafi", "Mira"],
-    files: 18,
-    focus: "Shared specs, design notes, and weekly checkpoints.",
-  },
-  {
-    name: "Data Structures Lab",
-    members: ["Sarah", "Kevin", "Diana"],
-    files: 11,
-    focus: "Lecture notes, diagrams, and practice problem solutions.",
-  },
-  {
-    name: "Study Group Hub",
-    members: ["Alex", "Nadia", "Hugo"],
-    files: 9,
-    focus: "Fast updates, revision packs, and meeting reminders.",
-  },
-];
-
-const COLLABORATION_ACTIVITY: CollaborationActivity[] = [
-  { actor: "Sarah", action: "uploaded a revised UML diagram", time: "2 min ago" },
-  { actor: "Alya", action: "pinned the sprint checklist", time: "17 min ago" },
-  { actor: "Rafi", action: "commented on the thesis outline", time: "42 min ago" },
-  { actor: "Mira", action: "shared meeting notes with the team", time: "1h ago" },
-];
-
-const MY_FILES: FileItem[] = [
-  {
-    id: "1",
-    name: "Data_Structures_Notes.pdf",
-    type: "pdf",
-    size: "2.4 MB",
-    uploadedAt: "Feb 20, 2026",
-    downloads: 45,
-  },
-  {
-    id: "2",
-    name: "Machine_Learning_Project.zip",
-    type: "zip",
-    size: "15.8 MB",
-    uploadedAt: "Feb 18, 2026",
-    downloads: 12,
-  },
-  {
-    id: "3",
-    name: "Algorithm_Analysis_Slides.pptx",
-    type: "pptx",
-    size: "5.2 MB",
-    uploadedAt: "Feb 15, 2026",
-    downloads: 28,
-  },
-  {
-    id: "4",
-    name: "Database_Design_Diagram.png",
-    type: "png",
-    size: "1.1 MB",
-    uploadedAt: "Feb 12, 2026",
-    downloads: 9,
-  },
-];
-
-const SHARED_FILES: FileItem[] = [
-  {
-    id: "5",
-    name: "Linear_Algebra_Notes.pdf",
-    type: "pdf",
-    size: "3.7 MB",
-    uploadedAt: "Feb 19, 2026",
-    downloads: 67,
-    sharedWith: "Sarah K.",
-  },
-  {
-    id: "6",
-    name: "Web_Dev_Project.zip",
-    type: "zip",
-    size: "22.3 MB",
-    uploadedAt: "Feb 14, 2026",
-    downloads: 34,
-    sharedWith: "Alex M.",
-  },
-  {
-    id: "7",
-    name: "OS_Concepts_Slides.pptx",
-    type: "pptx",
-    size: "8.9 MB",
-    uploadedAt: "Feb 10, 2026",
-    downloads: 51,
-    sharedWith: "Group - CS401",
-  },
-];
-
-const RECENT_FILES: FileItem[] = [
-  ...MY_FILES.slice(0, 2),
-  SHARED_FILES[0],
-].sort(() => Math.random() - 0.5);
 
 
 
@@ -199,8 +112,37 @@ function getFolderIcon(color: string, bgColor: string) {
 }
 
 
-function FileRow({ file }: { file: FileItem }) {
+function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: CollaborationSpace[]; onDelete: (id: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareSpace, setShareSpace] = useState<string>("");
+  const [shareEmail, setShareEmail] = useState<string>("");
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = async () => {
+    if (!shareSpace) return;
+
+    setSharing(true);
+    try {
+      const res = await fetch(`/api/files/${file.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId: shareSpace }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Unable to share file");
+      }
+
+      setShareOpen(false);
+      setShareSpace("");
+      alert("File shared to collaboration space");
+    } catch {
+      alert("Share failed");
+    } finally {
+      setSharing(false);
+    }
+  };
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 gap-3">
@@ -217,11 +159,30 @@ function FileRow({ file }: { file: FileItem }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-4">
-        <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors">
+        <button
+          onClick={() => {
+            // Trigger native download/open
+            try {
+              const a = document.createElement('a');
+              a.href = file.url;
+              a.target = '_blank';
+              a.download = file.name || '';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            } catch (e) {
+              window.open(file.url, '_blank');
+            }
+          }}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors"
+        >
           <Download size={13} />
           Download
         </button>
-        <button className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors">
+        <button
+          onClick={() => setShareOpen(true)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors"
+        >
           <Share2 size={13} />
           Share
         </button>
@@ -240,13 +201,99 @@ function FileRow({ file }: { file: FileItem }) {
               <button className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
                 Move to folder
               </button>
-              <button className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50">
+              <button
+                onClick={async () => {
+                  if (!confirm('Delete this file? This cannot be undone.')) return;
+                  try {
+                    const res = await fetch(`/api/files/${file.id}`, { method: 'DELETE', credentials: 'include' });
+                    if (!res.ok) throw new Error('Delete failed');
+                    onDelete(file.id);
+                    alert('File deleted');
+                  } catch (e) {
+                    alert('Failed to delete file');
+                  }
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50"
+              >
                 Delete
               </button>
             </div>
           )}
         </div>
       </div>
+
+      {shareOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h4 className="text-base font-semibold text-gray-900">Share file</h4>
+            <p className="mt-1 text-sm text-gray-500">Attach this file to a collaboration space so other members can access it.</p>
+
+            <label className="mt-4 block text-xs font-medium text-gray-600">Collaboration space</label>
+            <select
+              value={shareSpace}
+              onChange={(e) => setShareSpace(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select a space...</option>
+              {spaces.map((space) => (
+                <option key={space.id} value={space.id}>
+                  {space.name}
+                </option>
+              ))}
+            </select>
+
+            <label className="mt-3 block text-xs font-medium text-gray-600">Or share via email</label>
+            <input
+              type="email"
+              placeholder="recipient@example.com"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setShareOpen(false)}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleShare}
+                disabled={!shareSpace || sharing}
+                className="flex-1 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sharing ? "Sharing..." : "Share"}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!shareEmail) return alert('Enter recipient email');
+                  setSharing(true);
+                  try {
+                    const res = await fetch(`/api/files/${file.id}/share`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: shareEmail }),
+                      credentials: 'include',
+                    });
+                    if (!res.ok) throw new Error('Share by email failed');
+                    setShareOpen(false);
+                    setShareEmail('');
+                    alert('File shared via email');
+                  } catch (e) {
+                    alert('Share by email failed');
+                  } finally {
+                    setSharing(false);
+                  }
+                }}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Share via email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -259,13 +306,63 @@ export default function FilesPage() {
   const [dragging, setDragging] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState<string | "">("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [spaces, setSpaces] = useState<CollaborationSpace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const tabFiles =
-    activeTab === "my"
-      ? MY_FILES
-      : activeTab === "shared"
-      ? SHARED_FILES
-      : RECENT_FILES;
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [filesResponse, spacesResponse] = await Promise.all([
+          fetch("/api/files"),
+          fetch("/api/collaboration"),
+        ]);
+
+        const filesPayload = await filesResponse.json().catch(() => ({}));
+        const spacesPayload = await spacesResponse.json().catch(() => ({}));
+
+        if (!filesResponse.ok) {
+          throw new Error(filesPayload?.error?.message || "Failed to load files");
+        }
+        if (!spacesResponse.ok) {
+          throw new Error(spacesPayload?.error?.message || "Failed to load collaboration spaces");
+        }
+
+        setFiles(
+          (filesPayload.files || []).map((file: FileApiRecord) => ({
+            id: file.id,
+            name: file.name,
+            type: normalizeFileType(file.type),
+            size: formatFileSize(file.size),
+            uploadedAt: new Date(file.createdAt).toLocaleDateString(),
+            downloads: 0,
+            sharedWith: file.spaceId ? `Space ${file.spaceId}` : undefined,
+          }))
+        );
+
+        setSpaces(
+          (spacesPayload.spaces || []).map((space: { spaceID: string; name: string; description: string | null; forumID: string; createdAt: string }) => ({
+            id: space.spaceID,
+            name: space.name,
+            description: space.description,
+            forumID: space.forumID,
+            createdAt: space.createdAt,
+          }))
+        );
+        setLoadError(null);
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const tabFiles = files;
 
   const filteredFiles = tabFiles.filter((f) =>
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -307,7 +404,7 @@ export default function FilesPage() {
           className="bg-white rounded-xl border border-gray-200 px-4 sm:px-6 py-3 flex flex-col items-center justify-center"
           style={{ minWidth: 120 }}
         >
-          <span className="text-2xl font-bold text-gray-900">142</span>
+          <span className="text-2xl font-bold text-gray-900">{files.length}</span>
           <span className="text-xs text-gray-400">Total Files</span>
         </div>
       </div>
@@ -336,75 +433,32 @@ export default function FilesPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              {COLLABORATION_SPACES.map((space) => (
-                <div key={space.name} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-                  <p className="text-sm font-semibold">{space.name}</p>
-                  <p className="mt-1 text-xs text-white/75">{space.focus}</p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {space.members.map((member) => (
-                      <span key={member} className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium text-white/90">
-                        {member}
-                      </span>
-                    ))}
+              {spaces.length ? (
+                spaces.slice(0, 3).map((space) => (
+                  <div key={space.id} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+                    <p className="text-sm font-semibold">{space.name}</p>
+                    <p className="mt-1 text-xs text-white/75">{space.description ?? "No description provided."}</p>
+                    <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/70">
+                      <span className="inline-block max-w-48 align-middle overflow-hidden whitespace-nowrap text-ellipsis truncate">Forum {space.forumID}</span>
+                    </p>
                   </div>
-                  <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/70">
-                    {space.files} shared files
-                  </p>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm text-white/75">
+                  No collaboration spaces found.
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800">Live collaboration feed</h3>
-              <p className="text-xs text-gray-400 mt-1">Recent activity from shared spaces</p>
-            </div>
-            <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-700">8 active today</span>
-          </div>
-
-          <div className="space-y-3">
-            {COLLABORATION_ACTIVITY.map((item) => (
-              <div key={`${item.actor}-${item.time}`} className="flex items-start gap-3 rounded-xl border border-gray-100 px-3 py-3">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-700">
-                  {item.actor.slice(0, 1)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold text-gray-900">{item.actor}</span> {item.action}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">{item.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-sm font-semibold text-gray-800">Live collaboration feed</h3>
+          <p className="text-xs text-gray-400 mt-1">Recent activity from shared spaces</p>
 
           <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
-            Tip: attach files directly to a space so every team member sees the same version history and discussion trail.
+            Live activity is not seeded anymore. It will appear once collaboration events are connected.
           </div>
-        </div>
-      </div>
-
-      {/* Folders */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Folders</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {FOLDERS.map((folder) => (
-            <button
-              key={folder.name}
-              className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all text-left"
-            >
-              {getFolderIcon(folder.color, folder.bgColor)}
-              <div>
-                <p className="text-sm font-medium text-gray-800 leading-tight">
-                  {folder.name}
-                </p>
-                <p className="text-xs text-gray-400">{folder.count} files</p>
-              </div>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -414,8 +468,8 @@ export default function FilesPage() {
         <div className="flex border-b border-gray-100 px-3 sm:px-4 overflow-x-auto">
           {(
             [
-              { key: "my", label: "My Files" },
-              { key: "shared", label: "Shared with Me" },
+              { key: "my", label: "All Files" },
+              { key: "shared", label: "Shared" },
               { key: "recent", label: "Recent" },
             ] as const
           ).map((tab) => (
@@ -434,8 +488,23 @@ export default function FilesPage() {
         </div>
 
         {/* Files */}
-        {filteredFiles.length > 0 ? (
-          filteredFiles.map((file) => <FileRow key={file.id} file={file} />)
+        {loadError ? (
+          <div className="py-12 text-center text-red-500">
+            <p className="text-sm">{loadError}</p>
+          </div>
+        ) : loading ? (
+          <div className="py-12 text-center text-gray-400">
+            <p className="text-sm">Loading files...</p>
+          </div>
+        ) : filteredFiles.length > 0 ? (
+          filteredFiles.map((file) => (
+            <FileRow
+              key={file.id}
+              file={file}
+              spaces={spaces}
+              onDelete={(id) => setFiles((prev) => prev.filter((f) => f.id !== id))}
+            />
+          ))
         ) : (
           <div className="py-12 text-center text-gray-400">
             <FileText size={32} className="mx-auto mb-2 opacity-40" />
@@ -469,7 +538,7 @@ export default function FilesPage() {
               onDrop={(e) => {
                 e.preventDefault();
                 setDragging(false);
-                // handle file drop
+                setSelectedFile(e.dataTransfer.files?.[0] ?? null);
               }}
               className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center mb-4 transition-colors ${
                 dragging
@@ -487,21 +556,30 @@ export default function FilesPage() {
                 onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
                 className="mt-2"
               />
+              {selectedFile && (
+                <p className="text-xs text-gray-500 mt-2">Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})</p>
+              )}
               <p className="text-xs text-gray-400 mt-3">
                 PDF, DOCX, PNG, ZIP, PPTX • Max 50 MB
               </p>
             </div>
 
-            {/* Folder select */}
+            {/* Collaboration space select */}
             <div className="mb-4">
               <label className="text-xs font-medium text-gray-600 block mb-1">
-                Save to folder
+                Attach to collaboration space (optional)
               </label>
               <div className="relative">
-                <select className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 appearance-none outline-none focus:border-teal-500 bg-white pr-8">
-                  <option>Select a folder...</option>
-                  {FOLDERS.map((f) => (
-                    <option key={f.name}>{f.name}</option>
+                <select
+                  value={selectedSpace}
+                  onChange={(e) => setSelectedSpace(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 appearance-none outline-none focus:border-teal-500 bg-white pr-8"
+                >
+                  <option value="">Select a space...</option>
+                  {spaces.map((space) => (
+                    <option key={space.id} value={space.id}>
+                      {space.name}
+                    </option>
                   ))}
                 </select>
                 <ChevronDown
@@ -509,22 +587,6 @@ export default function FilesPage() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
                 />
               </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="text-xs font-medium text-gray-600 block mb-1">Attach to collaboration space (optional)</label>
-              <select
-                value={selectedSpace}
-                onChange={(e) => setSelectedSpace(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2"
-              >
-                <option value="">— none —</option>
-                {COLLABORATION_SPACES.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div className="flex gap-3">
@@ -536,23 +598,48 @@ export default function FilesPage() {
               </button>
               <button
                 onClick={async () => {
-                  if (!selectedFile) return;
-                  const fd = new FormData();
-                  fd.append("file", selectedFile);
-                  if (selectedSpace) fd.append("spaceId", selectedSpace);
+                  if (!selectedFile) return alert('Please choose a file first');
+                  const presignRes = await fetch('/api/storage/presign', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ fileName: selectedFile.name, contentType: selectedFile.type }),
+                  });
+
+                  if (!presignRes.ok) {
+                    const payload = await presignRes.json().catch(() => ({}));
+                    throw new Error(payload?.error?.message || payload?.message || 'Failed to get upload URL');
+                  }
+
+                  const json = await presignRes.json().catch(() => ({}));
+                  const uploadUrl = json?.url;
+                  const objectKey = json?.key;
+                  if (!uploadUrl || !objectKey) throw new Error('Invalid presign response');
+
+                  const putRes = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    body: selectedFile,
+                    headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+                  });
+
+                  if (!putRes.ok) throw new Error('Upload to storage failed');
 
                   try {
-                    const res = await fetch("/api/files", { method: "POST", body: fd });
-                    if (res.ok) {
-                      setShowUploadModal(false);
-                      setSelectedFile(null);
-                      setSelectedSpace("");
-                    } else {
-                      // handle error (simple alert for now)
-                      alert("Upload failed");
-                    }
-                  } catch (e) {
-                    alert("Upload failed");
+                    const createRes = await fetch('/api/files', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ objectKey, fileName: selectedFile.name, fileType: selectedFile.type, fileSize: selectedFile.size, spaceId: selectedSpace || null }),
+                    });
+
+                    const payload = await createRes.json().catch(() => ({}));
+                    if (!createRes.ok) throw new Error(payload?.error?.message || payload?.message || 'Failed to save file metadata');
+
+                    setShowUploadModal(false);
+                    setSelectedFile(null);
+                    setSelectedSpace("");
+                  } catch (e: any) {
+                    throw e;
                   }
                 }}
                 className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition-colors"

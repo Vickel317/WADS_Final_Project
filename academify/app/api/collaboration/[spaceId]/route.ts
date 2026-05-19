@@ -49,3 +49,24 @@ export async function DELETE(
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ spaceId: string }> }
+) {
+  try {
+    const session = await getSessionUser(request.headers);
+    if (!session) return apiError(401, "Not authenticated", "UNAUTHORIZED");
+
+    const { spaceId } = await params;
+    // create membership if not exists
+    const existing = await prisma.spaceMember.findUnique({ where: { spaceID_userID: { spaceID: spaceId, userID: session.user.userId } } });
+    if (existing) return NextResponse.json({ member: existing }, { status: 200 });
+
+    const member = await prisma.spaceMember.create({ data: { spaceID: spaceId, userID: session.user.userId, role: 'MEMBER' } });
+    return NextResponse.json({ member }, { status: 201 });
+  } catch (err) {
+    console.error("Join collaboration space error:", err);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
+  }
+}

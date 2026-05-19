@@ -83,6 +83,8 @@ export default function ConversationPage() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState(mockMessages[userId] ?? []);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [spaceFiles, setSpaceFiles] = useState<any[]>([]);
+  const [spaceInfo, setSpaceInfo] = useState<{ name?: string } | null>(null);
 
   const activeConv = mockConversations.find((c) => c.id === userId);
   const filtered = mockConversations.filter((c) =>
@@ -92,6 +94,36 @@ export default function ConversationPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (userId.startsWith("space-")) {
+      const spaceId = userId.replace("space-", "");
+      (async () => {
+        try {
+          const [spaceRes, filesRes] = await Promise.all([
+            fetch(`/api/collaboration/${spaceId}`),
+            fetch(`/api/files?spaceId=${spaceId}`),
+          ]);
+          // Try to join the space (idempotent)
+          try { await fetch(`/api/collaboration/${spaceId}`, { method: 'POST', credentials: 'include' }); } catch {}
+          if (spaceRes.ok) {
+            const p = await spaceRes.json();
+            setSpaceInfo({ name: p.space?.name });
+          }
+          if (filesRes.ok) {
+            const pf = await filesRes.json();
+            setSpaceFiles(pf.files || []);
+          }
+        } catch (e) {
+          // ignore
+        }
+      })();
+    } else {
+      setSpaceFiles([]);
+      setSpaceInfo(null);
+    }
+  }, [userId]);
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -231,6 +263,20 @@ export default function ConversationPage() {
             </svg>
           </button>
         </div>
+
+        {/* Files preview for collaboration spaces */}
+        {userId?.startsWith("space-") && (
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <h4 className="text-sm font-semibold mb-2">Files in this space {spaceInfo?.name ? `— ${spaceInfo.name}` : ''}</h4>
+            <div className="flex gap-2 overflow-x-auto">
+              {spaceFiles.length ? spaceFiles.map((f) => (
+                <a key={f.id} href={f.url} className="px-3 py-2 bg-white rounded-lg text-xs text-gray-700 border border-gray-100 whitespace-nowrap">{f.name}</a>
+              )) : (
+                <div className="text-xs text-gray-400">No files</div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">

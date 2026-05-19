@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+// UserRole enum is provided by Prisma client; avoid importing directly to prevent mismatches
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 
@@ -91,7 +91,7 @@ export async function PUT(
 
     const updated = await prisma.user.update({
       where: { userId },
-      data: { role: role.value.toUpperCase() as unknown as UserRole },
+      data: { role: role.value.toUpperCase() as unknown as any },
     });
 
     return NextResponse.json(
