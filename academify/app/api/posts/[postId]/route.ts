@@ -103,6 +103,7 @@ export async function GET(
       where: { postID: postId },
       include: {
         author: { select: { name: true } },
+        forum: { select: { name: true } },
         comments: { select: { commentID: true } },
       },
     });
@@ -117,7 +118,7 @@ export async function GET(
           id: post.postID,
           title: post.title,
           content: post.content,
-          categoryId: post.categoryID,
+          forumId: post.forumID,
           author: post.author.name,
           replyCount: post.comments.length,
           replies: post.comments.length,
@@ -195,7 +196,7 @@ export async function PUT(
           id: post.postID,
           title: post.title,
           content: post.content,
-          categoryId: post.categoryID,
+          forumId: post.forumID,
           createdAt: post.createdAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
         },

@@ -91,10 +91,10 @@ export async function GET(
 ) {
   try {
     const { id  } = await params;
-    const category = await prisma.category.findFirst({
+    const category = await prisma.forumHub.findFirst({
       where: {
         OR: [
-          { categoryID: id },
+          { forumID: id },
           { name: { equals: id, mode: "insensitive" } },
         ],
       },
@@ -106,7 +106,7 @@ export async function GET(
     return NextResponse.json(
       {
         category: {
-          id: category.categoryID,
+          id: category.forumID,
           name: category.name,
           description: category.description ?? "",
           slug: category.name.toLowerCase(),
@@ -136,8 +136,8 @@ export async function PUT(
     }
 
     const { id  } = await params;
-    const existing = await prisma.category.findUnique({
-      where: { categoryID: id },
+    const existing = await prisma.forumHub.findUnique({
+      where: { forumID: id },
     });
     if (!existing) {
       return apiError(404, "Category not found", "NOT_FOUND");
@@ -171,8 +171,8 @@ export async function PUT(
       return apiError(400, "No valid fields to update", "BAD_REQUEST");
     }
 
-    const updated = await prisma.category.update({
-      where: { categoryID: id },
+    const updated = await prisma.forumHub.update({
+      where: { forumID: id },
       data: {
         ...(name.value ? { name: name.value } : {}),
         ...(description.value !== undefined ? { description: description.value } : {}),
@@ -184,7 +184,7 @@ export async function PUT(
       {
         message: "Category updated successfully",
         category: {
-          id: updated.categoryID,
+          id: updated.forumID,
           name: updated.name,
           description: updated.description ?? "",
           slug: updated.name.toLowerCase(),
@@ -214,14 +214,14 @@ export async function DELETE(
     }
 
     const { id  } = await params;
-    const existing = await prisma.category.findUnique({
-      where: { categoryID: id },
+    const existing = await prisma.forumHub.findUnique({
+      where: { forumID: id },
     });
     if (!existing) {
       return apiError(404, "Category not found", "NOT_FOUND");
     }
 
-    await prisma.category.delete({ where: { categoryID: id } });
+    await prisma.forumHub.delete({ where: { forumID: id } });
 
     return NextResponse.json(
       { message: "Category deleted successfully" },
