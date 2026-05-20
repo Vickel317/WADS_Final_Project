@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, normalizeRole } from "@/lib/auth-session";
-import { handleApiError } from "@/lib/error-handler";
-import { validateCreateCategoryPayload } from "@/lib/security";
 import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 /**
  * @swagger
@@ -50,16 +50,24 @@ import { prisma } from "@/lib/prisma";
  *         description: Internal server error
  */
 
+const slugify = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
 export async function GET() {
   try {
-    const categories = await prisma.category.findMany({
+    const categories = await prisma.forumHub.findMany({
       orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json(
       {
         categories: categories.map((category: any) => ({
-          id: category.categoryID,
+          id: category.forumID,
           name: category.name,
           description: category.description ?? "",
           slug: category.name.toLowerCase(),
@@ -69,7 +77,8 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
-    return handleApiError("Get categories error:", error);
+    console.error("Get categories error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -77,46 +86,60 @@ export async function POST(request: NextRequest) {
   try {
     const sessionUser = await getSessionUser(request.headers);
     if (!sessionUser) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (normalizeRole(sessionUser.user.role) !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const body = await request.json();
-    const validationResult = validateCreateCategoryPayload(body);
-    if (!validationResult.ok) {
-      return NextResponse.json({ error: validationResult.error }, { status: 400 });
+    const body = await parseJson<{
+      name?: unknown;
+      description?: unknown;
+      slug?: unknown;
+    }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-    const { name, description, slug } = validationResult.data;
+    const errors = [] as Array<{ field?: string; message: string }>;
+    const name = parseRequiredString(body.name);
+    const description = parseRequiredString(body.description);
+    const slug = parseRequiredString(body.slug);
 
-    const exists = await prisma.category.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
+    if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
+    if (description.error) {
+      errors.push({ field: "description", message: `description ${description.error}` });
+    }
+    if (slug.error) errors.push({ field: "slug", message: `slug ${slug.error}` });
+
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
+    }
+
+    const exists = await prisma.forumHub.findFirst({
+      where: { name: { equals: name.value, mode: "insensitive" } },
     });
     if (exists) {
-      return NextResponse.json(
-        { error: "A category with this name already exists" },
-        { status: 409 }
+      return apiError(
+        409,
+        "A category with this name already exists",
+        "CONFLICT"
       );
     }
 
-    const created = await prisma.category.create({
+    const created = await prisma.forumHub.create({
       data: {
-        name,
-        description,
+        name: name.value!,
+        description: description.value!,
       },
     });
 
     const newCategory = {
-      id: created.categoryID,
-      name,
-      description,
-      slug,
+      id: created.forumID,
+      name: name.value!,
+      description: description.value!,
+      slug: slug.value!,
       createdAt: created.createdAt.toISOString(),
     };
 
@@ -125,6 +148,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    return handleApiError("Create category error:", error);
+    console.error("Create category error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

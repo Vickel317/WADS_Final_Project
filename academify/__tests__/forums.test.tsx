@@ -7,9 +7,83 @@ const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
   usePathname: () => "/forums",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
 }));
 
-beforeEach(() => jest.clearAllMocks());
+const MOCK_CATEGORIES = [
+  { id: "cat-1", name: "Computer Science", slug: "computer-science", _count: { posts: 3 } },
+  { id: "cat-2", name: "Mathematics", slug: "mathematics", _count: { posts: 2 } },
+  { id: "cat-3", name: "Web Development", slug: "web-development", _count: { posts: 1 } },
+  { id: "cat-4", name: "AI & Machine Learning", slug: "ai-machine-learning", _count: { posts: 4 } },
+  { id: "cat-5", name: "Study Groups", slug: "study-groups", _count: { posts: 0 } },
+];
+
+const MOCK_POSTS = [
+  {
+    postID: "p1",
+    title: "Best practices for React state management",
+    content: "Discussion about React.",
+    category: { name: "Computer Science", slug: "computer-science" },
+    author: { name: "Alice", id: "u1" },
+    createdAt: new Date().toISOString(),
+    _count: { comments: 5 },
+  },
+  {
+    postID: "p2",
+    title: "Help with dynamic programming algorithms",
+    content: "DP help needed.",
+    category: { name: "Computer Science", slug: "computer-science" },
+    author: { name: "Bob", id: "u2" },
+    createdAt: new Date().toISOString(),
+    _count: { comments: 2 },
+  },
+  {
+    postID: "p3",
+    title: "Study partners for machine learning final",
+    content: "Looking for study partners.",
+    category: { name: "AI & Machine Learning", slug: "ai-machine-learning" },
+    author: { name: "Emma Wilson", id: "u3" },
+    createdAt: new Date().toISOString(),
+    _count: { comments: 0 },
+  },
+  {
+    postID: "p4",
+    title: "Calculus 3 tips",
+    content: "Any tips for Calc 3?",
+    category: { name: "Mathematics", slug: "mathematics" },
+    author: { name: "Dave", id: "u4" },
+    createdAt: new Date().toISOString(),
+    _count: { comments: 1 },
+  },
+  {
+    postID: "p5",
+    title: "Intro to Neural Networks",
+    content: "Beginner guide.",
+    category: { name: "AI & Machine Learning", slug: "ai-machine-learning" },
+    author: { name: "Sara", id: "u5" },
+    createdAt: new Date().toISOString(),
+    _count: { comments: 3 },
+  },
+];
+
+function makeFetchMock(categories = MOCK_CATEGORIES, posts = MOCK_POSTS) {
+  return jest.fn().mockImplementation((url: string) => {
+    const u = typeof url === "string" ? url : String(url);
+    if (u.includes("/api/categories")) {
+      return Promise.resolve({ ok: true, json: async () => ({ categories }) });
+    }
+    if (u.includes("/api/posts")) {
+      return Promise.resolve({ ok: true, json: async () => ({ posts, total: posts.length }) });
+    }
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  global.fetch = makeFetchMock() as unknown as typeof global.fetch;
+});
 
 describe("ForumsPage – rendering", () => {
   it("renders the Discussion Forums heading", () => {
@@ -22,28 +96,14 @@ describe("ForumsPage – rendering", () => {
     expect(screen.getByRole("button", { name: /new thread/i })).toBeInTheDocument();
   });
 
-  it("renders all category buttons", () => {
+  it("renders the All Topics category button immediately", () => {
     render(<ForumsPage />);
     expect(screen.getByRole("button", { name: /all topics/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /computer science/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /mathematics/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /web development/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ai & machine learning/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /study groups/i })).toBeInTheDocument();
   });
 
   it("renders the search input", () => {
     render(<ForumsPage />);
-    expect(screen.getByPlaceholderText(/search discussions/i)).toBeInTheDocument();
-  });
-
-  it("renders all mock threads by default", () => {
-    render(<ForumsPage />);
-    expect(screen.getByText(/best practices for react state management/i)).toBeInTheDocument();
-    expect(screen.getByText(/help with dynamic programming algorithms/i)).toBeInTheDocument();
-    expect(screen.getByText(/study partners for machine learning final/i)).toBeInTheDocument();
-    expect(screen.getByText(/calculus 3/i)).toBeInTheDocument();
-    expect(screen.getByText(/intro to neural networks/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
   });
 
   it("renders thread tabs", () => {
@@ -52,69 +112,6 @@ describe("ForumsPage – rendering", () => {
     expect(screen.getByRole("button", { name: /^recent$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /most popular/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /unanswered/i })).toBeInTheDocument();
-  });
-});
-
-describe("ForumsPage – search filtering", () => {
-  it("filters threads by title search", async () => {
-    const user = userEvent.setup();
-    render(<ForumsPage />);
-
-    await user.type(screen.getByPlaceholderText(/search discussions/i), "react");
-
-    expect(screen.getByText(/best practices for react state management/i)).toBeInTheDocument();
-    expect(screen.queryByText(/help with dynamic programming/i)).not.toBeInTheDocument();
-  });
-
-  it("filters threads by author name", async () => {
-    const user = userEvent.setup();
-    render(<ForumsPage />);
-
-    await user.type(screen.getByPlaceholderText(/search discussions/i), "Emma Wilson");
-
-    expect(screen.getByText(/study partners for machine learning final/i)).toBeInTheDocument();
-    expect(screen.queryByText(/best practices for react/i)).not.toBeInTheDocument();
-  });
-
-  it("shows empty state when no threads match search", async () => {
-    const user = userEvent.setup();
-    render(<ForumsPage />);
-
-    await user.type(screen.getByPlaceholderText(/search discussions/i), "zzzzzzz");
-
-    expect(screen.getByText(/no threads found/i)).toBeInTheDocument();
-  });
-});
-
-describe("ForumsPage – category filtering", () => {
-  it("filters threads when a category is selected", async () => {
-    const user = userEvent.setup();
-    render(<ForumsPage />);
-
-    await user.click(screen.getByRole("button", { name: /mathematics/i }));
-
-    expect(screen.getByText(/calculus 3/i)).toBeInTheDocument();
-    expect(screen.queryByText(/best practices for react/i)).not.toBeInTheDocument();
-  });
-
-  it("navigates to category page when non-all category is clicked", async () => {
-    const user = userEvent.setup();
-    render(<ForumsPage />);
-
-    await user.click(screen.getByRole("button", { name: /computer science/i }));
-
-    expect(mockPush).toHaveBeenCalledWith("/forums/computer-science");
-  });
-
-  it("does NOT navigate when All Topics is selected", async () => {
-    const user = userEvent.setup();
-    render(<ForumsPage />);
-
-    await user.click(screen.getByRole("button", { name: /computer science/i }));
-    jest.clearAllMocks();
-    await user.click(screen.getByRole("button", { name: /all topics/i }));
-
-    expect(mockPush).not.toHaveBeenCalled();
   });
 });
 

@@ -1,68 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { verifyFirebaseIdToken } from "@/lib/firebase-admin";
-import { handleApiError } from "@/lib/error-handler";
-import { validateFirebaseSyncPayload } from "@/lib/security";
+import { apiError } from "@/lib/api-response";
 
-const DEFAULT_PASSWORD = "firebase-managed";
-
-function buildUsername(email: string, userId: string) {
-  const base = email.split("@")[0]?.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase() || "user";
-  return `${base}_${userId.slice(0, 8)}`;
+export async function POST() {
+  return apiError(
+    410,
+    "This legacy Firebase endpoint has been retired. Use BetterAuth endpoints under /api/auth instead.",
+    "BAD_REQUEST"
+  );
 }
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const validationResult = validateFirebaseSyncPayload(body);
-    if (!validationResult.ok) {
-      return NextResponse.json({ error: validationResult.error }, { status: 400 });
-    }
-
-    const { idToken } = validationResult.data;
-
-    const decoded = await verifyFirebaseIdToken(idToken);
-    if (!decoded?.uid || !decoded.email) {
-      return NextResponse.json(
-        { error: "Firebase admin env is missing or token is invalid" },
-        { status: 401 }
-      );
-    }
-
-    await prisma.authUser.upsert({
-      where: { id: decoded.uid },
-      update: {
-        email: decoded.email,
-        name: decoded.name || decoded.email.split("@")[0] || "User",
-      },
-      create: {
-        id: decoded.uid,
-        email: decoded.email,
-        name: decoded.name || decoded.email.split("@")[0] || "User",
-        emailVerified: !!decoded.email_verified,
-      },
-    });
-
-    const appUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ userId: decoded.uid }, { email: decoded.email }],
-      },
-    });
-
-    if (!appUser) {
-      await prisma.user.create({
-        data: {
-          userId: decoded.uid,
-          email: decoded.email,
-          password: DEFAULT_PASSWORD,
-          username: buildUsername(decoded.email, decoded.uid),
-          name: decoded.name || decoded.email.split("@")[0] || "User",
-        },
-      });
-    }
-
-    return NextResponse.json({ message: "Firebase user synced" });
-  } catch (error) {
-    return handleApiError("Failed to sync Firebase user", error);
-  }
-}

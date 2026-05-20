@@ -1,20 +1,10 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-response";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -23,7 +13,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Delete a user account (Admin only)
  *     tags: [Admin]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: userId
@@ -45,37 +35,31 @@ function verifyToken(request: NextRequest) {
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const { userId } = params;
+    const { userId  } = await params;
 
     // Prevent self-deletion
     if (userId === decoded.id) {
-      return NextResponse.json(
-        { error: "Cannot delete your own account" },
-        { status: 400 }
-      );
+      return apiError(400, "Cannot delete your own account", "BAD_REQUEST");
     }
 
-    const index = adminUsers.findIndex((u) => u.id === userId);
-    if (index === -1) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const existing = await prisma.user.findUnique({ where: { userId } });
+    if (!existing) {
+      return apiError(404, "User not found", "NOT_FOUND");
     }
 
-    adminUsers.splice(index, 1);
+    await prisma.user.delete({ where: { userId } });
 
     return NextResponse.json(
       { message: "User deleted successfully" },
@@ -83,9 +67,10 @@ export async function DELETE(
     );
   } catch (error) {
     console.error("Admin delete user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+
+

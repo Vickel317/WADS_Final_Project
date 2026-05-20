@@ -1,4 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getSessionUser } from "@/lib/auth-session";
+import { apiError } from "@/lib/api-response";
 
 /**
  * @swagger
@@ -26,92 +29,64 @@ import { NextResponse } from "next/server";
  *         description: Internal server error
  */
 
-// TODO: replace with Prisma in Week 7
-export const messages: Array<{
-  id: string;
-  senderId: string;
-  receiverId: string;
-  content: string;
-  createdAt: string;
-  read: boolean;
-}> = [
-  {
-    id: "1",
-    senderId: "user1",
-    receiverId: "current-user",
-    content: "Hey, want to study together?",
-    createdAt: new Date().toISOString(),
-    read: false,
-  },
-  {
-    id: "2",
-    senderId: "current-user",
-    receiverId: "user2",
-    content: "Sure! When are you free?",
-    createdAt: new Date().toISOString(),
-    read: true,
-  },
-  {
-    id: "3",
-    senderId: "user2",
-    receiverId: "current-user",
-    content: "How about tomorrow at 3PM?",
-    createdAt: new Date().toISOString(),
-    read: false,
-  },
-];
-
-export const dummyUsers: Record<string, string> = {
-  "user1": "Alex Turner",
-  "user2": "Sarah Chen",
-  "user3": "Mike Johnson",
-  "current-user": "John Doe",
-};
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // TODO: get currentUserId from JWT token in Week 8
-    const currentUserId = "current-user";
+    const sessionUser = await getSessionUser(request.headers);
+    if (!sessionUser) {
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    }
 
-    // Get unique conversation partners
-    const partnerIds = new Set<string>();
-    messages.forEach((m) => {
-      if (m.senderId === currentUserId) partnerIds.add(m.receiverId);
-      if (m.receiverId === currentUserId) partnerIds.add(m.senderId);
+    const currentUserId = sessionUser.user.userId;
+    const records = await prisma.message.findMany({
+      where: {
+        OR: [{ senderID: currentUserId }, { receiverID: currentUserId }],
+      },
+      orderBy: { sentAt: "desc" },
+      include: {
+        sender: { select: { userId: true, name: true } },
+        receiver: { select: { userId: true, name: true } },
+      },
     });
 
-    // Build conversation list
-    const conversations = Array.from(partnerIds).map((partnerId) => {
-      const conversation = messages
-        .filter(
-          (m) =>
-            (m.senderId === currentUserId && m.receiverId === partnerId) ||
-            (m.senderId === partnerId && m.receiverId === currentUserId)
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+    const conversationMap = new Map<
+      string,
+      { userId: string; name: string; lastMessage: string; lastAt: string; unread: number }
+    >();
 
-      const unread = conversation.filter(
-        (m) => m.receiverId === currentUserId && !m.read
-      ).length;
+    records.forEach((message) => {
+      const isSender = message.senderID === currentUserId;
+      const partnerId = isSender ? message.receiverID : message.senderID;
+      const partnerName = isSender
+        ? message.receiver?.name || "Unknown User"
+        : message.sender?.name || "Unknown User";
 
-      return {
-        userId: partnerId,
-        name: dummyUsers[partnerId] || "Unknown User",
-        lastMessage: conversation[0]?.content || "",
-        lastAt: conversation[0]?.createdAt || "",
-        unread,
-      };
+      const existing = conversationMap.get(partnerId);
+      if (!existing) {
+        conversationMap.set(partnerId, {
+          userId: partnerId,
+          name: partnerName,
+          lastMessage: message.content,
+          lastAt: message.sentAt.toISOString(),
+          unread: 0,
+        });
+      }
+
+      if (message.receiverID === currentUserId && !message.read) {
+        const entry = conversationMap.get(partnerId);
+        if (entry) {
+          entry.unread += 1;
+        }
+      }
     });
+
+    const conversations = Array.from(conversationMap.values()).sort(
+      (a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime()
+    );
 
     return NextResponse.json({ conversations }, { status: 200 });
   } catch (error) {
     console.error("Get conversations error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+

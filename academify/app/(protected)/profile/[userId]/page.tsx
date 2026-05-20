@@ -15,6 +15,8 @@ interface Profile {
   filesShared: number;
   skills: string[];
   isOwn: boolean;
+  isFollowing: boolean;
+  isFollower: boolean;
   isConnected: boolean;
 }
 
@@ -34,6 +36,8 @@ function mapApiUserToProfile(user: Record<string, unknown>, isOwn: boolean): Pro
       ? user.skills.map((skill) => String(skill))
       : [],
     isOwn,
+    isFollowing: Boolean(user.isFollowing ?? false),
+    isFollower: Boolean(user.isFollower ?? false),
     isConnected: Boolean(user.isConnected ?? false),
   };
 }
@@ -43,7 +47,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollower, setIsFollower] = useState(false);
 
   useEffect(() => {
     fetch(`/api/users/${userId}`)
@@ -54,15 +59,39 @@ export default function ProfilePage() {
           return;
         }
 
-        const mapped = mapApiUserToProfile(d.user as Record<string, unknown>, userId === "me");
+        const mapped = mapApiUserToProfile(d.user as Record<string, unknown>, userId === "me" || d.user.isOwn);
         setProfile(mapped);
-        setConnected(mapped.isConnected);
+        setIsFollowing(mapped.isFollowing);
+        setIsFollower(mapped.isFollower);
       })
       .catch(() => {
         setProfile(null);
       })
       .finally(() => setLoading(false));
   }, [userId]);
+
+  const handleConnectToggle = async () => {
+    const prevFollowing = isFollowing;
+    setIsFollowing(!prevFollowing);
+    try {
+      const res = await fetch(`/api/users/${userId}/follow`, {
+        method: prevFollowing ? "DELETE" : "POST",
+      });
+      if (!res.ok) {
+        setIsFollowing(prevFollowing); // revert on error
+        console.error("Failed to update connection state");
+      }
+    } catch {
+      setIsFollowing(prevFollowing);
+    }
+  };
+
+  const isConnected = isFollowing && isFollower;
+
+  let buttonText = "Follow";
+  if (isConnected) buttonText = "Connected";
+  else if (isFollowing) buttonText = "Following";
+  else if (isFollower) buttonText = "Follow Back";
 
   if (loading) {
     return (
@@ -115,18 +144,18 @@ export default function ProfilePage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setConnected((p) => !p)}
+                  onClick={handleConnectToggle}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition ${
-                    connected
+                    isFollowing
                       ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       : "text-white"
                   }`}
-                  style={!connected ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
+                  style={!isFollowing ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={connected ? "M5 13l4 4L19 7" : "M12 4v16m8-8H4"} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isConnected ? "M5 13l4 4L19 7" : "M12 4v16m8-8H4"} />
                   </svg>
-                  {connected ? "Connected" : "Connect"}
+                  {buttonText}
                 </button>
               )}
             </div>

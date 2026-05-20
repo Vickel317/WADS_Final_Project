@@ -1,20 +1,10 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-response";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -23,7 +13,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Get platform analytics (Admin only)
  *     tags: [Admin]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     responses:
  *       200:
  *         description: Platform analytics data
@@ -50,67 +40,71 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const usersByRole = adminUsers.reduce<Record<string, number>>(
+    const [totalPosts, totalComments, users, reportStatuses, moderationActions] =
+      await Promise.all([
+        prisma.post.count(),
+        prisma.comment.count(),
+        prisma.user.findMany({ select: { role: true } }),
+        prisma.reportReview.findMany({ select: { status: true } }),
+        prisma.moderationActionLog.findMany({ select: { actionType: true } }),
+      ]);
+
+    const usersByRole = (users as Array<{ role: string }>).reduce<Record<string, number>>(
       (acc, user) => {
-        acc[user.role] = (acc[user.role] || 0) + 1;
+        const role = String(user.role).toLowerCase();
+        acc[role] = (acc[role] || 0) + 1;
         return acc;
       },
       {}
     );
 
-    const usersByStatus = adminUsers.reduce<Record<string, number>>(
-      (acc, user) => {
-        acc[user.status] = (acc[user.status] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const usersByStatus = { active: users.length };
 
-    const reportsByStatus = reports.reduce<Record<string, number>>(
-      (acc, report) => {
-        acc[report.status] = (acc[report.status] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const reportsByStatus = (reportStatuses as Array<{ status: string }>).reduce<
+      Record<string, number>
+    >((acc, report) => {
+      const statusValue = String(report.status);
+      const status =
+        statusValue === "UNDER_REVIEW"
+          ? "reviewed"
+          : statusValue.toLowerCase();
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
 
-    const moderationActionCounts = moderationLogs.reduce<Record<string, number>>(
-      (acc, log) => {
-        acc[log.action] = (acc[log.action] || 0) + 1;
-        return acc;
-      },
-      {}
-    );
+    const moderationActionCounts = (moderationActions as Array<{ actionType: string }>).reduce<
+      Record<string, number>
+    >((acc, log) => {
+      const action = String(log.actionType).toLowerCase();
+      acc[action] = (acc[action] || 0) + 1;
+      return acc;
+    }, {});
 
     const analytics = {
       users: {
-        total: adminUsers.length,
+        total: users.length,
         byRole: usersByRole,
         byStatus: usersByStatus,
       },
       posts: {
-        total: threads.length,
-        totalViews: threads.reduce((sum, t) => sum + t.views, 0),
-        totalReplies: threads.reduce((sum, t) => sum + t.replyCount, 0),
+        total: totalPosts,
+        totalReplies: totalComments,
       },
       reports: {
-        total: reports.length,
+        total: reportStatuses.length,
         byStatus: reportsByStatus,
       },
       moderation: {
-        totalActions: moderationLogs.length,
+        totalActions: moderationActions.length,
         byAction: moderationActionCounts,
       },
     };
@@ -118,9 +112,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ analytics }, { status: 200 });
   } catch (error) {
     console.error("Admin analytics error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+

@@ -1,102 +1,116 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-const categories = [
-  { label: "All Topics", slug: "all", count: 234 },
-  { label: "Computer Science", slug: "computer-science", count: 89 },
-  { label: "Mathematics", slug: "mathematics", count: 56 },
-  { label: "Web Development", slug: "web-development", count: 67 },
-  { label: "AI & Machine Learning", slug: "ai-machine-learning", count: 45 },
-  { label: "Study Groups", slug: "study-groups", count: 78 },
-];
+type ForumCategory = {
+  id: string;
+  name: string;
+  description: string;
+  slug: string;
+  createdAt: string;
+};
 
-const mockThreads = [
-  {
-    id: 1,
-    pinned: true,
-    title: "Best practices for React state management?",
-    author: "Sarah Chen",
-    category: "Web Development",
-    categorySlug: "web-development",
-    time: "2 hours ago",
-    likes: 56,
-    replies: 24,
-    views: 342,
-  },
-  {
-    id: 2,
-    pinned: false,
-    title: "Help with Dynamic Programming algorithms",
-    author: "Mike Johnson",
-    category: "Computer Science",
-    categorySlug: "computer-science",
-    time: "4 hours ago",
-    likes: 34,
-    replies: 18,
-    views: 289,
-  },
-  {
-    id: 3,
-    pinned: false,
-    title: "Study partners for Machine Learning final",
-    author: "Emma Wilson",
-    category: "Study Groups",
-    categorySlug: "study-groups",
-    time: "6 hours ago",
-    likes: 67,
-    replies: 32,
-    views: 456,
-  },
-  {
-    id: 4,
-    pinned: false,
-    title: "Calculus 3: Integration techniques explained",
-    author: "Alex Turner",
-    category: "Mathematics",
-    categorySlug: "mathematics",
-    time: "1 day ago",
-    likes: 89,
-    replies: 41,
-    views: 578,
-  },
-  {
-    id: 5,
-    pinned: false,
-    title: "Intro to Neural Networks - resources & tips",
-    author: "Linda Park",
-    category: "AI & Machine Learning",
-    categorySlug: "ai-machine-learning",
-    time: "2 days ago",
-    likes: 102,
-    replies: 55,
-    views: 812,
-  },
-];
+type ForumThread = {
+  id: string;
+  title: string;
+  content: string;
+  forumId: string;
+  forumName: string;
+  forumSlug: string;
+  author: string;
+  replyCount: number;
+  replies: number;
+  views: number;
+  likes: number;
+  createdAt: string;
+  updatedAt: string;
+  status: string;
+};
 
 type Tab = "Trending" | "Recent" | "Most Popular" | "Unanswered";
 
 export default function CategoryForumsPage() {
   const { category } = useParams<{ category: string }>();
   const router = useRouter();
+  const [categories, setCategories] = useState<ForumCategory[]>([]);
+  const [threads, setThreads] = useState<ForumThread[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("Trending");
   const [search, setSearch] = useState("");
-  const [bookmarked, setBookmarked] = useState<number[]>([]);
+  const [bookmarked, setBookmarked] = useState<string[]>([]);
 
-  const toggleBookmark = (id: number) => {
+  const toggleBookmark = (id: string) => {
     setBookmarked((prev) =>
       prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
     );
   };
 
-  const filteredThreads = mockThreads.filter((thread) => {
-    const matchesCategory = thread.categorySlug === category;
-    const matchesSearch =
-      search === "" ||
-      thread.title.toLowerCase().includes(search.toLowerCase()) ||
-      thread.author.toLowerCase().includes(search.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  useEffect(() => {
+    let ignore = false;
+    const loadCategories = async () => {
+      try {
+        const res = await fetch("/api/categories");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load categories");
+        if (!ignore) setCategories(data.categories ?? []);
+      } catch (err) {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : "Failed to load categories");
+        }
+      }
+    };
+    loadCategories();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadThreads = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (category) params.set("forum", category);
+        if (activeTab === "Trending" || activeTab === "Most Popular") {
+          params.set("trending", "true");
+        }
+        params.set("limit", "50");
+
+        const res = await fetch(`/api/posts?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load threads");
+        if (!ignore) setThreads(data.threads ?? []);
+      } catch (err) {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : "Failed to load threads");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    loadThreads();
+    return () => {
+      ignore = true;
+    };
+  }, [category, activeTab]);
+
+  const filteredThreads = useMemo(() => {
+    return threads.filter((thread) => {
+      const matchesSearch =
+        search === "" ||
+        thread.title.toLowerCase().includes(search.toLowerCase()) ||
+        thread.author.toLowerCase().includes(search.toLowerCase());
+
+      if (activeTab === "Unanswered") {
+        return matchesSearch && thread.replyCount === 0;
+      }
+
+      return matchesSearch;
+    });
+  }, [threads, search, activeTab]);
 
   const handleCategoryClick = (slug: string) => {
     if (slug === "all") {
@@ -131,7 +145,7 @@ export default function CategoryForumsPage() {
         <div className="w-56 shrink-0 bg-white rounded-2xl border border-gray-100 p-4">
           <p className="text-sm font-semibold text-gray-700 mb-3 px-1">Categories</p>
           <div className="space-y-1">
-            {categories.map((cat) => {
+            {[{ id: "all", name: "All Topics", slug: "all", description: "", createdAt: "" }, ...categories].map((cat) => {
               const active = cat.slug === category || (cat.slug === "all" && !category);
               return (
                 <button
@@ -142,13 +156,13 @@ export default function CategoryForumsPage() {
                   }`}
                   style={active ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
                 >
-                  <span>{cat.label}</span>
+                  <span>{cat.name}</span>
                   <span
                     className={`text-xs rounded-full px-2 py-0.5 font-medium ${
                       active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {cat.count}
+                    {cat.slug === "all" ? threads.length : threads.filter((thread) => thread.forumSlug === cat.slug).length}
                   </span>
                 </button>
               );
@@ -195,13 +209,21 @@ export default function CategoryForumsPage() {
 
           {/* Thread List */}
           <div className="divide-y divide-gray-50">
-            {filteredThreads.length === 0 ? (
+            {loading ? (
+              <div className="py-16 text-center text-gray-400 text-sm">Loading threads...</div>
+            ) : error ? (
+              <div className="py-16 text-center text-red-400 text-sm">{error}</div>
+            ) : filteredThreads.length === 0 ? (
               <div className="py-16 text-center text-gray-400 text-sm">
                 No threads found in this category.
               </div>
             ) : (
               filteredThreads.map((thread) => (
-                <div key={thread.id} className="flex items-start gap-4 px-4 py-4 hover:bg-gray-50/50 transition cursor-pointer">
+                <div
+                  key={thread.id}
+                  onClick={() => router.push(`/post/${thread.id}`)}
+                  className="flex items-start gap-4 px-4 py-4 hover:bg-gray-50/50 transition cursor-pointer"
+                >
                   <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mt-0.5">
                     <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -209,21 +231,16 @@ export default function CategoryForumsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      {thread.pinned && (
-                        <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-600">
-                          Pinned
-                        </span>
-                      )}
                       <h3 className="text-sm font-semibold text-gray-900 truncate">{thread.title}</h3>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-2">
                       <span>by {thread.author}</span>
                       <span>•</span>
                       <span className="px-2 py-0.5 rounded-md font-medium text-teal-700 bg-teal-50">
-                        {thread.category}
+                        {thread.forumName}
                       </span>
                       <span>•</span>
-                      <span>{thread.time}</span>
+                      <span>{new Date(thread.createdAt).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center gap-4 text-xs text-gray-400">
                       <button className="flex items-center gap-1 hover:text-teal-600 transition">
@@ -236,7 +253,7 @@ export default function CategoryForumsPage() {
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
-                        {thread.replies} replies
+                        {thread.replyCount} replies
                       </button>
                       <span className="flex items-center gap-1">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

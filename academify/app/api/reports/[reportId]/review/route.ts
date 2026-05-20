@@ -1,22 +1,12 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
-import { handleApiError } from "@/lib/error-handler";
-import { validateReviewReportPayload } from "@/lib/security";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { ReportStatus } from "@prisma/client";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -25,7 +15,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Mark a report as reviewed (Moderator/Admin only)
  *     tags: [Reports]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: reportId
@@ -57,49 +47,83 @@ function verifyToken(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { reportId: string } }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
-    const { reportId } = params;
-    const index = reports.findIndex((r) => r.id === reportId);
+    const { reportId  } = await params;
+    const existing = await prisma.reportReview.findUnique({
+      where: { reportreviewID: reportId },
+    });
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    if (!existing) {
+      return apiError(404, "Report not found", "NOT_FOUND");
     }
 
-    const body = await request.json();
-      const validationResult = validateReviewReportPayload(body);
-      if (!validationResult.ok) {
-        return NextResponse.json({ error: validationResult.error }, { status: 400 });
-      }
+    const body = await parseJson<{ reviewNote?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-      const { reviewNote } = validationResult.data;
+    const reviewNote = parseOptionalString(body.reviewNote);
+    if (reviewNote.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "reviewNote", message: `reviewNote ${reviewNote.error}` },
+      ]);
+    }
 
-    reports[index] = {
-      ...reports[index],
-      status: "reviewed",
-      reviewNote: reviewNote || "",
-      reviewedBy: decoded.id,
-      updatedAt: new Date().toISOString(),
-    };
+    const updated = await prisma.reportReview.update({
+      where: { reportreviewID: reportId },
+      data: {
+        status: ReportStatus.UNDER_REVIEW,
+        reviewedAt: new Date(),
+      },
+    });
 
     return NextResponse.json(
-      { message: "Report marked as reviewed", report: reports[index] },
+      {
+        message: "Report marked as reviewed",
+        report: {
+          id: updated.reportreviewID,
+          reportedBy: updated.reporterID,
+          targetType: updated.reportedPostID
+            ? "post"
+            : updated.reportedCommentID
+              ? "comment"
+              : "user",
+          targetId:
+            updated.reportedPostID ||
+            updated.reportedCommentID ||
+            updated.reportedUserID ||
+            "",
+          reason: updated.reason,
+          status: "reviewed",
+          reviewNote: reviewNote.value || "",
+          reviewedBy: decoded.id,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.reviewedAt ? updated.reviewedAt.toISOString() : undefined,
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
-      return handleApiError("Review report error:", error);
+    console.error("Review report error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+
+

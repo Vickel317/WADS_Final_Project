@@ -1,24 +1,12 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
-import { handleApiError } from "@/lib/error-handler";
-import { validateRoleUpdatePayload } from "@/lib/security";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+// UserRole enum is provided by Prisma client; avoid importing directly to prevent mismatches
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
-const VALID_ROLES = ["student", "instructor", "moderator", "admin"];
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+const VALID_ROLES = ["student", "moderator", "admin"];
 
 /**
  * @swagger
@@ -27,7 +15,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Update a user's role (Admin only)
  *     tags: [Admin]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: userId
@@ -44,7 +32,7 @@ function verifyToken(request: NextRequest) {
  *             properties:
  *               role:
  *                 type: string
- *                 enum: [student, instructor, moderator, admin]
+ *                 enum: [student, moderator, admin]
  *                 example: moderator
  *     responses:
  *       200:
@@ -63,48 +51,68 @@ function verifyToken(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
+    if (decoded.role.toLowerCase() !== "admin") {
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
+    }
+
+    const { userId  } = await params;
+    const body = await parseJson<{ role?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
+
+    const role = parseRequiredString(body.role);
+    if (role.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "role", message: `role ${role.error}` },
+      ]);
+    }
+
+    if (!role.value || !VALID_ROLES.includes(role.value)) {
+      return apiError(
+        400,
+        `Role must be one of: ${VALID_ROLES.join(", ")}`,
+        "BAD_REQUEST"
       );
     }
 
-    const { userId } = params;
-    const body = await request.json();
-    const validationResult = validateRoleUpdatePayload(body, VALID_ROLES);
-    if (!validationResult.ok) {
-      return NextResponse.json({ error: validationResult.error }, { status: 400 });
+    const existing = await prisma.user.findUnique({ where: { userId } });
+    if (!existing) {
+      return apiError(404, "User not found", "NOT_FOUND");
     }
 
-    const { role } = validationResult.data;
-
-    const index = adminUsers.findIndex((u) => u.id === userId);
-    if (index === -1) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    adminUsers[index] = {
-      ...adminUsers[index],
-      role: role as "student" | "instructor" | "moderator" | "admin",
-    };
+    const updated = await prisma.user.update({
+      where: { userId },
+      data: { role: role.value.toUpperCase() as unknown as any },
+    });
 
     return NextResponse.json(
       {
         message: "User role updated successfully",
-        user: adminUsers[index],
+        user: {
+          id: updated.userId,
+          email: updated.email,
+          name: updated.name,
+          role: updated.role.toLowerCase(),
+          status: "active",
+          createdAt: updated.createdAt.toISOString(),
+        },
       },
       { status: 200 }
     );
   } catch (error) {
-    return handleApiError("Admin update role error:", error);
+    console.error("Admin update role error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+

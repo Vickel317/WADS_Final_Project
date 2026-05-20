@@ -1,4 +1,8 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { ModerationStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-response";
 
 
 // Shared moderation log (imported by other moderation routes)
@@ -19,20 +23,7 @@ export const moderationLogs: Array<{
   createdAt: string;
 }> = [];
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -41,7 +32,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Get content pending moderation (Moderator/Admin only)
  *     tags: [Moderation]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     responses:
  *       200:
  *         description: List of posts pending moderation
@@ -55,32 +46,51 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
-    // Return posts flagged for review (status === "pending")
-    const queue = threads.filter(
-      (t) => (t as { status?: string }).status === "pending"
-    );
+    const queue = await prisma.post.findMany({
+      where: { moderationStatus: ModerationStatus.PENDING },
+      include: {
+        author: { select: { name: true } },
+        forum: { select: { name: true } },
+        comments: { select: { commentID: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     return NextResponse.json(
-      { queue, total: queue.length },
+      {
+        queue: queue.map((post) => ({
+          id: post.postID,
+          title: post.title,
+          content: post.content,
+          forumId: post.forumID,
+          forum: post.forum.name,
+          author: post.author.name,
+          replyCount: post.comments.length,
+          createdAt: post.createdAt.toISOString(),
+          status: post.moderationStatus.toLowerCase(),
+        })),
+        total: queue.length,
+      },
       { status: 200 }
     );
   } catch (error) {
     console.error("Get moderation queue error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+

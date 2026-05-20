@@ -1,20 +1,12 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { ReportStatus } from "@prisma/client";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString, parseRequiredString } from "@/lib/validation";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -23,7 +15,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Take action on a report (Moderator/Admin only)
  *     tags: [Reports]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: reportId
@@ -62,54 +54,98 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { reportId: string } }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
-    const { reportId } = params;
-    const index = reports.findIndex((r) => r.id === reportId);
+    const { reportId  } = await params;
+    const existing = await prisma.reportReview.findUnique({
+      where: { reportreviewID: reportId },
+    });
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    if (!existing) {
+      return apiError(404, "Report not found", "NOT_FOUND");
     }
 
-    const body = await request.json();
-      const validationResult = validateReportActionPayload(body);
-      if (!validationResult.ok) {
-        return NextResponse.json({ error: validationResult.error }, { status: 400 });
+    const body = await parseJson<{ action?: unknown; note?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-      const { action, note } = validationResult.data;
+    const action = parseRequiredString(body.action);
+    const note = parseOptionalString(body.note);
+    const errors = [] as Array<{ field?: string; message: string }>;
 
-    const newStatus = action === "resolve" ? "resolved" : "dismissed";
+    if (action.error) errors.push({ field: "action", message: `action ${action.error}` });
+    if (note.error) errors.push({ field: "note", message: `note ${note.error}` });
 
-    reports[index] = {
-      ...reports[index],
-      status: newStatus,
-      reviewNote: note || reports[index].reviewNote,
-      reviewedBy: decoded.id,
-      updatedAt: new Date().toISOString(),
-    };
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
+    }
+
+    if (!action.value || !["resolve", "dismiss"].includes(action.value)) {
+      return apiError(400, "action must be 'resolve' or 'dismiss'", "BAD_REQUEST");
+    }
+
+    const newStatus = action.value === "resolve" ? ReportStatus.RESOLVED : ReportStatus.DISMISSED;
+
+    const updated = await prisma.reportReview.update({
+      where: { reportreviewID: reportId },
+      data: {
+        status: newStatus,
+        reviewedAt: new Date(),
+      },
+    });
 
     return NextResponse.json(
       {
-        message: `Report ${newStatus} successfully`,
-        report: reports[index],
+        message: `Report ${action.value === "resolve" ? "resolved" : "dismissed"} successfully`,
+        report: {
+          id: updated.reportreviewID,
+          reportedBy: updated.reporterID,
+          targetType: updated.reportedPostID
+            ? "post"
+            : updated.reportedCommentID
+              ? "comment"
+              : "user",
+          targetId:
+            updated.reportedPostID ||
+            updated.reportedCommentID ||
+            updated.reportedUserID ||
+            "",
+          reason: updated.reason,
+          status: updated.status === ReportStatus.UNDER_REVIEW
+            ? "reviewed"
+            : updated.status.toLowerCase(),
+          reviewNote: note.value || null,
+          reviewedBy: decoded.id,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.reviewedAt ? updated.reviewedAt.toISOString() : undefined,
+        },
       },
       { status: 200 }
     );
   } catch (error) {
-      return handleApiError("Report action error:", error);
+    console.error("Report action error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
+
+
+
+

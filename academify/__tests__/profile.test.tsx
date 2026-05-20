@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import ProfilePage from "@/app/(protected)/profile/[userId]/page";
 
 const mockPush = jest.fn();
@@ -12,8 +13,25 @@ jest.mock("next/navigation", () => ({
 beforeEach(() => {
   mockUserId = "me";
   jest.clearAllMocks();
-  // Reject so the catch block uses the mock profile
-  global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      user: {
+        id: "me",
+        name: "John Doe",
+        major: "Computer Science",
+        year: "3rd Year",
+        bio: "Building useful things.",
+        location: "Jakarta",
+        website: "johndoe.dev",
+        connections: 248,
+        posts: 67,
+        filesShared: 142,
+        skills: ["React", "TypeScript", "Python"],
+        isConnected: false,
+      },
+    }),
+  } as Response);
 });
 
 describe("ProfilePage – loading state", () => {
@@ -76,12 +94,12 @@ describe("ProfilePage – own profile (userId=me)", () => {
 describe("ProfilePage – other user's profile", () => {
   beforeEach(() => {
     mockUserId = "other-user-123";
-    global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
   });
 
-  it("shows Connect button for another user's profile", async () => {
+  it("shows Follow button for another user's profile", async () => {
     render(<ProfilePage />);
-    expect(await screen.findByRole("button", { name: /connect/i })).toBeInTheDocument();
+    // The CTA button reads "Follow" (or "Following" / "Follow Back") for other users
+    expect(await screen.findByRole("button", { name: /follow/i })).toBeInTheDocument();
   });
 });
 
