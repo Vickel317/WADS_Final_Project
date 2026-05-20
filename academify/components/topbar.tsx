@@ -1,29 +1,21 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+
+type SearchUser = {
+  userId: string;
+  name: string;
+  username: string;
+  isConnected?: boolean;
+};
 
 export default function Topbar() {
-  const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (query.trim().length > 0) {
-        searchUsers(query);
-      } else {
-        setResults([]);
-        setShowDropdown(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [query]);
-
-  const searchUsers = async (searchTerm: string) => {
+  const searchUsers = useCallback(async (searchTerm: string) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/users?q=${encodeURIComponent(searchTerm)}`);
@@ -37,7 +29,20 @@ export default function Topbar() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (query.trim().length > 0) {
+        void searchUsers(query);
+      } else {
+        setResults([]);
+        setShowDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [query, searchUsers]);
 
   return (
     <header className="fixed top-0 left-0 md:left-56 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-4 z-30 transition-all duration-300"

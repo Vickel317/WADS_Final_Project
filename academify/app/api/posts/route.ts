@@ -26,7 +26,7 @@ const resolveForum = async (value: string) => {
   if (direct) return direct;
 
   const forums = await prisma.forumHub.findMany();
-  return forums.find((forum: any) => slugify(forum.name) === value.toLowerCase()) ?? null;
+  return forums.find((forum) => slugify(forum.name) === value.toLowerCase()) ?? null;
 };
 
 const toForumName = (value: string) =>
@@ -145,13 +145,13 @@ export async function GET(request: NextRequest) {
         forum: { select: { forumID: true, name: true } },
         _count: { select: { comments: true } },
       },
-      orderBy: trending ? { comments: { _count: 'desc' } } : { createdAt: 'desc' } as any,
+      orderBy: trending ? { comments: { _count: "desc" } } : { createdAt: "desc" },
       take: Number.isFinite(limit) ? limit : 10,
     });
 
     return NextResponse.json(
       {
-        threads: result.map((post: any) => ({
+        threads: result.map((post) => ({
           id: post.postID,
           title: post.title,
           content: post.content,

@@ -46,11 +46,6 @@ const parseCategoryFromTitle = (titleValue: string) => {
   return { category: match[1], title: match[2] };
 };
 
-const formatTitleWithCategory = (categoryValue: string, titleValue: string) => {
-  if (!categoryValue || categoryValue === DEFAULT_CATEGORY) return titleValue;
-  return `[${categoryValue}] ${titleValue}`;
-};
-
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
@@ -83,8 +78,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        data: events.map((event: any) => {
-          const attendeeIds = event.attendees.map((attendee: any) => attendee.userID);
+        data: events.map((event) => {
+          const attendeeIds = event.attendees.map((attendee) => attendee.userID);
           const parsed = parseCategoryFromTitle(event.title);
           return {
             id: event.eventID,
@@ -181,6 +176,9 @@ export async function POST(request: NextRequest) {
     }
 
     const forum = await resolveForum(forumID.value ?? null);
+    if (!forum) {
+      return apiError(404, "Forum not found", "NOT_FOUND");
+    }
 
     const createdEvent = await prisma.event.create({
       data: {

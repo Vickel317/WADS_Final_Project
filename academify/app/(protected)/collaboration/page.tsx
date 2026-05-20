@@ -214,7 +214,7 @@ export default function CollaborationPage() {
                     setNewName("");
                     setNewDescription(null);
                     setNewForumID("");
-                  } catch (err) {
+                  } catch {
                     alert("Failed to create space");
                   } finally {
                     setCreating(false);

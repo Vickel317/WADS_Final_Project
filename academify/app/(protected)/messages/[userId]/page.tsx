@@ -32,7 +32,8 @@ export default function ConversationPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [partnerName, setPartnerName] = useState(partnerId);
+  const partnerName =
+    conversations.find((c) => c.userId === partnerId)?.name ?? String(partnerId ?? "");
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -92,16 +93,12 @@ export default function ConversationPage() {
 
   useEffect(() => {
     if (!partnerId) return;
-    setLoadingMsgs(true);
-    setMessages([]);
-    loadMessages();
+    void Promise.resolve().then(() => {
+      setLoadingMsgs(true);
+      setMessages([]);
+      return loadMessages();
+    });
   }, [partnerId, loadMessages]);
-
-  // Resolve partner name from conversation list
-  useEffect(() => {
-    const conv = conversations.find((c) => c.userId === partnerId);
-    if (conv) setPartnerName(conv.name);
-  }, [conversations, partnerId]);
 
   // Socket setup
   useEffect(() => {

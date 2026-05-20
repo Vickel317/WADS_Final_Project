@@ -37,7 +37,7 @@ export default function ModerationQueuePage() {
 	};
 
 	useEffect(() => {
-		loadQueue();
+		void Promise.resolve().then(() => loadQueue());
 	}, []);
 
 	const approve = async (postId: string) => {

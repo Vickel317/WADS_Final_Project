@@ -36,7 +36,7 @@ export default function ModerationReportsPage() {
 	};
 
 	useEffect(() => {
-		loadReports();
+		void Promise.resolve().then(() => loadReports());
 	}, []);
 
 	const review = async (reportId: string) => {

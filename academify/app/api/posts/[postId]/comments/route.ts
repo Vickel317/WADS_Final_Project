@@ -73,7 +73,7 @@ export async function GET(
 
     return NextResponse.json(
       {
-        comments: postComments.map((c: any) => ({
+        comments: postComments.map((c) => ({
           id: c.commentID,
           postId: c.postID,
           content: c.content,

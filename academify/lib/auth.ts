@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/prisma";
@@ -9,7 +9,7 @@ const trustedOrigins = [process.env.NEXT_PUBLIC_BETTER_AUTH_URL].filter(
 );
 
 const isProd = process.env.NODE_ENV === "production";
-const options: any = {
+const options: BetterAuthOptions = {
   trustedOrigins,
   user: { modelName: "AuthUser" },
   session: { modelName: "AuthSession" },

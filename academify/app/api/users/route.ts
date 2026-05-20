@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { apiError } from "@/lib/api-response";
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("q");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    const whereClause: any = {
+    const whereClause: Prisma.UserWhereInput = {
       NOT: {
         userId: sessionData.user.userId, // Exclude current user from search
       },

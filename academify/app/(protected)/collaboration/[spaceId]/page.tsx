@@ -1,6 +1,19 @@
 import Link from "next/link";
 import { format } from "date-fns";
 
+type SpaceMemberRow = {
+  user: { userId: string; name: string };
+  role: string;
+};
+
+type SpaceFileRow = {
+  fileID: string;
+  fileName: string;
+  fileUrl: string;
+  updatedAt: string;
+  uploadedBy?: { name: string };
+};
+
 export default async function SpacePage({ params }: { params: { spaceId: string } }) {
   const { spaceId } = params;
 
@@ -35,7 +48,7 @@ export default async function SpacePage({ params }: { params: { spaceId: string 
         <h2 className="text-lg font-semibold">Members</h2>
         <div className="mt-3 grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {space.members?.length ? (
-            space.members.map((m: any) => (
+            space.members.map((m: SpaceMemberRow) => (
               <div key={m.user.userId} className="rounded-lg border p-3">
                 <div className="text-sm font-medium">{m.user.name}</div>
                 <div className="text-xs text-gray-500">{m.role}</div>
@@ -51,7 +64,7 @@ export default async function SpacePage({ params }: { params: { spaceId: string 
         <h2 className="text-lg font-semibold">Files in this space</h2>
         <div className="mt-3 space-y-3">
           {space.files?.length ? (
-            space.files.map((f: any) => (
+            space.files.map((f: SpaceFileRow) => (
               <div key={f.fileID} className="rounded-lg border p-3 flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium">{f.fileName}</div>

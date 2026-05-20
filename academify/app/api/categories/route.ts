@@ -50,14 +50,6 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
  *         description: Internal server error
  */
 
-const slugify = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-
 export async function GET() {
   try {
     const categories = await prisma.forumHub.findMany({
@@ -66,7 +58,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        categories: categories.map((category: any) => ({
+        categories: categories.map((category) => ({
           id: category.forumID,
           name: category.name,
           description: category.description ?? "",
