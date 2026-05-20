@@ -10,7 +10,15 @@ import {
 } from "@/lib/validation";
 
 const DEFAULT_DURATION_MINUTES = 60;
-const DEFAULT_CATEGORY = "General";
+const DEFAULT_CATEGORY = "Study Session";
+
+const parseCategoryFromTitle = (title: string) => {
+  const match = title.match(/^\[(.+?)\]\s*(.+)$/);
+  if (!match) {
+    return { category: DEFAULT_CATEGORY, title };
+  }
+  return { category: match[1], title: match[2] };
+};
 
 
 
@@ -29,17 +37,18 @@ export async function GET(
     }
 
     const attendeeIds = event.attendees.map((attendee) => attendee.userID);
+    const parsed = parseCategoryFromTitle(event.title);
 
     return NextResponse.json(
       {
         id: event.eventID,
         userId: event.creatorID,
-        title: event.title,
+        title: parsed.title,
         description: event.description,
         date: event.dateTime.toISOString(),
         duration: DEFAULT_DURATION_MINUTES,
         location: event.location,
-        category: DEFAULT_CATEGORY,
+        category: parsed.category,
         maxAttendees: attendeeIds.length,
         attendees: attendeeIds,
         status: event.dateTime <= new Date() ? "completed" : "scheduled",
@@ -158,17 +167,18 @@ export async function PUT(
     });
 
     const attendeeIds = updatedEvent.attendees.map((attendee) => attendee.userID);
+    const updatedParsed = parseCategoryFromTitle(updatedEvent.title);
 
     return NextResponse.json(
       {
         id: updatedEvent.eventID,
         userId: updatedEvent.creatorID,
-        title: updatedEvent.title,
+        title: updatedParsed.title,
         description: updatedEvent.description,
         date: updatedEvent.dateTime.toISOString(),
         duration: duration.value ?? DEFAULT_DURATION_MINUTES,
         location: updatedEvent.location,
-        category: category.value || DEFAULT_CATEGORY,
+        category: updatedParsed.category,
         maxAttendees: maxAttendees.value ?? attendeeIds.length,
         attendees: attendeeIds,
         status: updatedEvent.dateTime <= new Date() ? "completed" : "scheduled",
