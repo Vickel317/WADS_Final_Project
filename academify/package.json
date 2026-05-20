@@ -17,6 +17,8 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1049.0",
+    "@aws-sdk/s3-request-presigner": "^3.1049.0",
     "@better-auth/prisma-adapter": "^1.5.6",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
