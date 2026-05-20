@@ -5,9 +5,8 @@ on:
     branches: [master, main]
     paths:
       - "academify/**"
-    paths-ignore:
-      - "academify/README.md"
-      - "academify/API_DOCS.md"
+      - "!academify/README.md"
+      - "!academify/API_DOCS.md"
   workflow_dispatch:
 
 concurrency:
