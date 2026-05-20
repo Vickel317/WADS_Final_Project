@@ -1,4 +1,6 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
+import { validateReviewReportPayload } from "@/lib/security";
 
 
 function verifyToken(request: NextRequest) {
@@ -78,7 +80,12 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { reviewNote } = body;
+      const validationResult = validateReviewReportPayload(body);
+      if (!validationResult.ok) {
+        return NextResponse.json({ error: validationResult.error }, { status: 400 });
+      }
+
+      const { reviewNote } = validationResult.data;
 
     reports[index] = {
       ...reports[index],
@@ -93,10 +100,6 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Review report error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+      return handleApiError("Review report error:", error);
   }
 }

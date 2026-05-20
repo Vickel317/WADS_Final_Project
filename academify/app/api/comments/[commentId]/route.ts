@@ -1,4 +1,6 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
+import { validateUpdateCommentPayload } from "@/lib/security";
 
 
 function verifyToken(request: NextRequest) {
@@ -90,14 +92,12 @@ export async function PUT(
 
     const { commentId } = params;
     const body = await request.json();
-    const { content } = body;
-
-    if (!content) {
-      return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
-      );
+    const validationResult = validateUpdateCommentPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { content } = validationResult.data;
 
     const comment = await prisma.comment.findUnique({
       where: { commentID: commentId },
@@ -138,11 +138,7 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Update comment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Update comment error:", error);
   }
 }
 
@@ -184,10 +180,6 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Delete comment error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Delete comment error:", error);
   }
 }

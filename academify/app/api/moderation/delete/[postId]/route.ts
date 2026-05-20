@@ -1,4 +1,5 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
 
 
 function verifyToken(request: NextRequest) {
@@ -96,10 +97,6 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Delete post (moderation) error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Delete post (moderation) error:", error);
   }
 }

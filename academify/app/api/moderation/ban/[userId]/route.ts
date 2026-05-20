@@ -1,4 +1,6 @@
 import { getJwtSecret } from "@/lib/auth-jwt";
+import { handleApiError } from "@/lib/error-handler";
+import { validateModerationReasonPayload } from "@/lib/security";
 
 
 function verifyToken(request: NextRequest) {
@@ -73,11 +75,12 @@ export async function POST(
 
     const { userId } = params;
     const body = await request.json();
-    const { reason } = body;
-
-    if (!reason) {
-      return NextResponse.json({ error: "Reason is required" }, { status: 400 });
+    const validationResult = validateModerationReasonPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { reason } = validationResult.data;
 
     const sanction = {
       id: `sanc_${Date.now()}`,
@@ -105,10 +108,6 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Ban user error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Ban user error:", error);
   }
 }

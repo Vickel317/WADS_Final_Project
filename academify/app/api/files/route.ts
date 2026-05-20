@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleApiError } from "@/lib/error-handler";
+import { validateFileUpload } from "@/lib/security";
 
 /**
  * @swagger
@@ -122,11 +124,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ files: result }, { status: 200 });
   } catch (error) {
-    console.error("Get files error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Get files error:", error);
   }
 }
 
@@ -149,6 +147,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const validationResult = validateFileUpload(file.name, file.type, file.size);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
+    }
+
     // TODO: upload to real storage (S3, Cloudinary, etc.) in Week 7
     const newFile = {
       id: Date.now().toString(),
@@ -167,10 +170,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Upload file error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Upload file error:", error);
   }
 }
