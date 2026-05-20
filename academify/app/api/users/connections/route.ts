@@ -47,7 +47,14 @@ export async function GET() {
     });
 
     // Map users and connection status
-    const mapUser = (u: any) => ({
+    const mapUser = (u: {
+      userId: string;
+      name: string;
+      username: string;
+      major: string | null;
+      followers: { followerId: string }[];
+      following: { followingId: string }[];
+    }) => ({
       userId: u.userId,
       name: u.name,
       username: u.username,

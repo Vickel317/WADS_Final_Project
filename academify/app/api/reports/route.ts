@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        reports: results.map((report: any) => {
+        reports: results.map((report) => {
           const target = resolveReportTarget(report);
           return {
             id: report.reportreviewID,

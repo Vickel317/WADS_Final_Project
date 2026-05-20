@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { getPresignedGetUrl } from "@/lib/storage";
 import { validateFileUpload } from "@/lib/validation";
+
+type FileWithRelations = Prisma.FileGetPayload<{
+  include: { uploadedBy: true; space: true };
+}>;
 
 /**
  * @swagger
@@ -77,15 +82,13 @@ export type FileRecord = {
   createdAt: string;
 };
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
     const type = searchParams.get("type");
     const spaceId = searchParams.get("spaceId");
-    const where: any = {};
+    const where: Prisma.FileWhereInput = {};
     if (search) where.fileName = { contains: search, mode: "insensitive" };
     if (type) where.fileType = { contains: type };
     if (spaceId) where.spaceID = spaceId;
@@ -98,7 +101,7 @@ export async function GET(request: NextRequest) {
       });
 
       const mapped: FileRecord[] = await Promise.all(
-        dbFiles.map(async (f: any) => {
+        dbFiles.map(async (f: FileWithRelations) => {
           const url = await getPresignedGetUrl(f.fileUrl);
           return {
             id: f.fileID,
@@ -114,12 +117,13 @@ export async function GET(request: NextRequest) {
       );
 
       return NextResponse.json({ files: mapped }, { status: 200 });
-    } catch (pErr: any) {
+    } catch (pErr: unknown) {
       // If the schema is not migrated (missing File.spaceID column), avoid returning 500
-      if (pErr && pErr.code === "P2022" && /spaceID/i.test(pErr.message)) {
+      const prismaErr = pErr as { code?: string; message?: string };
+      if (prismaErr?.code === "P2022" && /spaceID/i.test(prismaErr.message ?? "")) {
         console.warn(
           "Prisma schema mismatch: File.spaceID column missing. Returning empty file list. Run prisma migrate to update the database.",
-          pErr.message
+          prismaErr.message
         );
         return NextResponse.json({ files: [] }, { status: 200 });
       }
@@ -139,8 +143,6 @@ export async function POST(request: NextRequest) {
     const sessionUser = await getSessionUser(request.headers);
     if (!sessionUser) return apiError(401, "Unauthorized", "UNAUTHORIZED");
 
-    let created: any;
-
     if (!contentType.includes("application/json")) {
       return apiError(400, "MinIO upload metadata must be sent as JSON", "BAD_REQUEST");
     }
@@ -150,16 +152,16 @@ export async function POST(request: NextRequest) {
     if (!validation.ok) return apiError(400, validation.error, "BAD_REQUEST");
 
     const { objectKey, fileName, fileType, fileSize, spaceId } = validation.data;
-    const data: any = {
+    const data: Prisma.FileUncheckedCreateInput = {
       uploadedByID: sessionUser.user.userId,
       fileName,
       fileUrl: objectKey,
       fileType,
       fileSize,
+      ...(spaceId ? { spaceID: spaceId } : {}),
     };
-    if (spaceId) data.spaceID = spaceId;
 
-    created = await prisma.file.create({ data });
+    const created = await prisma.file.create({ data });
 
     const resp: FileRecord = {
       id: created.fileID,
@@ -173,8 +175,9 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json({ message: "File uploaded successfully", file: resp }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Upload file error:", error);
-    return apiError(500, error?.message || "Internal server error", "INTERNAL_ERROR");
+    const message = error instanceof Error ? error.message : "Internal server error";
+    return apiError(500, message, "INTERNAL_ERROR");
   }
 }

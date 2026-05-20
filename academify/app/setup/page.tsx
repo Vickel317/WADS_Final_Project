@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 export default function ProfileSetupPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<"STUDENT" | "LECTURER">("STUDENT");
   
@@ -64,7 +62,7 @@ export default function ProfileSetupPage() {
         const errorData = await res.json();
         alert(errorData.error.message || "Failed to setup profile");
       }
-    } catch (error) {
+    } catch {
       alert("Something went wrong");
     } finally {
       setLoading(false);

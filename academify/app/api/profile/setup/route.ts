@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { apiError } from "@/lib/api-response";
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Common fields
-    const updates: any = {
+    const updates: Prisma.UserUpdateInput = {
       profileSetupComplete: true,
       bio: bio || null,
       username: username || sessionData.user.username,

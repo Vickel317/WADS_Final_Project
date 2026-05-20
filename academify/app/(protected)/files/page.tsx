@@ -8,7 +8,6 @@ import {
   Download,
   Share2,
   MoreVertical,
-  FolderOpen,
   FileText,
   ChevronDown,
 } from "lucide-react";
@@ -23,13 +22,6 @@ interface FileItem {
   downloads: number;
   sharedWith?: string;
   url: string;
-}
-
-interface Folder {
-  name: string;
-  count: number;
-  color: string;
-  bgColor: string;
 }
 
 interface CollaborationSpace {
@@ -100,18 +92,6 @@ function getFileIcon(type: FileItem["type"]) {
   }
 }
 
-function getFolderIcon(color: string, bgColor: string) {
-  return (
-    <div
-      className="w-10 h-10 flex items-center justify-center rounded-lg"
-      style={{ backgroundColor: bgColor }}
-    >
-      <FolderOpen size={20} style={{ color }} />
-    </div>
-  );
-}
-
-
 function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: CollaborationSpace[]; onDelete: (id: string) => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -170,7 +150,7 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
               document.body.appendChild(a);
               a.click();
               a.remove();
-            } catch (e) {
+            } catch {
               window.open(file.url, '_blank');
             }
           }}
@@ -209,7 +189,7 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
                     if (!res.ok) throw new Error('Delete failed');
                     onDelete(file.id);
                     alert('File deleted');
-                  } catch (e) {
+                  } catch {
                     alert('Failed to delete file');
                   }
                 }}
@@ -280,7 +260,7 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
                     setShareOpen(false);
                     setShareEmail('');
                     alert('File shared via email');
-                  } catch (e) {
+                  } catch {
                     alert('Share by email failed');
                   } finally {
                     setSharing(false);
@@ -638,7 +618,7 @@ export default function FilesPage() {
                     setShowUploadModal(false);
                     setSelectedFile(null);
                     setSelectedSpace("");
-                  } catch (e: any) {
+                  } catch (e: unknown) {
                     throw e;
                   }
                 }}

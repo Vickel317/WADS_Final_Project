@@ -53,25 +53,34 @@ function ProfileModalContent() {
   const [isFollower, setIsFollower] = useState(false);
 
   useEffect(() => {
-    if (!userId) {
-      setProfile(null);
-      return;
-    }
-    setLoading(true);
-    fetch(`/api/users/${userId}`)
-      .then((r) => r.json())
-      .then((d) => {
+    if (!userId) return;
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/users/${userId}`);
+        const d = await r.json();
+        if (cancelled) return;
         if (!d?.user) {
           setProfile(null);
           return;
         }
-        const mapped = mapApiUserToProfile(d.user as Record<string, unknown>, userId === "me" || d.user.isOwn);
+        const mapped = mapApiUserToProfile(
+          d.user as Record<string, unknown>,
+          userId === "me" || Boolean(d.user.isOwn)
+        );
         setProfile(mapped);
         setIsFollowing(mapped.isFollowing);
         setIsFollower(mapped.isFollower);
-      })
-      .catch(() => setProfile(null))
-      .finally(() => setLoading(false));
+      } catch {
+        if (!cancelled) setProfile(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   if (!userId) return null;
@@ -102,7 +111,7 @@ function ProfileModalContent() {
   else if (isFollower) buttonText = "Follow Back";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"

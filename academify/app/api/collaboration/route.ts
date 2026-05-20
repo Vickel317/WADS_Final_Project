@@ -68,9 +68,10 @@ export async function POST(request: NextRequest) {
           forumID: finalForumID,
         },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Prisma create collabSpace error:", err);
-      return apiError(500, err?.message || "Internal server error", "INTERNAL_ERROR");
+      const message = err instanceof Error ? err.message : "Internal server error";
+      return apiError(500, message, "INTERNAL_ERROR");
     }
 
     // Add creator as a member

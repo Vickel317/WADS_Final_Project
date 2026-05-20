@@ -112,7 +112,7 @@ export async function GET(
 
     return NextResponse.json(
       {
-        messages: conversation.map((message: any) => ({
+        messages: conversation.map((message) => ({
           id: message.messageID,
           senderId: message.senderID,
           receiverId: message.receiverID,

@@ -1,24 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type LikeButtonProps = {
   postId: string;
   initialCount?: number;
 };
 
+function readStoredLike(storageKey: string): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(storageKey) === "1";
+}
+
 export default function LikeButton({ postId, initialCount = 0 }: LikeButtonProps) {
   const storageKey = `forum-like:${postId}`;
-  const [liked, setLiked] = useState(false);
-  const [count, setCount] = useState(initialCount);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(storageKey);
-    if (stored === "1") {
-      setLiked(true);
-      setCount((prev) => Math.max(prev, initialCount + 1));
-    }
-  }, [storageKey, initialCount]);
+  const storedLiked = readStoredLike(storageKey);
+  const [liked, setLiked] = useState(storedLiked);
+  const [count, setCount] = useState(
+    storedLiked ? Math.max(initialCount, initialCount + 1) : initialCount
+  );
 
   const toggleLike = () => {
     setLiked((prev) => {

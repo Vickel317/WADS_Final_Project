@@ -38,7 +38,7 @@ export default function AdminUsersPage() {
 	};
 
 	useEffect(() => {
-		loadUsers();
+		void Promise.resolve().then(() => loadUsers());
 	}, []);
 
 	const updateRole = async (userId: string, role: string) => {
