@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
+import { handleApiError } from "@/lib/error-handler";
+import { validateProfileUpdatePayload } from "@/lib/security";
 
 function mapProfile(user: {
   userId: string;
@@ -52,8 +54,7 @@ export async function GET(
     const isOwn = sessionData?.user.userId === user.userId;
     return NextResponse.json({ user: { ...mapProfile(user), isOwn } }, { status: 200 });
   } catch (error) {
-    console.error("Get user error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Get user error:", error);
   }
 }
 
@@ -79,20 +80,12 @@ async function updateUserProfile(
     }
 
     const body = await request.json();
-    const { name, major, bio } = body as {
-      name?: string;
-      major?: string;
-      bio?: string;
-    };
-
-    const updates: { name?: string; major?: string; bio?: string } = {};
-    if (typeof name === "string") updates.name = name.trim();
-    if (typeof major === "string") updates.major = major.trim();
-    if (typeof bio === "string") updates.bio = bio.trim();
-
-    if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    const validationResult = validateProfileUpdatePayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const updates = validationResult.data;
 
     const updated = await prisma.user.update({
       where: { userId: targetUserId },
@@ -104,16 +97,7 @@ async function updateUserProfile(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Update user error:", error);
-    const status =
-      typeof error === "object" && error && "status" in error
-        ? Number((error as { status?: number }).status)
-        : 500;
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json(
-      { error: message || "Internal server error" },
-      { status: status || 500 }
-    );
+    return handleApiError("Update user error:", error);
   }
 }
 
@@ -156,15 +140,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Account deleted successfully" }, { status: 200 });
   } catch (error) {
-    console.error("Delete user error:", error);
-    const status =
-      typeof error === "object" && error && "status" in error
-        ? Number((error as { status?: number }).status)
-        : 500;
-    const message = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json(
-      { error: message || "Internal server error" },
-      { status: status || 500 }
-    );
+    return handleApiError("Delete user error:", error);
   }
 }

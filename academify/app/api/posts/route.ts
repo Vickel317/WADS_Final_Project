@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ModerationStatus } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth-session";
+import { validateCreatePostPayload } from "@/lib/security";
 import { prisma } from "@/lib/prisma";
+import { handleApiError } from "@/lib/error-handler";
 
 /**
  * @swagger
@@ -92,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        threads: result.map((post) => ({
+        threads: result.map((post: any) => ({
           id: post.postID,
           title: post.title,
           content: post.content,
@@ -111,8 +113,7 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Get threads error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Get threads error:", error);
   }
 }
 
@@ -124,14 +125,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, content, categoryId } = body;
-
-    if (!title || !content || !categoryId) {
-      return NextResponse.json(
-        { error: "Title, content, and categoryId are required" },
-        { status: 400 }
-      );
+    const validationResult = validateCreatePostPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { title, content, categoryId } = validationResult.data;
 
     const category = await prisma.category.findFirst({
       where: {
@@ -176,7 +175,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Create thread error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Create thread error:", error);
   }
 }

@@ -1,0 +1,5 @@
+* text=auto
+
+# Keep migration and config text files consistent across OSes
+*.sql text eol=lf
+*.toml text eol=lf

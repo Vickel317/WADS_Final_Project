@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-session";
+import { handleApiError } from "@/lib/error-handler";
+import { validateCreateEventPayload } from "@/lib/security";
 
 const mockEvents = [
   {
@@ -84,8 +86,7 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Get events error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Get events error:", error);
   }
 }
 
@@ -97,14 +98,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, date, duration, location, category, maxAttendees } = body;
-
-    if (!title || !date || !location) {
-      return NextResponse.json(
-        { error: "Missing required fields: title, date, location" },
-        { status: 400 }
-      );
+    const validationResult = validateCreateEventPayload(body);
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { title, description, date, duration, location, category, maxAttendees } =
+      validationResult.data;
 
     const newEvent = {
       id: `event_${Date.now()}`,
@@ -126,7 +126,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newEvent, { status: 201 });
   } catch (error) {
-    console.error("Create event error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError("Create event error:", error);
   }
 }

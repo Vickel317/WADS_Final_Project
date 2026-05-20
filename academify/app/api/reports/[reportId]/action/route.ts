@@ -85,14 +85,12 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { action, note } = body;
-
-    if (!action || !["resolve", "dismiss"].includes(action)) {
-      return NextResponse.json(
-        { error: "action must be 'resolve' or 'dismiss'" },
-        { status: 400 }
-      );
+      const validationResult = validateReportActionPayload(body);
+      if (!validationResult.ok) {
+        return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+      const { action, note } = validationResult.data;
 
     const newStatus = action === "resolve" ? "resolved" : "dismissed";
 
@@ -112,10 +110,6 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Report action error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+      return handleApiError("Report action error:", error);
   }
 }

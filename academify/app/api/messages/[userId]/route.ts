@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleApiError } from "@/lib/error-handler";
+import { validateCreateMessagePayload } from "@/lib/security";
 import { messages, dummyUsers } from "@/app/api/messages/route";
 
 /**
@@ -102,11 +104,7 @@ export async function GET(
 
     return NextResponse.json({ messages: conversation }, { status: 200 });
   } catch (error) {
-    console.error("Get messages error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Get messages error:", error);
   }
 }
 
@@ -116,14 +114,15 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    const { content } = body;
-
-    if (!content || !content.trim()) {
-      return NextResponse.json(
-        { error: "Message content is required" },
-        { status: 400 }
-      );
+    const validationResult = validateCreateMessagePayload({
+      content: body?.content,
+      receiverId: params.userId,
+    });
+    if (!validationResult.ok) {
+      return NextResponse.json({ error: validationResult.error }, { status: 400 });
     }
+
+    const { content } = validationResult.data;
 
     const receiverId = params.userId;
 
@@ -151,10 +150,6 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
-    console.error("Send message error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError("Send message error:", error);
   }
 }
