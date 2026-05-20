@@ -86,6 +86,10 @@ export async function GET(
       return apiError(404, "User not found", "NOT_FOUND");
     }
 
+    // ?since=<ISO timestamp> — return only messages after this point (catch-up after reconnect)
+    const sinceParam = request.nextUrl.searchParams.get("since");
+    const sinceDate = sinceParam ? new Date(sinceParam) : null;
+
     await prisma.message.updateMany({
       where: {
         senderID: partnerId,
@@ -101,6 +105,7 @@ export async function GET(
           { senderID: currentUserId, receiverID: partnerId },
           { senderID: partnerId, receiverID: currentUserId },
         ],
+        ...(sinceDate ? { sentAt: { gt: sinceDate } } : {}),
       },
       orderBy: { sentAt: "asc" },
     });
