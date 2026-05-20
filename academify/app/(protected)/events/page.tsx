@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Calendar,
@@ -21,69 +22,17 @@ interface Event {
   time: string;
   location: string;
   host: string;
+  hostUsername?: string;
   participants: number;
   maxParticipants: number;
   joined?: boolean;
+  durationMinutes?: number;
+  startsAt?: Date;
+  creatorId?: string;
+  attendeeIds?: string[];
 }
 
 
-const EVENTS: Event[] = [
-  {
-    id: "1",
-    title: "Machine Learning Study Group",
-    type: "Study Session",
-    date: "Today, Feb 24",
-    time: "4:00 PM - 6:00 PM",
-    location: "Library Room 203",
-    host: "Sarah Chen",
-    participants: 8,
-    maxParticipants: 12,
-  },
-  {
-    id: "2",
-    title: "Web Development Workshop",
-    type: "Workshop",
-    date: "Tomorrow, Feb 25",
-    time: "2:00 PM - 4:30 PM",
-    location: "CS Building Lab 1",
-    host: "Mike Johnson",
-    participants: 15,
-    maxParticipants: 20,
-  },
-  {
-    id: "3",
-    title: "Final Exam Prep - Calculus",
-    type: "Study Session",
-    date: "Feb 26",
-    time: "10:00 AM - 12:00 PM",
-    location: "Online (Zoom)",
-    host: "Prof. Williams",
-    participants: 22,
-    maxParticipants: 30,
-  },
-  {
-    id: "4",
-    title: "Data Structures Review",
-    type: "Study Session",
-    date: "Feb 27",
-    time: "3:00 PM - 5:00 PM",
-    location: "Room B204",
-    host: "Alex Turner",
-    participants: 6,
-    maxParticipants: 10,
-  },
-  {
-    id: "5",
-    title: "UI/UX Design Seminar",
-    type: "Seminar",
-    date: "Feb 28",
-    time: "1:00 PM - 3:00 PM",
-    location: "Auditorium A",
-    host: "Design Club",
-    participants: 40,
-    maxParticipants: 60,
-  },
-];
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -95,6 +44,48 @@ const TYPE_STYLES: Record<Event["type"], { badge: string; border: string }> = {
   Workshop: { badge: "bg-indigo-500 text-white", border: "border-indigo-200" },
   Seminar: { badge: "bg-amber-500 text-white", border: "border-amber-200" },
   Social: { badge: "bg-pink-500 text-white", border: "border-pink-200" },
+};
+
+const formatGCalDate = (value: Date) =>
+  value
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+
+const buildGoogleCalendarUrl = (event: Event) => {
+  if (!event.startsAt) return null;
+  const start = event.startsAt;
+  const durationMinutes = event.durationMinutes ?? 60;
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  const details = [event.location, event.time].filter(Boolean).join(" | ");
+
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title,
+    dates: `${formatGCalDate(start)}/${formatGCalDate(end)}`,
+    details,
+    location: event.location,
+  });
+
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+};
+
+type ApiEvent = {
+  id: string;
+  userId?: string;
+  title: string;
+  description: string;
+  date: string;
+  location: string;
+  category?: string;
+  duration?: number;
+  attendees?: string[];
+  maxAttendees?: number;
+  creator?: {
+    id: string;
+    name: string;
+    username: string;
+  };
 };
 
 
@@ -123,16 +114,22 @@ function StatCard({ value, label }: { value: number | string; label: string }) {
 function EventCard({
   event,
   onJoin,
+  onOpen,
 }: {
   event: Event;
   onJoin: (id: string) => void;
+  onOpen: (id: string) => void;
 }) {
   const styles = TYPE_STYLES[event.type];
-  const full = event.participants >= event.maxParticipants;
+  const hasCap = event.maxParticipants > 0;
+  const full = hasCap && event.participants >= event.maxParticipants;
+  const hostInitial = event.host?.slice(0, 1).toUpperCase() || "?";
+  const gcalUrl = buildGoogleCalendarUrl(event);
 
   return (
     <div
-      className={`bg-white rounded-xl border ${styles.border} p-4 hover:shadow-sm transition-shadow`}
+      onClick={() => onOpen(event.id)}
+      className={`bg-white rounded-xl border ${styles.border} p-4 hover:shadow-sm transition-shadow cursor-pointer`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -161,18 +158,23 @@ function EventCard({
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
               <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-bold text-gray-500">
-                {event.host[0]}
+                {hostInitial}
               </div>
               <span>by {event.host}</span>
               <Users size={11} className="ml-1 shrink-0" />
               <span>
-                {event.participants}/{event.maxParticipants} participants
+                {hasCap
+                  ? `${event.participants}/${event.maxParticipants} participants`
+                  : `${event.participants} participants`}
               </span>
             </div>
           </div>
         </div>
         <button
-          onClick={() => !full && onJoin(event.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!full) onJoin(event.id);
+          }}
           disabled={event.joined}
           className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
             event.joined
@@ -187,26 +189,64 @@ function EventCard({
         >
           {event.joined ? "Joined" : full ? "Full" : "Join"}
         </button>
+        {gcalUrl && (
+          <a
+            href={gcalUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 px-3 py-2 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:border-teal-200 hover:text-teal-700"
+          >
+            Add to Google Calendar
+          </a>
+        )}
       </div>
 
       {/* Participants bar */}
-      <div className="mt-3">
-        <div className="w-full bg-gray-100 rounded-full h-1.5">
-          <div
-            className="h-1.5 rounded-full transition-all"
-            style={{
-              width: `${(event.participants / event.maxParticipants) * 100}%`,
-              backgroundColor: "#0d9488",
-            }}
-          />
+      {hasCap && (
+        <div className="mt-3">
+          <div className="w-full bg-gray-100 rounded-full h-1.5">
+            <div
+              className="h-1.5 rounded-full transition-all"
+              style={{
+                width: `${(event.participants / event.maxParticipants) * 100}%`,
+                backgroundColor: "#0d9488",
+              }}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 
-function CreateEventModal({ onClose }: { onClose: () => void }) {
+type EventForm = {
+  title: string;
+  type: Event["type"];
+  date: string;
+  time: string;
+  location: string;
+  maxParticipants: string;
+  description: string;
+  virtualLink: string;
+};
+
+function CreateEventModal({
+  form,
+  onChange,
+  onClose,
+  onSubmit,
+  loading,
+  error,
+}: {
+  form: EventForm;
+  onChange: (updates: Partial<EventForm>) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  loading: boolean;
+  error: string | null;
+}) {
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
@@ -233,6 +273,8 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
             </label>
             <input
               placeholder="e.g. Algorithms Study Group"
+              value={form.title}
+              onChange={(e) => onChange({ title: e.target.value })}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
             />
           </div>
@@ -240,11 +282,17 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
             <label className="text-xs font-medium text-gray-600 block mb-1">
               Type
             </label>
-            <select className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500 bg-white">
-              <option>Study Session</option>
-              <option>Workshop</option>
-              <option>Seminar</option>
-              <option>Social</option>
+            <select
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500 bg-white"
+              value={form.type}
+              onChange={(e) =>
+                onChange({ type: e.target.value as Event["type"] })
+              }
+            >
+              <option value="Study Session">Study Session</option>
+              <option value="Workshop">Workshop</option>
+              <option value="Seminar">Seminar</option>
+              <option value="Social">Social</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -254,6 +302,8 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
               </label>
               <input
                 type="date"
+                value={form.date}
+                onChange={(e) => onChange({ date: e.target.value })}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
               />
             </div>
@@ -263,6 +313,8 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
               </label>
               <input
                 type="time"
+                value={form.time}
+                onChange={(e) => onChange({ time: e.target.value })}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
               />
             </div>
@@ -273,6 +325,8 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
             </label>
             <input
               placeholder="e.g. Library Room 203 or Online (Zoom)"
+              value={form.location}
+              onChange={(e) => onChange({ location: e.target.value })}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
             />
           </div>
@@ -283,6 +337,8 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
             <input
               type="number"
               placeholder="e.g. 20"
+              value={form.maxParticipants}
+              onChange={(e) => onChange({ maxParticipants: e.target.value })}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
             />
           </div>
@@ -293,23 +349,41 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
             <textarea
               rows={3}
               placeholder="What will you cover?"
+              value={form.description}
+              onChange={(e) => onChange({ description: e.target.value })}
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500 resize-none"
             />
           </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Virtual Link (optional)
+            </label>
+            <input
+              placeholder="https://meet.google.com/..."
+              value={form.virtualLink}
+              onChange={(e) => onChange({ virtualLink: e.target.value })}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
+            />
+          </div>
         </div>
+
+        {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
 
         <div className="flex gap-3 mt-5">
           <button
             onClick={onClose}
             className="flex-1 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50"
+            disabled={loading}
           >
             Cancel
           </button>
           <button
-            className="flex-1 py-2 rounded-lg text-sm font-medium text-white"
+            onClick={onSubmit}
+            disabled={loading}
+            className="flex-1 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
             style={{ backgroundColor: "#0d9488" }}
           >
-            Create Event
+            {loading ? "Creating..." : "Create Event"}
           </button>
         </div>
       </div>
@@ -319,11 +393,88 @@ function CreateEventModal({ onClose }: { onClose: () => void }) {
 
 
 export default function EventsPage() {
+  const router = useRouter();
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [modal, setModal] = useState(false);
-  const [events, setEvents] = useState<Event[]>(EVENTS);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [form, setForm] = useState<EventForm>({
+    title: "",
+    type: "Study Session",
+    date: "",
+    time: "",
+    location: "",
+    maxParticipants: "",
+    description: "",
+    virtualLink: "",
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+
+  const normalizeType = (value?: string): Event["type"] => {
+    if (!value) return "Study Session";
+    const normalized = value.toLowerCase();
+    if (normalized.includes("workshop")) return "Workshop";
+    if (normalized.includes("seminar")) return "Seminar";
+    if (normalized.includes("social")) return "Social";
+    return "Study Session";
+  };
+
+  useEffect(() => {
+    let ignore = false;
+    const loadEvents = async () => {
+      try {
+        const [eventRes, userRes] = await Promise.all([
+          fetch("/api/events?filter=upcoming"),
+          fetch("/api/users/me"),
+        ]);
+        const data = await eventRes.json();
+        if (userRes.ok) {
+          const me = await userRes.json();
+          if (!ignore) setCurrentUserId(me.user?.userId ?? null);
+        }
+        if (!eventRes.ok) return;
+
+        const mapped = (data.data ?? []).map((event: ApiEvent) => {
+          const when = new Date(event.date);
+          return {
+            id: event.id,
+            creatorId: event.userId ?? event.creator?.id,
+            title: event.title,
+            type: normalizeType(event.category),
+            date: when.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+            time: when.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+            }),
+            location: event.location,
+            host: event.creator?.name ?? "Host",
+            hostUsername: event.creator?.username,
+            participants: event.attendees?.length ?? 0,
+            maxParticipants: event.maxAttendees ?? 0,
+            durationMinutes: event.duration ?? 60,
+            startsAt: when,
+            attendeeIds: event.attendees ?? [],
+          } as Event;
+        });
+
+        if (!ignore) setEvents(mapped);
+      } catch {
+        // Swallow errors to keep the page usable.
+      }
+    };
+
+    loadEvents();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
@@ -337,6 +488,141 @@ export default function EventsPage() {
       )
     );
   };
+
+  const handleCreateEvent = async () => {
+    setFormError(null);
+
+    if (!form.title.trim() || !form.location.trim() || !form.date || !form.time) {
+      setFormError("Title, location, date, and time are required.");
+      return;
+    }
+
+    const trimmedLink = form.virtualLink.trim();
+    if (trimmedLink && !/^https?:\/\//i.test(trimmedLink)) {
+      setFormError("Virtual link must start with http:// or https://");
+      return;
+    }
+
+    const dateTime = new Date(`${form.date}T${form.time}`);
+    if (Number.isNaN(dateTime.getTime())) {
+      setFormError("Please provide a valid date and time.");
+      return;
+    }
+
+    const descriptionValue = (() => {
+      const base = form.description.trim();
+      if (!trimmedLink) return base;
+      return base ? `${base}\n\n${trimmedLink}` : trimmedLink;
+    })();
+
+    setFormLoading(true);
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: form.title,
+          description: descriptionValue,
+          date: dateTime.toISOString(),
+          location: form.location,
+          category: form.type,
+          maxAttendees: form.maxParticipants ? Number(form.maxParticipants) : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to create event");
+      }
+
+      setModal(false);
+      setForm({
+        title: "",
+        type: "Study Session",
+        date: "",
+        time: "",
+        location: "",
+        maxParticipants: "",
+        description: "",
+        virtualLink: "",
+      });
+      setFormError(null);
+      const refreshRes = await fetch("/api/events?filter=upcoming");
+      const refreshed = await refreshRes.json();
+      if (refreshRes.ok) {
+        const mapped = (refreshed.data ?? []).map((event: ApiEvent) => {
+          const when = new Date(event.date);
+          return {
+            id: event.id,
+            creatorId: event.userId ?? event.creator?.id,
+            title: event.title,
+            type: normalizeType(event.category),
+            date: when.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+            time: when.toLocaleTimeString(undefined, {
+              hour: "numeric",
+              minute: "2-digit",
+            }),
+            location: event.location,
+            host: event.creator?.name ?? "Host",
+            hostUsername: event.creator?.username,
+            participants: event.attendees?.length ?? 0,
+            maxParticipants: event.maxAttendees ?? 0,
+            durationMinutes: event.duration ?? 60,
+            startsAt: when,
+            attendeeIds: event.attendees ?? [],
+          } as Event;
+        });
+        setEvents(mapped);
+      }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to create event");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const stats = useMemo(() => {
+    const upcomingCount = events.length;
+    const organizedCount = currentUserId
+      ? events.filter((event) => event.creatorId === currentUserId).length
+      : 0;
+    const attendedCount = currentUserId
+      ? events.filter((event) => event.attendeeIds?.includes(currentUserId)).length
+      : 0;
+    const totalHours = events.reduce((sum, event) => {
+      const minutes = event.durationMinutes ?? 60;
+      return sum + minutes / 60;
+    }, 0);
+
+    return {
+      upcomingCount,
+      organizedCount,
+      attendedCount,
+      totalHours: Math.round(totalHours),
+    };
+  }, [events, currentUserId]);
+
+  const upcomingSummary = useMemo(() => {
+    const counts = events.reduce<Record<Event["type"], number>>(
+      (acc, event) => {
+        acc[event.type] = (acc[event.type] ?? 0) + 1;
+        return acc;
+      },
+      {
+        "Study Session": 0,
+        Workshop: 0,
+        Seminar: 0,
+        Social: 0,
+      }
+    );
+    return {
+      total: events.length,
+      counts,
+    };
+  }, [events]);
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -370,10 +656,10 @@ export default function EventsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard value={23} label="Events Attended" />
-        <StatCard value={8} label="Events Organized" />
-        <StatCard value={5} label="Upcoming" />
-        <StatCard value={142} label="Total Hours" />
+        <StatCard value={stats.attendedCount} label="Events Attended" />
+        <StatCard value={stats.organizedCount} label="Events Organized" />
+        <StatCard value={stats.upcomingCount} label="Upcoming" />
+        <StatCard value={stats.totalHours} label="Total Hours" />
       </div>
 
       {/* Body */}
@@ -437,16 +723,28 @@ export default function EventsPage() {
             {/* This week summary */}
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs font-semibold text-gray-700 mb-2">
-                Upcoming This Week
+                Upcoming Summary
               </p>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="w-2 h-2 rounded-full bg-teal-500 shrink-0" />
-                  3 events
+                  {upcomingSummary.total} events
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                  2 workshops
+                  {upcomingSummary.counts.Workshop} workshops
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  {upcomingSummary.counts.Seminar} seminars
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="w-2 h-2 rounded-full bg-pink-500 shrink-0" />
+                  {upcomingSummary.counts.Social} socials
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  {upcomingSummary.counts["Study Session"]} study sessions
                 </div>
               </div>
             </div>
@@ -457,15 +755,33 @@ export default function EventsPage() {
         <div className="flex-1 min-w-0 w-full">
           <p className="text-sm font-semibold text-gray-700 mb-3">Upcoming</p>
           <div className="space-y-3">
-            {events.map((event) => (
-              <EventCard key={event.id} event={event} onJoin={handleJoin} />
-            ))}
+            {events.length === 0 ? (
+              <p className="text-sm text-gray-500">No upcoming events yet.</p>
+            ) : (
+              events.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onJoin={handleJoin}
+                  onOpen={(id) => router.push(`/events/${id}`)}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
 
       {/* Modal */}
-      {modal && <CreateEventModal onClose={() => setModal(false)} />}
+      {modal && (
+        <CreateEventModal
+          form={form}
+          onChange={(updates) => setForm((prev) => ({ ...prev, ...updates }))}
+          onClose={() => setModal(false)}
+          onSubmit={handleCreateEvent}
+          loading={formLoading}
+          error={formError}
+        />
+      )}
     </div>
   );
 }
