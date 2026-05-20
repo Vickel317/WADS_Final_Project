@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { disconnectSocket } from "@/lib/socket-client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: (
@@ -177,6 +178,7 @@ export default function Sidebar() {
               <button 
                 onClick={async () => {
                   setUserDropdownOpen(false);
+                  disconnectSocket();
                   await authClient.signOut({
                     fetchOptions: {
                       onSuccess: () => {
