@@ -16,8 +16,39 @@ datasource db {
 // Enums
 enum UserRole {
   STUDENT
-  MODERATOR
+  LECTURER
   ADMIN
+}
+
+enum EventRole {
+  GUEST
+  HOST
+}
+
+enum SpaceRole {
+  MEMBER
+  MODERATOR
+  OWNER
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  BUSY
+  OFFLINE
+}
+
+enum DMRestriction {
+  ALL
+  CONNECTIONS
+  LECTURERS
+  NONE
+}
+
+enum UserStatus {
+  ACTIVE
+  WARNED
+  SUSPENDED
+  BANNED
 }
 
 enum ModerationStatus {
@@ -58,53 +89,141 @@ model User {
   bio       String?  @db.Text
   createdAt DateTime @default(now())
 
+  // -- Setup & Profile Attributes --
+  profileSetupComplete Boolean  @default(false)
+  academicLevel        String?
+  skillTags            String[]
+  portfolioLinks       String[]
+
+  // Lecturer Attributes
+  department           String?
+  specializations      String[]
+  consultationHours    String?
+  verifiedPublications String[]
+  askMeAbout           String[]
+
+  // -- Collaboration & Networking --
+  activeProjects     String[]
+  availabilityStatus AvailabilityStatus @default(AVAILABLE)
+
+  // -- Privacy & Safety --
+  showEmail         Boolean       @default(true)
+  showAcademicLevel Boolean       @default(true)
+  showLastSeen      Boolean       @default(true)
+  dmRestriction     DMRestriction @default(ALL)
+
+  // -- Admin Controls --
+  accountStatus  UserStatus @default(ACTIVE)
+  isShadowBanned Boolean    @default(false)
+
   // Relations
-  posts                Post[]                  @relation("UserPosts")
-  comments             Comment[]               @relation("UserComments")
-  files                File[]                  @relation("UserFiles")
-  createdEvents        Event[]                 @relation("EventCreator")
-  attendingEvents      EventAttendee[]         @relation("EventAttendees")
-  sentMessages         Message[]               @relation("MessageSender")
-  receivedMessages     Message[]               @relation("MessageReceiver")
-  reportsMade          ReportReview[]          @relation("Reporter")
-  reportsAgainstUser   ReportReview[]          @relation("ReportedUser")
-  moderationActions    ModerationActionLog[]   @relation("ModeratorActions")
+  posts              Post[]                @relation("UserPosts")
+  comments           Comment[]             @relation("UserComments")
+  files              File[]                @relation("UserFiles")
+  createdEvents      Event[]               @relation("EventCreator")
+  attendingEvents    EventAttendee[]       @relation("EventAttendees")
+  sentMessages       Message[]             @relation("MessageSender")
+  receivedMessages   Message[]             @relation("MessageReceiver")
+  reportsMade        ReportReview[]        @relation("Reporter")
+  reportsAgainstUser ReportReview[]        @relation("ReportedUser")
+  moderationActions  ModerationActionLog[] @relation("ModeratorActions")
+  followers          Follow[]              @relation("Follower")
+  following          Follow[]              @relation("Following")
+  moderatedForums    ForumModerator[]      @relation("ForumModerators")
+  collabSpaces       SpaceMember[]         @relation("SpaceMembers")
 
   @@map("User")
 }
 
-model Category {
-  categoryID  String   @id @default(cuid())
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Following", fields: [followerId], references: [userId], onDelete: Cascade)
+  following User @relation("Follower", fields: [followingId], references: [userId], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("Follow")
+}
+
+model ForumHub {
+  forumID     String   @id @default(cuid())
   name        String   @unique
   description String?  @db.Text
   createdAt   DateTime @default(now())
 
   // Relations
-  posts Post[]
+  posts        Post[]
+  moderators   ForumModerator[]
+  events       Event[]
+  collabSpaces CollabSpace[]
 
-  @@map("Category")
+  @@map("ForumHub")
+}
+
+model ForumModerator {
+  forumID String
+  userID  String
+
+  forum ForumHub @relation(fields: [forumID], references: [forumID], onDelete: Cascade)
+  user  User     @relation("ForumModerators", fields: [userID], references: [userId], onDelete: Cascade)
+
+  @@id([forumID, userID])
+  @@map("ForumModerator")
+}
+
+model CollabSpace {
+  spaceID     String   @id @default(cuid())
+  forumID     String
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relations
+  forum   ForumHub      @relation(fields: [forumID], references: [forumID], onDelete: Cascade)
+  members SpaceMember[]
+  files   File[]
+
+  @@index([forumID])
+  @@map("CollabSpace")
+}
+
+model SpaceMember {
+  spaceID  String
+  userID   String
+  role     SpaceRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  space CollabSpace @relation(fields: [spaceID], references: [spaceID], onDelete: Cascade)
+  user  User        @relation("SpaceMembers", fields: [userID], references: [userId], onDelete: Cascade)
+
+  @@id([spaceID, userID])
+  @@index([userID])
+  @@map("SpaceMember")
 }
 
 model Post {
-  postID            String            @id @default(cuid())
-  authorID          String
-  categoryID        String
-  title             String
-  content           String            @db.Text
-  moderationStatus  ModerationStatus  @default(PENDING)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  postID           String           @id @default(cuid())
+  authorID         String
+  forumID          String
+  title            String
+  content          String           @db.Text
+  moderationStatus ModerationStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   // Relations
-  author            User              @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)
-  category          Category          @relation(fields: [categoryID], references: [categoryID], onDelete: Restrict)
-  comments          Comment[]         @relation("PostComments")
-  file              File?             @relation("PostFile")
-  reports           ReportReview[]    @relation("ReportedPost")
+  author            User                  @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)
+  forum             ForumHub              @relation(fields: [forumID], references: [forumID], onDelete: Restrict)
+  comments          Comment[]             @relation("PostComments")
+  file              File?                 @relation("PostFile")
+  reports           ReportReview[]        @relation("ReportedPost")
   moderationActions ModerationActionLog[] @relation("TargetPost")
 
   @@index([authorID])
-  @@index([categoryID])
+  @@index([forumID])
   @@index([createdAt])
   @@map("Post")
 }
@@ -117,9 +236,9 @@ model Comment {
   createdAt DateTime @default(now())
 
   // Relations
-  post              Post              @relation("PostComments", fields: [postID], references: [postID], onDelete: Cascade)
-  author            User              @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
-  reports           ReportReview[]    @relation("ReportedComment")
+  post              Post                  @relation("PostComments", fields: [postID], references: [postID], onDelete: Cascade)
+  author            User                  @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
+  reports           ReportReview[]        @relation("ReportedComment")
   moderationActions ModerationActionLog[] @relation("TargetComment")
 
   @@index([postID])
@@ -130,6 +249,7 @@ model Comment {
 model Event {
   eventID     String   @id @default(cuid())
   creatorID   String
+  forumID     String
   title       String
   description String   @db.Text
   dateTime    DateTime
@@ -138,9 +258,11 @@ model Event {
 
   // Relations
   creator   User            @relation("EventCreator", fields: [creatorID], references: [userId], onDelete: Cascade)
+  forum     ForumHub        @relation(fields: [forumID], references: [forumID], onDelete: Cascade)
   attendees EventAttendee[] @relation("EventAttendees")
 
   @@index([creatorID])
+  @@index([forumID])
   @@index([dateTime])
   @@map("Event")
 }
@@ -148,6 +270,7 @@ model Event {
 model EventAttendee {
   eventID String
   userID  String
+  role    EventRole @default(GUEST)
 
   // Relations
   event Event @relation("EventAttendees", fields: [eventID], references: [eventID], onDelete: Cascade)
@@ -159,7 +282,7 @@ model EventAttendee {
 
 model File {
   fileID       String   @id @default(cuid())
-  postID       String   @unique
+  postID       String?  @unique
   uploadedByID String
   fileName     String
   fileUrl      String
@@ -168,10 +291,13 @@ model File {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  post         Post @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
-  uploadedBy   User @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
+  post       Post?        @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
+  uploadedBy User         @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
+  spaceID    String?
+  space      CollabSpace? @relation(fields: [spaceID], references: [spaceID], onDelete: Cascade)
 
   @@index([uploadedByID])
+  @@index([spaceID])
   @@map("File")
 }
 
@@ -194,16 +320,16 @@ model Message {
 }
 
 model ReportReview {
-  reportreviewID    String        @id @default(cuid())
+  reportreviewID    String       @id @default(cuid())
   reporterID        String
   reportedUserID    String?
   reportedPostID    String?
   reportedCommentID String?
   reason            String
-  description       String        @db.Text
-  status            ReportStatus  @default(PENDING)
+  description       String       @db.Text
+  status            ReportStatus @default(PENDING)
   reviewedAt        DateTime?
-  createdAt         DateTime      @default(now())
+  createdAt         DateTime     @default(now())
 
   // Relations
   reporter          User                  @relation("Reporter", fields: [reporterID], references: [userId], onDelete: Cascade)
@@ -218,23 +344,23 @@ model ReportReview {
 }
 
 model ModerationActionLog {
-  ModaiID           String     @id @default(cuid())
-  modID             String
-  targetUserID      String?
-  targetPostID      String?
-  targetCommentID   String?
-  relatedReportID   String?
-  actionType        ActionType
-  reason            String     @db.Text
-  details           String?    @db.Text
-  duration          Int?
-  timestamp         DateTime   @default(now())
+  ModaiID         String     @id @default(cuid())
+  modID           String
+  targetUserID    String?
+  targetPostID    String?
+  targetCommentID String?
+  relatedReportID String?
+  actionType      ActionType
+  reason          String     @db.Text
+  details         String?    @db.Text
+  duration        Int?
+  timestamp       DateTime   @default(now())
 
   // Relations
-  moderator       User          @relation("ModeratorActions", fields: [modID], references: [userId], onDelete: Cascade)
-  targetPost      Post?         @relation("TargetPost", fields: [targetPostID], references: [postID], onDelete: SetNull)
-  targetComment   Comment?      @relation("TargetComment", fields: [targetCommentID], references: [commentID], onDelete: SetNull)
-  relatedReport   ReportReview? @relation("RelatedReport", fields: [relatedReportID], references: [reportreviewID], onDelete: SetNull)
+  moderator     User          @relation("ModeratorActions", fields: [modID], references: [userId], onDelete: Cascade)
+  targetPost    Post?         @relation("TargetPost", fields: [targetPostID], references: [postID], onDelete: SetNull)
+  targetComment Comment?      @relation("TargetComment", fields: [targetCommentID], references: [commentID], onDelete: SetNull)
+  relatedReport ReportReview? @relation("RelatedReport", fields: [relatedReportID], references: [reportreviewID], onDelete: SetNull)
 
   @@index([modID])
   @@index([timestamp])
@@ -242,13 +368,13 @@ model ModerationActionLog {
 }
 
 model AuthUser {
-  id            String         @id
+  id            String        @id
   name          String
   email         String
-  emailVerified Boolean        @default(false)
+  emailVerified Boolean       @default(false)
   image         String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   authsessions  AuthSession[]
   authaccounts  AuthAccount[]
 
@@ -297,8 +423,8 @@ model AuthVerification {
   identifier String
   value      String
   expiresAt  DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([identifier])
   @@map("AuthVerification")

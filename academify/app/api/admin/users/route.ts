@@ -1,55 +1,11 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-response";
+
+import { UserRole } from "@prisma/client";
 
 
-// TODO: replace with Prisma in Week 7
-export const adminUsers: Array<{
-  id: string;
-  email: string;
-  name: string;
-  role: "student" | "instructor" | "moderator" | "admin";
-  status: "active" | "suspended" | "banned";
-  createdAt: string;
-}> = [
-  {
-    id: "user_1",
-    email: "john@example.com",
-    name: "John Doe",
-    role: "student",
-    status: "active",
-    createdAt: new Date("2026-01-15").toISOString(),
-  },
-  {
-    id: "user_2",
-    email: "sarah@example.com",
-    name: "Sarah Chen",
-    role: "instructor",
-    status: "active",
-    createdAt: new Date("2026-01-10").toISOString(),
-  },
-  {
-    id: "user_admin",
-    email: "admin@example.com",
-    name: "Admin User",
-    role: "admin",
-    status: "active",
-    createdAt: new Date("2026-01-01").toISOString(),
-  },
-];
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * @swagger
@@ -58,7 +14,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Get all users (Admin only)
  *     tags: [Admin]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: query
  *         name: role
@@ -90,44 +46,63 @@ function verifyToken(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Admin access required" },
-        { status: 403 }
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
     const { searchParams } = new URL(request.url);
-    const role = searchParams.get("role");
+    const role = searchParams.get("role")?.toUpperCase();
     const status = searchParams.get("status");
     const search = searchParams.get("search")?.toLowerCase();
 
-    let result = adminUsers;
-
-    if (role) result = result.filter((u) => u.role === role);
-    if (status) result = result.filter((u) => u.status === status);
-    if (search) {
-      result = result.filter(
-        (u) =>
-          u.name.toLowerCase().includes(search) ||
-          u.email.toLowerCase().includes(search)
-      );
+    if (role && !Object.values(UserRole).includes(role as UserRole)) {
+      return apiError(400, "Invalid role", "BAD_REQUEST");
     }
 
+    if (status && status !== "active") {
+      return NextResponse.json({ users: [], total: 0 }, { status: 200 });
+    }
+
+    const where = {
+      ...(role ? { role: role as UserRole } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" as const } },
+              { email: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const users = await prisma.user.findMany({ where });
+
     return NextResponse.json(
-      { users: result, total: result.length },
+      {
+        users: users.map((user) => ({
+          id: user.userId,
+          email: user.email,
+          name: user.name,
+          role: user.role.toLowerCase(),
+          status: "active",
+          createdAt: user.createdAt.toISOString(),
+        })),
+        total: users.length,
+      },
       { status: 200 }
     );
   } catch (error) {
     console.error("Admin get users error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+
+
+

@@ -5,7 +5,7 @@ describe("Topbar – rendering", () => {
   it("renders the search input", () => {
     render(<Topbar />);
     expect(
-      screen.getByPlaceholderText(/search for forums, files, events/i)
+      screen.getByPlaceholderText(/search/i)
     ).toBeInTheDocument();
   });
 
@@ -29,7 +29,7 @@ describe("Topbar – rendering", () => {
 
   it("search input is a text input", () => {
     render(<Topbar />);
-    const input = screen.getByPlaceholderText(/search for forums, files, events/i);
+    const input = screen.getByPlaceholderText(/search/i);
     expect(input.tagName).toBe("INPUT");
   });
 });

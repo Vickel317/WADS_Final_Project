@@ -1,24 +1,54 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-const categoryLabels: Record<string, string> = {
-  "computer-science": "Computer Science",
-  "mathematics": "Mathematics",
-  "web-development": "Web Development",
-  "ai-machine-learning": "AI & Machine Learning",
-  "study-groups": "Study Groups",
-  "general": "General",
+type ForumCategory = {
+  id: string;
+  name: string;
+  description: string;
+  slug: string;
+  createdAt: string;
 };
 
 export default function NewThreadPage() {
   const { category } = useParams<{ category: string }>();
   const router = useRouter();
-  const categoryLabel = categoryLabels[category] ?? category;
-
   const [form, setForm] = useState({ title: "", content: "" });
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<ForumCategory[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    const loadCategories = async () => {
+      try {
+        const res = await fetch("/api/categories");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Failed to load categories");
+        if (!ignore) setCategories(data.categories ?? []);
+      } catch (err) {
+        if (!ignore) {
+          setLoadError(err instanceof Error ? err.message : "Failed to load categories");
+        }
+      }
+    };
+    loadCategories();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const categoryLabel = useMemo(() => {
+    return categories.find((item) => item.slug === category)?.name ?? category;
+  }, [categories, category]);
+
+  const categoryExists = useMemo(() => {
+    if (!categories.length) return true;
+    return categories.some((item) => item.slug === category);
+  }, [categories, category]);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -31,21 +61,26 @@ export default function NewThreadPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     try {
+      const formData = new FormData();
+      formData.set("title", form.title);
+      formData.set("content", form.content);
+      formData.set("forum", category);
+      if (attachment) formData.set("file", attachment);
+
       const res = await fetch("/api/posts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: form.title, content: form.content, category }),
+        body: formData,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create thread");
       router.push(`/forums/${category}`);
-    } catch {
-      // On error, stay on page and navigate back on success
-      router.push(`/forums/${category}`);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to create thread");
     } finally {
       setLoading(false);
     }
@@ -69,6 +104,14 @@ export default function NewThreadPage() {
             Posting in{" "}
             <span className="text-teal-600 font-medium">{categoryLabel}</span>
           </p>
+          {loadError && (
+            <p className="text-xs text-red-500 mt-1">{loadError}</p>
+          )}
+          {!categoryExists && (
+            <p className="text-xs text-amber-600 mt-1">
+              This forum does not exist yet. Posting will create it.
+            </p>
+          )}
         </div>
       </div>
 
@@ -130,6 +173,23 @@ export default function NewThreadPage() {
             </p>
           </div>
 
+          {/* Attachment */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Attachment (optional)
+            </label>
+            <input
+              type="file"
+              onChange={(e) => setAttachment(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-600 file:mr-3 file:px-4 file:py-2 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+            />
+            {attachment && (
+              <p className="mt-2 text-xs text-gray-400">
+                {attachment.name} ({Math.ceil(attachment.size / 1024)} KB)
+              </p>
+            )}
+          </div>
+
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">
             <button
@@ -163,6 +223,9 @@ export default function NewThreadPage() {
               Cancel
             </button>
           </div>
+          {submitError && (
+            <p className="text-sm text-red-500">{submitError}</p>
+          )}
         </form>
       </div>
     </div>

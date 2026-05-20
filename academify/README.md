@@ -31,12 +31,7 @@ Minimum required for Better Auth (tutorial style):
 - `BETTER_AUTH_SECRET`
 - `NEXT_PUBLIC_BETTER_AUTH_URL`
 
-If you also use the tutorial's Firebase flow (`/api/auth/firebase`), configure:
-
-- `NEXT_PUBLIC_FIREBASE_*` variables
-- `FIREBASE_PROJECT_ID`
-- `FIREBASE_CLIENT_EMAIL`
-- `FIREBASE_PRIVATE_KEY`
+Firebase auth flow is retired in this codebase. Use BetterAuth endpoints only.
 
 ## Learn More
 

@@ -5,7 +5,14 @@ const mockPathname = jest.fn(() => "/dashboard");
 
 jest.mock("next/navigation", () => ({
   usePathname: () => mockPathname(),
+  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
 }));
+
+beforeEach(() => {
+  global.fetch = jest.fn().mockImplementation(() => new Promise(() => {}));
+});
 
 describe("Sidebar – rendering", () => {
   it("renders the Academify brand name", () => {
@@ -16,11 +23,12 @@ describe("Sidebar – rendering", () => {
   it("renders all navigation links", () => {
     render(<Sidebar />);
     expect(screen.getByRole("link", { name: /dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /profile/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /forums/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /chat/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /collab space/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /files/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /events/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /connections/i })).toBeInTheDocument();
   });
 
   it("renders navigation links with correct hrefs", () => {
@@ -28,14 +36,15 @@ describe("Sidebar – rendering", () => {
     expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: /forums/i })).toHaveAttribute("href", "/forums");
     expect(screen.getByRole("link", { name: /chat/i })).toHaveAttribute("href", "/messages");
+    expect(screen.getByRole("link", { name: /collab space/i })).toHaveAttribute("href", "/collaboration");
     expect(screen.getByRole("link", { name: /files/i })).toHaveAttribute("href", "/files");
     expect(screen.getByRole("link", { name: /events/i })).toHaveAttribute("href", "/events");
+    expect(screen.getByRole("link", { name: /connections/i })).toHaveAttribute("href", "/connections");
   });
 
   it("renders the user section at the bottom", () => {
     render(<Sidebar />);
-    expect(screen.getByText("John Doe")).toBeInTheDocument();
-    expect(screen.getByText("Computer Science")).toBeInTheDocument();
+    expect(screen.getByText("Signed in user")).toBeInTheDocument();
   });
 
   it("renders the tagline", () => {

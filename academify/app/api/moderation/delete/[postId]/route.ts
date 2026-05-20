@@ -1,21 +1,12 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
-import { handleApiError } from "@/lib/error-handler";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { prisma } from "@/lib/prisma";
+import { moderationLogs } from "../../queue/route";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -24,7 +15,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Delete a post via moderation (Moderator/Admin only)
  *     tags: [Moderation]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: postId
@@ -55,32 +46,44 @@ function verifyToken(request: NextRequest) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return NextResponse.json(
-        { error: "Forbidden: Moderator or Admin access required" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
       );
     }
 
-    const { postId } = params;
-    const index = threads.findIndex((t) => t.id === postId);
+    const { postId } = await params;
+    const existing = await prisma.post.findUnique({ where: { postID: postId } });
 
-    if (index === -1) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    if (!existing) {
+      return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    const body = await request.json().catch(() => ({}));
-    const { reason } = body;
+    const contentLength = request.headers.get("content-length");
+    const hasBody = contentLength !== null && contentLength !== "0";
+    const body = hasBody ? await parseJson<{ reason?: unknown }>(request) : {};
+    if (hasBody && !body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+    }
 
-    threads.splice(index, 1);
+    const reason = parseOptionalString(body?.reason);
+    if (reason.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "reason", message: `reason ${reason.error}` },
+      ]);
+    }
+
+    await prisma.post.delete({ where: { postID: postId } });
 
     moderationLogs.push({
       id: `log_${Date.now()}`,
@@ -88,7 +91,7 @@ export async function POST(
       targetType: "post",
       targetId: postId,
       performedBy: decoded.id,
-      reason: reason || "No reason provided",
+      reason: reason.value || "No reason provided",
       createdAt: new Date().toISOString(),
     });
 
@@ -97,6 +100,11 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    return handleApiError("Delete post (moderation) error:", error);
+    console.error("Delete post (moderation) error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+
+

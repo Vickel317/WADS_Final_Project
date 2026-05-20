@@ -1,22 +1,11 @@
-import { getJwtSecret } from "@/lib/auth-jwt";
-import { handleApiError } from "@/lib/error-handler";
-import { validateUpdateCommentPayload } from "@/lib/security";
+import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyToken } from "@/lib/auth-session";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.substring(7);
-  try {
-    return jwt.verify(token, getJwtSecret()) as {
-      id: string;
-      email: string;
-      role?: string;
-    };
-  } catch {
-    return null;
-  }
-}
+
 
 /**
  * @swagger
@@ -25,7 +14,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Update a comment
  *     tags: [Comments]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: commentId
@@ -60,7 +49,7 @@ function verifyToken(request: NextRequest) {
  *     summary: Delete a comment
  *     tags: [Comments]
  *     security:
- *       - bearerAuth: []
+ *       - sessionCookieAuth: []
  *     parameters:
  *       - in: path
  *         name: commentId
@@ -82,46 +71,48 @@ function verifyToken(request: NextRequest) {
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { commentId: string } }
+  { params }: { params: Promise<{ commentId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const { commentId } = params;
-    const body = await request.json();
-    const validationResult = validateUpdateCommentPayload(body);
-    if (!validationResult.ok) {
-      return NextResponse.json({ error: validationResult.error }, { status: 400 });
+    const { commentId  } = await params;
+    const body = await parseJson<{ content?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-    const { content } = validationResult.data;
+    const content = parseRequiredString(body.content);
+    if (content.error) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", [
+        { field: "content", message: `content ${content.error}` },
+      ]);
+    }
 
     const comment = await prisma.comment.findUnique({
       where: { commentID: commentId },
     });
     if (!comment) {
-      return NextResponse.json(
-        { error: "Comment not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Comment not found", "NOT_FOUND");
     }
 
     const isModerator =
       decoded.role === "moderator" || decoded.role === "admin";
 
     if (comment.authorID !== decoded.id && !isModerator) {
-      return NextResponse.json(
-        { error: "Forbidden: You can only edit your own comments" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: You can only edit your own comments",
+        "FORBIDDEN"
       );
     }
 
     const updated = await prisma.comment.update({
       where: { commentID: commentId },
-      data: { content },
+      data: { content: content.value! },
     });
 
     return NextResponse.json(
@@ -138,38 +129,37 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
-    return handleApiError("Update comment error:", error);
+    console.error("Update comment error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { commentId: string } }
+  { params }: { params: Promise<{ commentId: string }> }
 ) {
   try {
-    const decoded = verifyToken(request);
+    const decoded = await verifyToken(request);
     if (!decoded) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const { commentId } = params;
+    const { commentId  } = await params;
     const comment = await prisma.comment.findUnique({
       where: { commentID: commentId },
     });
     if (!comment) {
-      return NextResponse.json(
-        { error: "Comment not found" },
-        { status: 404 }
-      );
+      return apiError(404, "Comment not found", "NOT_FOUND");
     }
 
     const isModerator =
       decoded.role === "moderator" || decoded.role === "admin";
 
     if (comment.authorID !== decoded.id && !isModerator) {
-      return NextResponse.json(
-        { error: "Forbidden: You can only delete your own comments" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: You can only delete your own comments",
+        "FORBIDDEN"
       );
     }
 
@@ -180,6 +170,12 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    return handleApiError("Delete comment error:", error);
+    console.error("Delete comment error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+
+
+
+

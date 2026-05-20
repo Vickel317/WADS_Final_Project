@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
-import { handleApiError } from "@/lib/error-handler";
-import { validateProfileUpdatePayload } from "@/lib/security";
+import { apiError } from "@/lib/api-response";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 
 function mapProfile(user: {
   userId: string;
@@ -43,18 +43,36 @@ export async function GET(
 
     const resolvedUserId = userId === "me" ? sessionData?.user.userId : userId;
     if (!resolvedUserId) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    const user = await prisma.user.findUnique({ where: { userId: resolvedUserId } });
+    const user = await prisma.user.findUnique({ 
+      where: { userId: resolvedUserId },
+      include: {
+        followers: { where: { followerId: sessionData?.user.userId } },
+        following: { where: { followingId: sessionData?.user.userId } }
+      }
+    });
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return apiError(404, "User not found", "NOT_FOUND");
     }
 
     const isOwn = sessionData?.user.userId === user.userId;
-    return NextResponse.json({ user: { ...mapProfile(user), isOwn } }, { status: 200 });
+    const isFollowing = !isOwn && user.followers.length > 0;
+    const isFollower = !isOwn && user.following.length > 0;
+
+    return NextResponse.json({ 
+      user: { 
+        ...mapProfile({ ...user, role: user.role }), 
+        isOwn,
+        isFollowing,
+        isFollower,
+        isConnected: isFollowing && isFollower
+      } 
+    }, { status: 200 });
   } catch (error) {
-    return handleApiError("Get user error:", error);
+    console.error("Get user error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -65,7 +83,7 @@ async function updateUserProfile(
   try {
     const sessionData = await getSession();
     if (!sessionData) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const { userId } = await Promise.resolve(params);
@@ -73,19 +91,39 @@ async function updateUserProfile(
     const isOwnerPath = targetUserId === sessionData.user.userId;
 
     if (!isOwnerPath) {
-      return NextResponse.json(
-        { error: "Forbidden: you can only update your own profile" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: you can only update your own profile",
+        "FORBIDDEN"
       );
     }
 
-    const body = await request.json();
-    const validationResult = validateProfileUpdatePayload(body);
-    if (!validationResult.ok) {
-      return NextResponse.json({ error: validationResult.error }, { status: 400 });
+    const body = await parseJson<{ name?: unknown; major?: unknown; bio?: unknown }>(request);
+    if (!body) {
+      return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-    const updates = validationResult.data;
+    const name = parseOptionalString(body.name);
+    const major = parseOptionalString(body.major);
+    const bio = parseOptionalString(body.bio);
+    const errors = [] as Array<{ field?: string; message: string }>;
+
+    if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
+    if (major.error) errors.push({ field: "major", message: `major ${major.error}` });
+    if (bio.error) errors.push({ field: "bio", message: `bio ${bio.error}` });
+
+    if (errors.length) {
+      return apiError(400, "Invalid request", "BAD_REQUEST", errors);
+    }
+
+    const updates: { name?: string; major?: string; bio?: string } = {};
+    if (name.value !== undefined) updates.name = name.value;
+    if (major.value !== undefined) updates.major = major.value;
+    if (bio.value !== undefined) updates.bio = bio.value;
+
+    if (Object.keys(updates).length === 0) {
+      return apiError(400, "No valid fields to update", "BAD_REQUEST");
+    }
 
     const updated = await prisma.user.update({
       where: { userId: targetUserId },
@@ -97,7 +135,8 @@ async function updateUserProfile(
       { status: 200 }
     );
   } catch (error) {
-    return handleApiError("Update user error:", error);
+    console.error("Update user error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
 
@@ -122,7 +161,7 @@ export async function DELETE(
   try {
     const sessionData = await getSession();
     if (!sessionData) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
     const { userId } = await Promise.resolve(params);
@@ -130,9 +169,10 @@ export async function DELETE(
     const isOwnerPath = targetUserId === sessionData.user.userId;
 
     if (!isOwnerPath) {
-      return NextResponse.json(
-        { error: "Forbidden: you can only delete your own account" },
-        { status: 403 }
+      return apiError(
+        403,
+        "Forbidden: you can only delete your own account",
+        "FORBIDDEN"
       );
     }
 
@@ -140,6 +180,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Account deleted successfully" }, { status: 200 });
   } catch (error) {
-    return handleApiError("Delete user error:", error);
+    console.error("Delete user error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

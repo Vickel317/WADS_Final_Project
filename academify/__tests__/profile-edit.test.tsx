@@ -26,25 +26,26 @@ describe("EditProfilePage – rendering", () => {
 
   it("renders default form values", async () => {
     render(<EditProfilePage />);
-    const nameInput = await screen.findByDisplayValue("John Doe");
+    const nameInput = await screen.findByPlaceholderText(/your full name/i);
     expect(nameInput).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Computer Science")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Jakarta, Indonesia")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("johndoe.dev")).toBeInTheDocument();
+    expect(nameInput).toHaveValue("");
+    expect(screen.getByPlaceholderText(/e\.g\. computer science/i)).toHaveValue("");
+    expect(screen.getByPlaceholderText(/city, country/i)).toHaveValue("");
+    expect(screen.getByPlaceholderText(/yoursite\.com/i)).toHaveValue("");
   });
 
   it("renders the year dropdown with options", async () => {
     render(<EditProfilePage />);
-    const select = await screen.findByDisplayValue("3rd Year");
+    const select = await screen.findByDisplayValue("1st Year");
     expect(select).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "1st Year" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Graduate" })).toBeInTheDocument();
   });
 
-  it("renders skill tags preview", async () => {
+  it("does not render skill tags preview when skills are empty", async () => {
     render(<EditProfilePage />);
-    expect(await screen.findByText("React")).toBeInTheDocument();
-    expect(screen.getByText("TypeScript")).toBeInTheDocument();
+    await screen.findByText(/skills & interests/i);
+    expect(screen.queryByText("React")).not.toBeInTheDocument();
   });
 
   it("renders password change section", async () => {
@@ -67,7 +68,7 @@ describe("EditProfilePage – validation", () => {
     const user = userEvent.setup();
     render(<EditProfilePage />);
 
-    const nameInput = await screen.findByDisplayValue("John Doe");
+    const nameInput = await screen.findByPlaceholderText(/your full name/i);
     await user.clear(nameInput);
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
@@ -79,7 +80,7 @@ describe("EditProfilePage – validation", () => {
     const user = userEvent.setup();
     render(<EditProfilePage />);
 
-    await screen.findByDisplayValue("John Doe");
+    await screen.findByRole("button", { name: /save changes/i });
     // Password inputs: [0]=currentPassword, [1]=newPassword, [2]=confirmPassword
     const passwordInputs = screen.getAllByPlaceholderText("••••••••");
     await user.type(passwordInputs[1], "short");
@@ -92,7 +93,7 @@ describe("EditProfilePage – validation", () => {
     const user = userEvent.setup();
     render(<EditProfilePage />);
 
-    await screen.findByDisplayValue("John Doe");
+    await screen.findByRole("button", { name: /save changes/i });
     const passwordInputs = screen.getAllByPlaceholderText("••••••••");
     await user.type(passwordInputs[0], "oldpass123");    // currentPassword
     await user.type(passwordInputs[1], "newpass123");    // newPassword
@@ -106,7 +107,7 @@ describe("EditProfilePage – validation", () => {
     const user = userEvent.setup();
     render(<EditProfilePage />);
 
-    await screen.findByDisplayValue("John Doe");
+    await screen.findByRole("button", { name: /save changes/i });
     const passwordInputs = screen.getAllByPlaceholderText("••••••••");
     await user.type(passwordInputs[1], "newpass123");  // newPassword
     await user.type(passwordInputs[2], "newpass123");  // confirmPassword
@@ -120,7 +121,15 @@ describe("EditProfilePage – submission", () => {
   it("calls PATCH /api/users/me and redirects on success", async () => {
     const user = userEvent.setup();
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // GET /api/users/me
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          user: {
+            name: "John Doe",
+            major: "Computer Science",
+          },
+        }),
+      }) // GET /api/users/me
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // PATCH /api/users/me
 
     render(<EditProfilePage />);
@@ -144,7 +153,15 @@ describe("EditProfilePage – submission", () => {
   it("shows error message when PATCH fails", async () => {
     const user = userEvent.setup();
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // GET
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          user: {
+            name: "John Doe",
+            major: "Computer Science",
+          },
+        }),
+      }) // GET
       .mockResolvedValueOnce({ ok: false, json: async () => ({ message: "Server error" }) }); // PATCH
 
     render(<EditProfilePage />);

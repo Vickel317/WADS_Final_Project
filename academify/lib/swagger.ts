@@ -139,7 +139,7 @@ const options = {
             },
             url: {
               type: "string",
-              example: "/uploads/Binary_Trees_Notes.pdf",
+              example: "https://minio.example.com/academify-files/1700000000000-uuid-Binary_Trees_Notes.pdf",
             },
             uploadedBy: {
               type: "object",
