@@ -2,40 +2,68 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
-const endpoint = process.env.MINIO_ENDPOINT;
-const bucket = process.env.MINIO_BUCKET;
+type MinioConfig = {
+  endpoint: string;
+  bucket: string;
+  accessKey: string;
+  secretKey: string;
+};
 
-if (!endpoint || !bucket || !process.env.MINIO_ACCESS_KEY || !process.env.MINIO_SECRET_KEY) {
-  throw new Error(
-    "MinIO is required. Set MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, and MINIO_SECRET_KEY."
-  );
+let cachedClient: S3Client | null = null;
+
+function getMinioConfig(): MinioConfig | null {
+  const endpoint = process.env.MINIO_ENDPOINT;
+  const bucket = process.env.MINIO_BUCKET;
+  const accessKey = process.env.MINIO_ACCESS_KEY;
+  const secretKey = process.env.MINIO_SECRET_KEY;
+  if (!endpoint || !bucket || !accessKey || !secretKey) {
+    return null;
+  }
+  return { endpoint, bucket, accessKey, secretKey };
 }
 
-const s3Client = new S3Client({
-  endpoint,
-  region: process.env.MINIO_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY,
-    secretAccessKey: process.env.MINIO_SECRET_KEY,
-  },
-  forcePathStyle: process.env.MINIO_FORCE_PATH_STYLE === "true",
-});
+function requireMinioConfig(): MinioConfig {
+  const config = getMinioConfig();
+  if (!config) {
+    throw new Error(
+      "MinIO is required. Set MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, and MINIO_SECRET_KEY."
+    );
+  }
+  return config;
+}
+
+function getS3Client(): S3Client {
+  if (cachedClient) return cachedClient;
+  const { endpoint, accessKey, secretKey } = requireMinioConfig();
+  cachedClient = new S3Client({
+    endpoint,
+    region: process.env.MINIO_REGION || "us-east-1",
+    credentials: {
+      accessKeyId: accessKey,
+      secretAccessKey: secretKey,
+    },
+    forcePathStyle: process.env.MINIO_FORCE_PATH_STYLE === "true",
+  });
+  return cachedClient;
+}
 
 export function isMinioEnabled() {
-  return !!s3Client;
+  return getMinioConfig() !== null;
 }
 
 export async function getPresignedPutUrl(key: string, contentType: string, expiresSeconds = 900) {
-  if (!s3Client) throw new Error("MinIO not configured");
-  const cmd = new PutObjectCommand({ Bucket: bucket!, Key: key, ContentType: contentType });
-  return getSignedUrl(s3Client, cmd, { expiresIn: expiresSeconds });
+  const { bucket } = requireMinioConfig();
+  const client = getS3Client();
+  const cmd = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
+  return getSignedUrl(client, cmd, { expiresIn: expiresSeconds });
 }
 
 export async function getPresignedGetUrl(key: string, expiresSeconds = 900) {
-  if (!s3Client) throw new Error("MinIO not configured");
+  const { bucket } = requireMinioConfig();
+  const client = getS3Client();
   const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-  const getCmd = new GetObjectCommand({ Bucket: bucket!, Key: key });
-  return getSignedUrl(s3Client, getCmd, { expiresIn: expiresSeconds });
+  const getCmd = new GetObjectCommand({ Bucket: bucket, Key: key });
+  return getSignedUrl(client, getCmd, { expiresIn: expiresSeconds });
 }
 
 export function generateObjectKey(originalName: string) {
@@ -44,9 +72,11 @@ export function generateObjectKey(originalName: string) {
 }
 
 export async function deleteObject(key: string) {
-  if (!s3Client) return;
-  const cmd = new DeleteObjectCommand({ Bucket: bucket!, Key: key });
-  await s3Client.send(cmd);
+  const config = getMinioConfig();
+  if (!config) return;
+  const client = getS3Client();
+  const cmd = new DeleteObjectCommand({ Bucket: config.bucket, Key: key });
+  await client.send(cmd);
 }
 
-export default s3Client;
+export default getS3Client;

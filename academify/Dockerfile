@@ -17,6 +17,8 @@ COPY . .
 
 # prisma generate does not open a DB connection; fixed placeholder satisfies prisma.config.ts only.
 ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?sslmode=disable
+# Satisfy better-auth during `next build` page-data collection (runtime uses deploy secrets).
+ENV BETTER_AUTH_SECRET=ci-docker-build-placeholder-not-used-at-runtime
 RUN npx prisma generate
 
 # Values come from compose `build.args` — single source: .env.production + compose defaults.
