@@ -34,6 +34,16 @@ jest.mock("@/lib/auth-client", () => ({
   },
 }));
 
+// Avoid MinIO env requirement when API routes import lib/storage at module load
+jest.mock("@/lib/storage", () => ({
+  isMinioEnabled: jest.fn(() => true),
+  getPresignedPutUrl: jest.fn().mockResolvedValue("https://example.com/upload"),
+  getPresignedGetUrl: jest.fn().mockResolvedValue("https://example.com/download"),
+  generateObjectKey: jest.fn((name: string) => `test-key-${name}`),
+  deleteObject: jest.fn().mockResolvedValue(undefined),
+  default: {},
+}));
+
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
