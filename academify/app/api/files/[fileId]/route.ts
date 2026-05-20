@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { files } from "@/app/api/files/route";
 import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
+import { prisma } from "@/lib/prisma";
+import { getPresignedGetUrl, deleteObject } from "@/lib/storage";
 
 /**
  * @swagger
@@ -61,13 +62,31 @@ export async function GET(
 ) {
   try {
     const { fileId } = await params;
-    const file = files.find((f) => f.id === fileId);
+    const file = await prisma.file.findUnique({
+      where: { fileID: fileId },
+      include: { uploadedBy: true, space: true },
+    });
 
     if (!file) {
       return apiError(404, "File not found", "NOT_FOUND");
     }
+    const url = await getPresignedGetUrl(file.fileUrl);
 
-    return NextResponse.json({ file }, { status: 200 });
+    return NextResponse.json(
+      {
+        file: {
+          id: file.fileID,
+          name: file.fileName,
+          size: file.fileSize,
+          type: file.fileType,
+          url,
+          uploadedBy: { id: file.uploadedBy.userId, name: file.uploadedBy.name },
+          spaceId: file.spaceID ?? null,
+          createdAt: file.updatedAt.toISOString(),
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Get file error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
@@ -85,13 +104,15 @@ export async function DELETE(
     }
 
     const { fileId } = await params;
-    const fileIndex = files.findIndex((f) => f.id === fileId);
+    const file = await prisma.file.findUnique({
+      where: { fileID: fileId },
+    });
 
-    if (fileIndex === -1) {
+    if (!file) {
       return apiError(404, "File not found", "NOT_FOUND");
     }
 
-    if (files[fileIndex].uploadedBy.id !== decoded.id) {
+    if (file.uploadedByID !== decoded.id) {
       return apiError(
         403,
         "Forbidden: You can only delete your own files",
@@ -99,15 +120,88 @@ export async function DELETE(
       );
     }
 
-    // TODO: delete from real storage in Week 7
-    const deleted = files.splice(fileIndex, 1)[0];
+    await deleteObject(file.fileUrl).catch((e) => console.warn("MinIO delete failed:", e));
+
+    const deleted = await prisma.file.delete({ where: { fileID: fileId } });
 
     return NextResponse.json(
-      { message: "File deleted successfully", file: deleted },
+      {
+        message: "File deleted successfully",
+        file: {
+          id: deleted.fileID,
+          name: deleted.fileName,
+          size: deleted.fileSize,
+          type: deleted.fileType,
+          url: deleted.fileUrl,
+          spaceId: deleted.spaceID ?? null,
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
     console.error("Delete file error:", error);
+    return apiError(500, "Internal server error", "INTERNAL_ERROR");
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ fileId: string }> }
+) {
+  try {
+    const decoded = await verifyToken(request);
+    if (!decoded) {
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    }
+
+    const { fileId } = await params;
+    const body = (await request.json().catch(() => null)) as
+      | { spaceId?: string | null }
+      | null;
+
+    if (!body || !("spaceId" in body)) {
+      return apiError(400, "Missing spaceId", "BAD_REQUEST");
+    }
+
+    const file = await prisma.file.findUnique({
+      where: { fileID: fileId },
+    });
+
+    if (!file) {
+      return apiError(404, "File not found", "NOT_FOUND");
+    }
+
+    if (file.uploadedByID !== decoded.id) {
+      return apiError(
+        403,
+        "Forbidden: You can only share your own files",
+        "FORBIDDEN"
+      );
+    }
+
+    const updated = await prisma.file.update({
+      where: { fileID: fileId },
+      data: {
+        spaceID: body.spaceId || null,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        message: "File shared successfully",
+        file: {
+          id: updated.fileID,
+          name: updated.fileName,
+          size: updated.fileSize,
+          type: updated.fileType,
+          url: updated.fileUrl,
+          spaceId: updated.spaceID ?? null,
+        },
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Share file error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

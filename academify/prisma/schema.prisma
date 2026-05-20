@@ -184,6 +184,7 @@ model CollabSpace {
   // Relations
   forum   ForumHub      @relation(fields: [forumID], references: [forumID], onDelete: Cascade)
   members SpaceMember[]
+  files   File[]
 
   @@index([forumID])
   @@map("CollabSpace")
@@ -281,7 +282,7 @@ model EventAttendee {
 
 model File {
   fileID       String   @id @default(cuid())
-  postID       String   @unique
+  postID       String?  @unique
   uploadedByID String
   fileName     String
   fileUrl      String
@@ -290,10 +291,13 @@ model File {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  post       Post @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
-  uploadedBy User @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
+  post       Post?        @relation("PostFile", fields: [postID], references: [postID], onDelete: Cascade)
+  uploadedBy User         @relation("UserFiles", fields: [uploadedByID], references: [userId], onDelete: Cascade)
+  spaceID    String?
+  space      CollabSpace? @relation(fields: [spaceID], references: [spaceID], onDelete: Cascade)
 
   @@index([uploadedByID])
+  @@index([spaceID])
   @@map("File")
 }
 

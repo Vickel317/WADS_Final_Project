@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
         forum: { select: { forumID: true, name: true } },
         _count: { select: { comments: true } },
       },
-      orderBy: trending ? { comments: { _count: "desc" } } : { createdAt: "desc" },
+      orderBy: trending ? { comments: { _count: 'desc' } } : { createdAt: 'desc' } as any,
       take: Number.isFinite(limit) ? limit : 10,
     });
 
@@ -299,3 +299,5 @@ export async function POST(request: NextRequest) {
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
+
+

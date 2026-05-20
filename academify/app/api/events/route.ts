@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
       forumId?: unknown;
       forum?: unknown;
       maxAttendees?: unknown;
+      forumID?: unknown;
     }>(request);
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
     const category = parseOptionalString(body.category);
     const duration = parseOptionalNumber(body.duration);
     const maxAttendees = parseOptionalNumber(body.maxAttendees);
-    const forumId = parseOptionalString(body.forumId ?? body.forum);
+    const forumID = parseRequiredString(body.forumID);
 
     if (title.error) errors.push({ field: "title", message: `title ${title.error}` });
     if (location.error) {
@@ -171,24 +172,21 @@ export async function POST(request: NextRequest) {
     if (maxAttendees.error) {
       errors.push({ field: "maxAttendees", message: `maxAttendees ${maxAttendees.error}` });
     }
-    if (forumId.error) {
-      errors.push({ field: "forumId", message: `forumId ${forumId.error}` });
+    if (forumID.error) {
+      errors.push({ field: "forumID", message: `forumID ${forumID.error}` });
     }
 
     if (errors.length) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const forum = await resolveForum(forumId.value ?? null);
+    const forum = await resolveForum(forumID.value ?? null);
 
     const createdEvent = await prisma.event.create({
       data: {
-        creator: { connect: { userId: sessionUser.user.userId } },
-        forum: { connect: { forumID: forum.forumID } },
-        title: formatTitleWithCategory(
-          category.value || DEFAULT_CATEGORY,
-          title.value!
-        ),
+        creatorID: sessionUser.user.userId,
+        forumID: forumID.value!,
+        title: title.value!,
         description: description.value || "",
         dateTime: date.value!,
         location: location.value!,

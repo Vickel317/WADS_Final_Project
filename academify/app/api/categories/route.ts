@@ -60,18 +60,18 @@ const slugify = (value: string) =>
 
 export async function GET() {
   try {
-    const forums = await prisma.forumHub.findMany({
+    const categories = await prisma.forumHub.findMany({
       orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json(
       {
-        categories: forums.map((forum) => ({
-          id: forum.forumID,
-          name: forum.name,
-          description: forum.description ?? "",
-          slug: slugify(forum.name),
-          createdAt: forum.createdAt.toISOString(),
+        categories: categories.map((category: any) => ({
+          id: category.forumID,
+          name: category.name,
+          description: category.description ?? "",
+          slug: category.name.toLowerCase(),
+          createdAt: category.createdAt.toISOString(),
         })),
       },
       { status: 200 }
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     const exists = await prisma.forumHub.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
+      where: { name: { equals: name.value, mode: "insensitive" } },
     });
     if (exists) {
       return apiError(

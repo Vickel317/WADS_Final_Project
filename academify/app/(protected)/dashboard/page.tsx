@@ -41,7 +41,7 @@ export default async function DashboardPage() {
       include: { _count: { select: { attendees: true } } }
     }),
     prisma.post.findMany({
-      orderBy: { comments: { _count: "desc" } },
+      orderBy: { createdAt: "desc" },
       take: 3,
       include: { author: true, forum: true, _count: { select: { comments: true } } }
     }),
