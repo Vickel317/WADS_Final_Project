@@ -11,15 +11,6 @@ jest.mock("@/lib/auth-session", () => ({
   verifyToken: jest.fn(),
 }));
 
-jest.mock("@prisma/client", () => ({
-  ModerationStatus: {
-    PENDING: "PENDING",
-    APPROVED: "APPROVED",
-    FLAGGED: "FLAGGED",
-    BLOCKED: "BLOCKED",
-  },
-}));
-
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     post: {
