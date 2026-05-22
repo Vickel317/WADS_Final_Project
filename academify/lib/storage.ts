@@ -32,35 +32,55 @@ function requireMinioConfig(): MinioConfig {
   return config;
 }
 
-function getS3Client(): S3Client {
-  if (cachedClient) return cachedClient;
-  const { endpoint, accessKey, secretKey } = requireMinioConfig();
-  cachedClient = new S3Client({
-    endpoint,
+function getS3Client(endpoint?: string): S3Client {
+  const config = requireMinioConfig();
+  const resolvedEndpoint = endpoint ?? config.endpoint;
+  // Use a separate cached client only for the internal endpoint
+  if (!endpoint) {
+    if (cachedClient) return cachedClient;
+    cachedClient = new S3Client({
+      endpoint: resolvedEndpoint,
+      region: process.env.MINIO_REGION || "us-east-1",
+      credentials: {
+        accessKeyId: config.accessKey,
+        secretAccessKey: config.secretKey,
+      },
+      forcePathStyle: process.env.MINIO_FORCE_PATH_STYLE === "true",
+    });
+    return cachedClient;
+  }
+  return new S3Client({
+    endpoint: resolvedEndpoint,
     region: process.env.MINIO_REGION || "us-east-1",
     credentials: {
-      accessKeyId: accessKey,
-      secretAccessKey: secretKey,
+      accessKeyId: config.accessKey,
+      secretAccessKey: config.secretKey,
     },
     forcePathStyle: process.env.MINIO_FORCE_PATH_STYLE === "true",
   });
-  return cachedClient;
 }
 
 export function isMinioEnabled() {
   return getMinioConfig() !== null;
 }
 
+// Presigned URLs must use a host the browser can reach.
+// MINIO_PUBLIC_ENDPOINT overrides MINIO_ENDPOINT for these URLs only.
+function getPublicClient(): S3Client {
+  const publicEndpoint = process.env.MINIO_PUBLIC_ENDPOINT;
+  return getS3Client(publicEndpoint);
+}
+
 export async function getPresignedPutUrl(key: string, contentType: string, expiresSeconds = 900) {
   const { bucket } = requireMinioConfig();
-  const client = getS3Client();
+  const client = getPublicClient();
   const cmd = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
   return getSignedUrl(client, cmd, { expiresIn: expiresSeconds });
 }
 
 export async function getPresignedGetUrl(key: string, expiresSeconds = 900) {
   const { bucket } = requireMinioConfig();
-  const client = getS3Client();
+  const client = getPublicClient();
   const { GetObjectCommand } = await import("@aws-sdk/client-s3");
   const getCmd = new GetObjectCommand({ Bucket: bucket, Key: key });
   return getSignedUrl(client, getCmd, { expiresIn: expiresSeconds });

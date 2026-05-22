@@ -151,6 +151,7 @@ jobs:
 
           NEXT_PUBLIC_MINIO=${{ secrets.NEXT_PUBLIC_MINIO }}
           MINIO_ENDPOINT=${{ secrets.MINIO_ENDPOINT }}
+          MINIO_PUBLIC_ENDPOINT=${{ secrets.MINIO_PUBLIC_ENDPOINT }}
           MINIO_REGION=${{ secrets.MINIO_REGION }}
           MINIO_BUCKET=${{ secrets.MINIO_BUCKET }}
           MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
