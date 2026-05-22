@@ -80,7 +80,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Image
+      - name: Build and Push App Image
         uses: docker/build-push-action@v6
         with:
           context: ./academify
@@ -92,12 +92,23 @@ jobs:
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
             NEXT_PUBLIC_API_DOCS_ENABLED=${{ secrets.NEXT_PUBLIC_API_DOCS_ENABLED }}
             NEXT_PUBLIC_BETTER_AUTH_URL=${{ secrets.NEXT_PUBLIC_BETTER_AUTH_URL }}
+            NEXT_PUBLIC_SOCKET_URL=${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
             NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
             NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
             NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
             NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
             NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
             NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
+      - name: Build and Push Socket Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./academify
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/academify-socket:latest
+          target: socket
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/academify-socket:latest
+          cache-to: type=inline
 
   # =========================================================================
   #  JOB 3 – Deploy to VPS via self-hosted GitHub Actions runner
@@ -119,6 +130,7 @@ jobs:
           NODE_ENV=production
           NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
           NEXT_PUBLIC_API_DOCS_ENABLED=${{ secrets.NEXT_PUBLIC_API_DOCS_ENABLED }}
+          NEXT_PUBLIC_SOCKET_URL=${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
 
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           DIRECT_URL=${{ secrets.DIRECT_URL }}
@@ -152,8 +164,10 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Pull latest image
-        run: docker pull ${{ secrets.DOCKER_USERNAME }}/academify:latest
+      - name: Pull latest images
+        run: |
+          docker pull ${{ secrets.DOCKER_USERNAME }}/academify:latest
+          docker pull ${{ secrets.DOCKER_USERNAME }}/academify-socket:latest
 
       - name: Build DB migration image
         run: docker compose --profile migrate build --pull db-schema-sync
@@ -161,10 +175,10 @@ jobs:
       - name: Run DB migrations
         run: docker compose --profile migrate run --rm db-schema-sync
 
-      - name: Deploy app
+      - name: Deploy stack
         run: |
-          docker compose pull app
-          docker compose up -d --no-deps app
+          docker compose pull app socket
+          docker compose up -d app socket minio
 
       - name: Remove .env.production
         if: always()

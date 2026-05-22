@@ -2,7 +2,11 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 
 const PORT = parseInt(process.env.SOCKET_PORT || "3001", 10);
-const NEXT_URL = process.env.NEXT_PUBLIC_BETTER_AUTH_URL || "http://localhost:3000";
+const corsOrigins = [
+  process.env.NEXT_PUBLIC_APP_URL,
+  process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+  "http://localhost:3000",
+].filter((origin): origin is string => Boolean(origin));
 
 const httpServer = createServer((req, res) => {
   if (req.url === "/health") {
@@ -16,7 +20,7 @@ const httpServer = createServer((req, res) => {
 
 const io = new Server(httpServer, {
   cors: {
-    origin: [NEXT_URL, "http://localhost:3000"],
+    origin: corsOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
