@@ -45,3 +45,4 @@ next-env.d.ts
 /generated/prisma
 minio-data/
 socket-server/index.js
+socket-server/index.cjs

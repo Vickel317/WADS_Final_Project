@@ -58,6 +58,23 @@ ENV DATABASE_URL=postgresql://migrate:migrate@127.0.0.1:5432/migrate?sslmode=dis
 RUN npx prisma generate
 CMD ["npx", "prisma", "migrate", "deploy"]
 
+# Socket.IO relay (separate process; exposed on host port 3100 in compose)
+FROM base AS socket
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.server.json ./
+COPY socket-server ./socket-server
+# package.json has "type":"module" so compiled CommonJS must use .cjs extension
+RUN npx tsc -p tsconfig.server.json \
+  && mv socket-server/index.js socket-server/index.cjs
+
+ENV NODE_ENV=production
+ENV SOCKET_PORT=3100
+EXPOSE 3100
+CMD ["node", "socket-server/index.cjs"]
+
+# Final image for the Next.js app (must be last stage OR build with --target runner)
 FROM base AS runner
 
 LABEL org.opencontainers.image.title="academify"
@@ -78,17 +95,3 @@ ENV PORT=3011
 ENV HOSTNAME=0.0.0.0
 
 CMD ["node", "server.js"]
-
-# Socket.IO relay (separate process; exposed on host port 3100 in compose)
-FROM base AS socket
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
-COPY tsconfig.server.json ./
-COPY socket-server ./socket-server
-RUN npx tsc -p tsconfig.server.json
-
-ENV NODE_ENV=production
-ENV SOCKET_PORT=3100
-EXPOSE 3100
-CMD ["node", "socket-server/index.js"]
