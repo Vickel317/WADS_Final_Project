@@ -86,6 +86,7 @@ jobs:
           context: ./academify
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/academify:latest
+          target: runner
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/academify:latest
           cache-to: type=inline
           build-args: |
