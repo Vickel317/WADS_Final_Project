@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
@@ -97,6 +97,34 @@ export async function deleteObject(key: string) {
   const client = getS3Client();
   const cmd = new DeleteObjectCommand({ Bucket: config.bucket, Key: key });
   await client.send(cmd);
+}
+
+export async function putObjectBytes(key: string, body: Uint8Array | Buffer, contentType: string) {
+  const config = requireMinioConfig();
+  const client = getS3Client();
+  const cmd = new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  });
+  await client.send(cmd);
+}
+
+export async function getObjectBytes(key: string) {
+  const config = requireMinioConfig();
+  const client = getS3Client();
+  const cmd = new GetObjectCommand({ Bucket: config.bucket, Key: key });
+  const response = await client.send(cmd);
+  if (!response.Body) {
+    throw new Error("Object body is empty");
+  }
+  return {
+    body: response.Body,
+    contentType: response.ContentType || "application/octet-stream",
+    contentLength: response.ContentLength ?? undefined,
+    lastModified: response.LastModified?.toUTCString(),
+  };
 }
 
 export default getS3Client;

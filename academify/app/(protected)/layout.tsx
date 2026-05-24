@@ -4,6 +4,15 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/get-session";
 import { ProfileModalProvider } from "@/components/profile-modal-provider";
+import { CurrentUserProvider } from "@/components/current-user-context";
+
+function resolveAvatarUrl(user: { userId: string; avatarUrl: string | null }) {
+  if (!user.avatarUrl) return null;
+  if (user.avatarUrl.startsWith("http") || user.avatarUrl.startsWith("data:")) {
+    return user.avatarUrl;
+  }
+  return `/api/users/${user.userId}/avatar`;
+}
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const sessionData = await getSession();
@@ -16,6 +25,11 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   }
 
   const { user } = sessionData;
+  const currentUser = {
+    userId: user.userId,
+    name: user.name,
+    avatarUrl: resolveAvatarUrl(user),
+  };
 
   // Intercept for forced profile setup
   const isSetupRoute = pathname === "/setup";
@@ -27,14 +41,16 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap');`}</style>
-      
-      {!isSetupRoute && <Sidebar />}
-      {!isSetupRoute && <Topbar />}
-      {!isSetupRoute && <ProfileModalProvider />}
-      
-      <main className={`${!isSetupRoute ? "md:ml-56 pt-16 md:pt-20" : "pt-8"} min-h-screen p-4 md:p-6 transition-all duration-300`}>
-        {children}
-      </main>
+
+      <CurrentUserProvider user={currentUser}>
+        {!isSetupRoute && <Sidebar />}
+        {!isSetupRoute && <Topbar />}
+        {!isSetupRoute && <ProfileModalProvider />}
+
+        <main className={`${!isSetupRoute ? "md:ml-56 pt-16 md:pt-20" : "pt-8"} min-h-screen p-4 md:p-6 transition-all duration-300`}>
+          {children}
+        </main>
+      </CurrentUserProvider>
     </div>
   );
 }

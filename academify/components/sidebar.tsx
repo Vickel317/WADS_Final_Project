@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { Menu, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { disconnectSocket } from "@/lib/socket-client";
+import { useCurrentUser } from "@/components/current-user-context";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: (
@@ -31,11 +32,13 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const currentUser = useCurrentUser();
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [userName, setUserName] = useState("Signed in user");
+  const [userName, setUserName] = useState(currentUser?.name ?? "Signed in user");
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(currentUser?.avatarUrl ?? null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +64,7 @@ export default function Sidebar() {
         }
 
         setUserName(data.user.name || "Signed in user");
+        setUserAvatarUrl(typeof data.user.avatarUrl === "string" ? data.user.avatarUrl : null);
       })
       .catch(() => {
         // Keep neutral fallback labels when user fetch fails.
@@ -69,7 +73,12 @@ export default function Sidebar() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [currentUser]);
+
+  useEffect(() => {
+    setUserName(currentUser?.name ?? "Signed in user");
+    setUserAvatarUrl(currentUser?.avatarUrl ?? null);
+  }, [currentUser]);
 
   return (
     <>
@@ -154,10 +163,14 @@ export default function Sidebar() {
             className="flex items-center gap-2 w-full p-2 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group"
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
           >
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
+            <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+              {userAvatarUrl ? (
+                <img src={userAvatarUrl} alt={userName} className="w-full h-full object-cover" />
+              ) : (
+                <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              )}
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1 text-left">

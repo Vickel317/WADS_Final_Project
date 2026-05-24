@@ -87,6 +87,7 @@ model User {
   role      UserRole @default(STUDENT)
   major     String?
   bio       String?  @db.Text
+  avatarUrl String?
   createdAt DateTime @default(now())
 
   // -- Setup & Profile Attributes --
