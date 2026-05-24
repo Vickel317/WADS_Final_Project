@@ -11,6 +11,7 @@ interface Profile {
   bio: string;
   location: string;
   website: string;
+  avatarUrl: string | null;
   connections: number;
   posts: number;
   filesShared: number;
@@ -30,6 +31,7 @@ function mapApiUserToProfile(user: Record<string, unknown>, isOwn: boolean): Pro
     bio: String(user.bio ?? ""),
     location: String(user.location ?? ""),
     website: String(user.website ?? ""),
+    avatarUrl: user.avatarUrl === null || user.avatarUrl === undefined ? null : String(user.avatarUrl),
     connections: Number(user.connections ?? 0),
     posts: Number(user.posts ?? 0),
     filesShared: Number(user.filesShared ?? 0),
@@ -149,10 +151,14 @@ function ProfileModalContent() {
 
             <div className="px-6 pb-6">
               <div className="flex items-end justify-between -mt-10 mb-4">
-                <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-md flex items-center justify-center shrink-0">
-                  <svg className="w-10 h-10 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
+                <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-md overflow-hidden flex items-center justify-center shrink-0">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <svg className="w-10 h-10 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   {profile.isOwn ? (

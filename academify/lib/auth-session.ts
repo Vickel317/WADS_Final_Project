@@ -23,11 +23,9 @@ async function createAppUser(sessionUser: { id: string; email: string; name?: st
       },
     });
   } catch {
-    const existing = await prisma.user.findFirst({
-      where: {
-        OR: [{ userId: sessionUser.id }, { email: sessionUser.email }],
-      },
-    });
+    const existing =
+      (await prisma.user.findUnique({ where: { userId: sessionUser.id } })) ||
+      (await prisma.user.findUnique({ where: { email: sessionUser.email } }));
 
     if (existing) {
       return existing;
@@ -45,11 +43,9 @@ export async function getSessionUser(headers: Headers) {
     return null;
   }
 
-  const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ userId: session.user.id }, { email: session.user.email }],
-    },
-  });
+  const existingUser =
+    (await prisma.user.findUnique({ where: { userId: session.user.id } })) ||
+    (await prisma.user.findUnique({ where: { email: session.user.email } }));
 
   const user = existingUser || (await createAppUser(session.user));
 

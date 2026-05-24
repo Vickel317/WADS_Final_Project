@@ -348,6 +348,13 @@ export default function FilesPage() {
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
       {/* Header */}
@@ -533,11 +540,25 @@ export default function FilesPage() {
               <p className="text-xs text-gray-400 mt-1">or</p>
               <input
                 type="file"
+                ref={fileInputRef}
                 onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
                 className="mt-2"
               />
               {selectedFile && (
-                <p className="text-xs text-gray-500 mt-2">Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})</p>
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-500">
+                  <p className="min-w-0 truncate">
+                    Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearSelectedFile}
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Remove selected file"
+                    title="Remove selected file"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               )}
               <p className="text-xs text-gray-400 mt-3">
                 PDF, DOCX, PNG, ZIP, PPTX • Max 50 MB
