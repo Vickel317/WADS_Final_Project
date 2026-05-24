@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Upload,
   Search,
@@ -286,6 +286,7 @@ export default function FilesPage() {
   const [dragging, setDragging] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState<string | "">("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>([]);
   const [loading, setLoading] = useState(true);
@@ -556,7 +557,7 @@ export default function FilesPage() {
                     aria-label="Remove selected file"
                     title="Remove selected file"
                   >
-                    <X size={14} />
+                    <span aria-hidden="true">×</span>
                   </button>
                 </div>
               )}
