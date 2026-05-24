@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalString } from "@/lib/validation";
+import { deleteObject } from "@/lib/storage";
 
 function mapProfile(user: {
   userId: string;
@@ -11,8 +12,16 @@ function mapProfile(user: {
   role: string;
   major: string | null;
   bio: string | null;
+  avatarUrl: string | null;
   createdAt: Date;
 }) {
+  const avatarUrl =
+    user.avatarUrl && (user.avatarUrl.startsWith("http") || user.avatarUrl.startsWith("data:"))
+      ? user.avatarUrl
+      : user.avatarUrl
+        ? `/api/users/${user.userId}/avatar`
+        : null;
+
   return {
     id: user.userId,
     email: user.email,
@@ -23,6 +32,7 @@ function mapProfile(user: {
     bio: user.bio ?? "",
     location: "",
     website: "",
+    avatarUrl,
     connections: 0,
     posts: 0,
     filesShared: 0,
@@ -63,7 +73,7 @@ export async function GET(
 
     return NextResponse.json({ 
       user: { 
-        ...mapProfile({ ...user, role: user.role }), 
+        ...mapProfile({ ...user, role: user.role, avatarUrl: user.avatarUrl }), 
         isOwn,
         isFollowing,
         isFollower,
@@ -98,7 +108,7 @@ async function updateUserProfile(
       );
     }
 
-    const body = await parseJson<{ name?: unknown; major?: unknown; bio?: unknown }>(request);
+    const body = await parseJson<{ name?: unknown; major?: unknown; bio?: unknown; avatarUrl?: unknown }>(request);
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
@@ -106,29 +116,56 @@ async function updateUserProfile(
     const name = parseOptionalString(body.name);
     const major = parseOptionalString(body.major);
     const bio = parseOptionalString(body.bio);
+    const avatarUrl = parseOptionalString(body.avatarUrl);
     const errors = [] as Array<{ field?: string; message: string }>;
 
     if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
     if (major.error) errors.push({ field: "major", message: `major ${major.error}` });
     if (bio.error) errors.push({ field: "bio", message: `bio ${bio.error}` });
+    if (avatarUrl.error) errors.push({ field: "avatarUrl", message: `avatarUrl ${avatarUrl.error}` });
 
     if (errors.length) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const updates: { name?: string; major?: string; bio?: string } = {};
+    const updates: { name?: string; major?: string; bio?: string; avatarUrl?: string | null } = {};
     if (name.value !== undefined) updates.name = name.value;
     if (major.value !== undefined) updates.major = major.value;
     if (bio.value !== undefined) updates.bio = bio.value;
+    if (avatarUrl.value !== undefined) updates.avatarUrl = avatarUrl.value || null;
 
     if (Object.keys(updates).length === 0) {
       return apiError(400, "No valid fields to update", "BAD_REQUEST");
     }
 
+    const previousAvatarUrl =
+      updates.avatarUrl !== undefined
+        ? (await prisma.user.findUnique({
+            where: { userId: targetUserId },
+            select: { avatarUrl: true },
+          }))?.avatarUrl
+        : null;
+
     const updated = await prisma.user.update({
       where: { userId: targetUserId },
       data: updates,
     });
+
+    if (
+      updates.avatarUrl !== undefined &&
+      previousAvatarUrl &&
+      previousAvatarUrl !== updated.avatarUrl &&
+      !previousAvatarUrl.startsWith("http") &&
+      !previousAvatarUrl.startsWith("/") &&
+      !previousAvatarUrl.startsWith("data:")
+    ) {
+      try {
+        await deleteObject(previousAvatarUrl);
+      } catch (e) {
+        console.warn("Failed to delete previous avatar object:", e);
+        // Do not fail the whole profile update if deleting the old object fails
+      }
+    }
 
     return NextResponse.json(
       { message: "Profile updated successfully", user: { ...mapProfile(updated), isOwn: true } },
