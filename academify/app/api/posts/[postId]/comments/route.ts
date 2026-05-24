@@ -118,14 +118,9 @@ export async function POST(
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    const author = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { userId: decoded.id },
-          ...(decoded.email ? [{ email: decoded.email }] : []),
-        ],
-      },
-    });
+    const author =
+      (await prisma.user.findUnique({ where: { userId: decoded.id } })) ||
+      (decoded.email ? await prisma.user.findUnique({ where: { email: decoded.email } }) : null);
     if (!author) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }

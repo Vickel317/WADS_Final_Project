@@ -10,11 +10,9 @@ function buildUsername(email: string, userId: string) {
 }
 
 async function ensureAppUser(userId: string, email: string, name?: string | null) {
-  const existing = await prisma.user.findFirst({
-    where: {
-      OR: [{ userId }, { email }],
-    },
-  });
+  const existing =
+    (await prisma.user.findUnique({ where: { userId } })) ||
+    (await prisma.user.findUnique({ where: { email } }));
 
   if (existing) {
     return existing;
