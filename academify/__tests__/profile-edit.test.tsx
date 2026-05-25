@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EditProfilePage from "@/app/(protected)/profile/edit/page";
 
@@ -118,7 +118,7 @@ describe("EditProfilePage – validation", () => {
 });
 
 describe("EditProfilePage – submission", () => {
-  it("calls PATCH /api/users/me and redirects on success", async () => {
+  it("calls PATCH /api/users/me when profile fields change", async () => {
     const user = userEvent.setup();
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
@@ -130,14 +130,21 @@ describe("EditProfilePage – submission", () => {
           },
         }),
       }) // GET /api/users/me
-      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // PATCH /api/users/me
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ message: "Profile updated successfully" }) }); // PATCH
 
     render(<EditProfilePage />);
-    await screen.findByDisplayValue("John Doe");
+    const nameInput = await screen.findByPlaceholderText(/your full name/i);
+    fireEvent.change(nameInput, { target: { value: "Jane Doe" } });
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() =>
-      expect(fetch).toHaveBeenCalledWith("/api/users/me", expect.objectContaining({ method: "PATCH" }))
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/users/me",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ name: "Jane Doe" }),
+        })
+      )
     );
     expect(await screen.findByText(/saved/i)).toBeInTheDocument();
   });
@@ -162,10 +169,14 @@ describe("EditProfilePage – submission", () => {
           },
         }),
       }) // GET
-      .mockResolvedValueOnce({ ok: false, json: async () => ({ message: "Server error" }) }); // PATCH
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: { message: "Server error" } }),
+      }); // PATCH
 
     render(<EditProfilePage />);
-    await screen.findByDisplayValue("John Doe");
+    const nameInput = await screen.findByPlaceholderText(/your full name/i);
+    fireEvent.change(nameInput, { target: { value: "Jane Doe" } });
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     expect(await screen.findByText(/server error/i)).toBeInTheDocument();
