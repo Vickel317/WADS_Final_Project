@@ -73,12 +73,7 @@ export default function Sidebar() {
     return () => {
       mounted = false;
     };
-  }, [currentUser]);
-
-  useEffect(() => {
-    setUserName(currentUser?.name ?? "Signed in user");
-    setUserAvatarUrl(currentUser?.avatarUrl ?? null);
-  }, [currentUser]);
+  }, [currentUser?.name, currentUser?.avatarUrl]);
 
   return (
     <>
@@ -165,6 +160,7 @@ export default function Sidebar() {
           >
             <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center shrink-0">
               {userAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- user avatar may be external or API-served
                 <img src={userAvatarUrl} alt={userName} className="w-full h-full object-cover" />
               ) : (
                 <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">

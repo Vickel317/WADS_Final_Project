@@ -47,10 +47,6 @@ export default function EditProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
-    if (currentUser?.avatarUrl) {
-      setAvatarPreview(currentUser.avatarUrl);
-    }
-
     fetch("/api/users/me")
       .then((r) => r.json())
       .then((d) => {
@@ -264,6 +260,7 @@ export default function EditProfilePage() {
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
               {avatarPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element -- blob/data/api avatar URLs are dynamic
                 <img src={avatarPreview} alt="Profile preview" className="w-full h-full object-cover" />
               ) : (
                 <svg className="w-8 h-8 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
