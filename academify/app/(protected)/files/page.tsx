@@ -291,6 +291,7 @@ export default function FilesPage() {
   const [spaces, setSpaces] = useState<CollaborationSpace[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -601,32 +602,36 @@ export default function FilesPage() {
               <button
                 onClick={async () => {
                   if (!selectedFile) return alert('Please choose a file first');
-                  const presignRes = await fetch('/api/storage/presign', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ fileName: selectedFile.name, contentType: selectedFile.type }),
-                  });
 
-                  if (!presignRes.ok) {
-                    const payload = await presignRes.json().catch(() => ({}));
-                    throw new Error(payload?.error?.message || payload?.message || 'Failed to get upload URL');
-                  }
-
-                  const json = await presignRes.json().catch(() => ({}));
-                  const uploadUrl = json?.url;
-                  const objectKey = json?.key;
-                  if (!uploadUrl || !objectKey) throw new Error('Invalid presign response');
-
-                  const putRes = await fetch(uploadUrl, {
-                    method: 'PUT',
-                    body: selectedFile,
-                    headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
-                  });
-
-                  if (!putRes.ok) throw new Error('Upload to storage failed');
-
+                  setUploading(true);
                   try {
+                    const presignRes = await fetch('/api/storage/presign', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ fileName: selectedFile.name, contentType: selectedFile.type }),
+                    });
+
+                    if (!presignRes.ok) {
+                      const payload = await presignRes.json().catch(() => ({}));
+                      throw new Error(payload?.error?.message || payload?.message || 'Failed to get upload URL');
+                    }
+
+                    const json = await presignRes.json().catch(() => ({}));
+                    const uploadUrl = json?.url;
+                    const objectKey = json?.key;
+                    if (!uploadUrl || !objectKey) throw new Error('Invalid presign response');
+
+                    const putRes = await fetch(uploadUrl, {
+                      method: 'PUT',
+                      body: selectedFile,
+                      headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+                    });
+
+                    if (!putRes.ok) {
+                      throw new Error('Storage upload failed. File was not saved.');
+                    }
+
                     const createRes = await fetch('/api/files', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -639,15 +644,36 @@ export default function FilesPage() {
 
                     setShowUploadModal(false);
                     setSelectedFile(null);
-                    setSelectedSpace("");
-                  } catch (e: unknown) {
-                    throw e;
+                    setSelectedSpace('');
+
+                    setFiles((prev) => [
+                      {
+                        id: payload?.file?.id ?? crypto.randomUUID(),
+                        name: payload?.file?.name ?? selectedFile.name,
+                        type: normalizeFileType(payload?.file?.type ?? selectedFile.type),
+                        size: formatFileSize(payload?.file?.size ?? selectedFile.size),
+                        uploadedAt: new Date(payload?.file?.createdAt ?? Date.now()).toLocaleDateString(),
+                        downloads: 0,
+                        sharedWith: payload?.file?.spaceId ? `Space ${payload.file.spaceId}` : undefined,
+                        url: payload?.file?.url ?? '',
+                      },
+                      ...prev,
+                    ]);
+                  } catch (error) {
+                    const message =
+                      error instanceof Error
+                        ? error.message
+                        : 'Storage upload failed. File was not saved.';
+                    alert(message);
+                  } finally {
+                    setUploading(false);
                   }
                 }}
+                disabled={uploading}
                 className="flex-1 py-2 rounded-lg text-sm font-medium text-white transition-colors"
                 style={{ backgroundColor: "#0d9488" }}
               >
-                Upload
+                {uploading ? 'Uploading...' : 'Upload'}
               </button>
             </div>
           </div>

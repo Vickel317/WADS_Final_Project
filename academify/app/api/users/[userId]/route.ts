@@ -13,6 +13,10 @@ function mapProfile(user: {
   major: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  location: string | null;
+  website: string | null;
+  academicLevel: string | null;
+  skillTags: string[];
   createdAt: Date;
 }) {
   const avatarUrl =
@@ -28,15 +32,15 @@ function mapProfile(user: {
     name: user.name,
     role: user.role.toLowerCase(),
     major: user.major ?? "",
-    year: "",
+    year: user.academicLevel ?? "",
     bio: user.bio ?? "",
-    location: "",
-    website: "",
+    location: user.location ?? "",
+    website: user.website ?? "",
     avatarUrl,
     connections: 0,
     posts: 0,
     filesShared: 0,
-    skills: [] as string[],
+    skills: user.skillTags ?? [],
     isConnected: false,
     createdAt: user.createdAt.toISOString(),
     updatedAt: new Date().toISOString(),
@@ -117,22 +121,50 @@ async function updateUserProfile(
     const major = parseOptionalString(body.major);
     const bio = parseOptionalString(body.bio);
     const avatarUrl = parseOptionalString(body.avatarUrl);
+    const location = parseOptionalString((body as { location?: unknown }).location);
+    const website = parseOptionalString((body as { website?: unknown }).website);
+    const year = parseOptionalString((body as { year?: unknown }).year);
+    const skillsRaw = (body as { skills?: unknown }).skills;
     const errors = [] as Array<{ field?: string; message: string }>;
 
     if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
     if (major.error) errors.push({ field: "major", message: `major ${major.error}` });
     if (bio.error) errors.push({ field: "bio", message: `bio ${bio.error}` });
     if (avatarUrl.error) errors.push({ field: "avatarUrl", message: `avatarUrl ${avatarUrl.error}` });
+    if (location.error) errors.push({ field: "location", message: `location ${location.error}` });
+    if (website.error) errors.push({ field: "website", message: `website ${website.error}` });
+    if (year.error) errors.push({ field: "year", message: `year ${year.error}` });
+    if (skillsRaw !== undefined && !Array.isArray(skillsRaw)) {
+      errors.push({ field: "skills", message: "skills must be an array of strings" });
+    }
+    if (Array.isArray(skillsRaw) && skillsRaw.some((skill) => typeof skill !== "string")) {
+      errors.push({ field: "skills", message: "skills must be an array of strings" });
+    }
 
     if (errors.length) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    const updates: { name?: string; major?: string; bio?: string; avatarUrl?: string | null } = {};
+    const updates: {
+      name?: string;
+      major?: string;
+      bio?: string;
+      avatarUrl?: string | null;
+      location?: string | null;
+      website?: string | null;
+      academicLevel?: string | null;
+      skillTags?: string[];
+    } = {};
     if (name.value !== undefined) updates.name = name.value;
     if (major.value !== undefined) updates.major = major.value;
     if (bio.value !== undefined) updates.bio = bio.value;
     if (avatarUrl.value !== undefined) updates.avatarUrl = avatarUrl.value || null;
+    if (location.value !== undefined) updates.location = location.value || null;
+    if (website.value !== undefined) updates.website = website.value || null;
+    if (year.value !== undefined) updates.academicLevel = year.value || null;
+    if (Array.isArray(skillsRaw)) {
+      updates.skillTags = skillsRaw.map((skill) => skill.trim()).filter(Boolean);
+    }
 
     if (Object.keys(updates).length === 0) {
       return apiError(400, "No valid fields to update", "BAD_REQUEST");
