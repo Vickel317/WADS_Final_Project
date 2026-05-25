@@ -153,6 +153,7 @@ function ProfileModalContent() {
               <div className="flex items-end justify-between -mt-10 mb-4">
                 <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-md overflow-hidden flex items-center justify-center shrink-0">
                   {profile.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- user avatar may be external or API-served
                     <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" />
                   ) : (
                     <svg className="w-10 h-10 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
