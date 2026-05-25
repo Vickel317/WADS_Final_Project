@@ -11,7 +11,7 @@ services:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://e2526-wads-b4ac-02.csbihub.id}
         NEXT_PUBLIC_API_DOCS_ENABLED: ${NEXT_PUBLIC_API_DOCS_ENABLED:-true}
         NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL:-https://e2526-wads-b4ac-02.csbihub.id}
-        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-https://e2526-wads-b4ac-02.csbihub.id:3100}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-https://socket-e2526-wads-b4ac-02.csbihub.id}
         NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
         NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
         NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
@@ -21,8 +21,9 @@ services:
     env_file:
       - .env.production
     environment:
-      # Server-side S3 client uses Docker DNS (browser uploads use MINIO_ENDPOINT / NEXT_PUBLIC_MINIO from secrets)
+      # Server-side S3: internal Docker DNS. Browser presign uses MINIO_PUBLIC_ENDPOINT from .env.production.
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-https://minio-e2526-wads-b4ac-02.csbihub.id}
     ports:
       - "3011:3011"
     depends_on:
