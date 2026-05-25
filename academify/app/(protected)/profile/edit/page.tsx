@@ -38,6 +38,7 @@ export default function EditProfilePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm);
+  const [initialForm, setInitialForm] = useState<FormState>(defaultForm);
   const [errors, setErrors] = useState<Partial<FormState>>({});
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -55,17 +56,22 @@ export default function EditProfilePage() {
       .then((d) => {
         if (d.user) {
           const resolvedAvatar = typeof d.user.avatarUrl === "string" ? d.user.avatarUrl : "";
-          setForm((prev) => ({
-            ...prev,
-            name: d.user.name ?? prev.name,
-            major: d.user.major ?? prev.major,
-            year: d.user.year ?? prev.year,
-            bio: d.user.bio ?? prev.bio,
-            location: d.user.location ?? prev.location,
-            website: d.user.website ?? prev.website,
-            skills: Array.isArray(d.user.skills) ? d.user.skills.join(", ") : prev.skills,
+          const loadedForm: FormState = {
+            name: d.user.name ?? "",
+            major: d.user.major ?? "",
+            year: d.user.year ?? defaultForm.year,
+            bio: d.user.bio ?? "",
+            location: d.user.location ?? "",
+            website: d.user.website ?? "",
+            skills: Array.isArray(d.user.skills) ? d.user.skills.join(", ") : "",
             avatarUrl: resolvedAvatar,
-          }));
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: "",
+          };
+
+          setForm(loadedForm);
+          setInitialForm(loadedForm);
           setAvatarPreview(resolvedAvatar);
         }
       })
@@ -153,17 +159,31 @@ export default function EditProfilePage() {
     setLoading(true);
     let uploadedAvatarKey: string | null = null;
     try {
-      const avatarKey = await uploadAvatar();
+      let avatarKey: string | null = null;
+      let avatarUploadError: string | null = null;
+
+      try {
+        avatarKey = await uploadAvatar();
+      } catch (error) {
+        avatarUploadError = error instanceof Error ? error.message : "Failed to upload avatar image";
+      }
       uploadedAvatarKey = avatarKey;
-      const payload: Record<string, unknown> = {
-        name: form.name.trim(),
-        major: form.major.trim(),
-        year: form.year,
-        bio: form.bio.trim(),
-        location: form.location.trim(),
-        website: form.website.trim(),
-        skills: form.skills.split(",").map((s) => s.trim()).filter(Boolean),
-      };
+
+      const payload: Record<string, unknown> = {};
+
+      if (form.name.trim() !== initialForm.name.trim()) payload.name = form.name.trim();
+      if (form.major.trim() !== initialForm.major.trim()) payload.major = form.major.trim();
+      if (form.year !== initialForm.year) payload.year = form.year;
+      if (form.bio.trim() !== initialForm.bio.trim()) payload.bio = form.bio.trim();
+      if (form.location.trim() !== initialForm.location.trim()) payload.location = form.location.trim();
+      if (form.website.trim() !== initialForm.website.trim()) payload.website = form.website.trim();
+
+      const nextSkills = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
+      const initialSkills = initialForm.skills.split(",").map((s) => s.trim()).filter(Boolean);
+      if (nextSkills.join("|") !== initialSkills.join("|")) {
+        payload.skills = nextSkills;
+      }
+
       if (avatarKey) {
         payload.avatarUrl = avatarKey;
       }
@@ -171,6 +191,12 @@ export default function EditProfilePage() {
         payload.currentPassword = form.currentPassword;
         payload.newPassword = form.newPassword;
       }
+
+      if (Object.keys(payload).length === 0 && !avatarKey && !form.newPassword) {
+        setSaved(true);
+        return;
+      }
+
       const res = await fetch("/api/users/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -179,6 +205,9 @@ export default function EditProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to save");
       setErrors({});
+      if (avatarUploadError) {
+        setErrors({ avatarUrl: avatarUploadError });
+      }
       setSaved(true);
     } catch (err: unknown) {
       if (uploadedAvatarKey) {
