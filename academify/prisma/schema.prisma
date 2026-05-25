@@ -88,6 +88,8 @@ model User {
   major     String?
   bio       String?  @db.Text
   avatarUrl String?
+  location  String?
+  website   String?
   createdAt DateTime @default(now())
 
   // -- Setup & Profile Attributes --
