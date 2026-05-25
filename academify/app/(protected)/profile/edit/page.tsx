@@ -198,8 +198,13 @@ export default function EditProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to save");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const apiMessage =
+          (data as { error?: { message?: string }; message?: string })?.error?.message ||
+          (data as { message?: string })?.message;
+        throw new Error(apiMessage || "Failed to save");
+      }
       setErrors({});
       if (avatarUploadError) {
         setErrors({ avatarUrl: avatarUploadError });
