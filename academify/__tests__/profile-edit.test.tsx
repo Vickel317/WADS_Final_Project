@@ -133,8 +133,10 @@ describe("EditProfilePage – submission", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ message: "Profile updated successfully" }) }); // PATCH
 
     render(<EditProfilePage />);
-    const nameInput = await screen.findByPlaceholderText(/your full name/i);
-    fireEvent.change(nameInput, { target: { value: "Jane Doe" } });
+    await screen.findByDisplayValue("John Doe");
+    // Change a field so the component has a payload to PATCH
+    await user.clear(screen.getByPlaceholderText(/your full name/i));
+    await user.type(screen.getByPlaceholderText(/your full name/i), "John Doe Jr.");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() =>
@@ -175,8 +177,10 @@ describe("EditProfilePage – submission", () => {
       }); // PATCH
 
     render(<EditProfilePage />);
-    const nameInput = await screen.findByPlaceholderText(/your full name/i);
-    fireEvent.change(nameInput, { target: { value: "Jane Doe" } });
+    await screen.findByDisplayValue("John Doe");
+    // Change a field so PATCH is triggered and returns an error
+    await user.clear(screen.getByPlaceholderText(/your full name/i));
+    await user.type(screen.getByPlaceholderText(/your full name/i), "John Doe Jr.");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     expect(await screen.findByText(/server error/i)).toBeInTheDocument();

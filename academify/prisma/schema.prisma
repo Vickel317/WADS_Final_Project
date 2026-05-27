@@ -188,6 +188,7 @@ model CollabSpace {
   forum   ForumHub      @relation(fields: [forumID], references: [forumID], onDelete: Cascade)
   members SpaceMember[]
   files   File[]
+  messages Message[]
 
   @@index([forumID])
   @@map("CollabSpace")
@@ -314,14 +315,17 @@ model Message {
   content    String   @db.Text
   read       Boolean  @default(false)
   sentAt     DateTime @default(now())
+  spaceID    String?
 
   // Relations
   sender   User @relation("MessageSender", fields: [senderID], references: [userId], onDelete: Cascade)
   receiver User @relation("MessageReceiver", fields: [receiverID], references: [userId], onDelete: Cascade)
+  space    CollabSpace? @relation(fields: [spaceID], references: [spaceID], onDelete: Cascade)
 
   @@index([senderID])
   @@index([receiverID])
   @@index([sentAt])
+  @@index([spaceID])
   @@map("Message")
 }
 

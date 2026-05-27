@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { getSocket } from "@/lib/socket-client";
 import { authClient } from "@/lib/auth-client";
-import type { ChatMessage } from "@/socket-server/index";
+import type { ChatMessage, SpaceChatMessage } from "@/socket-server/index";
 import NewMessageModal from "@/components/new-message-modal";
 
 interface Conversation {
   userId: string;
+  kind?: "direct" | "space";
   name: string;
+  avatarUrl?: string | null;
   lastMessage: string;
   lastAt: string;
   unread: number;
@@ -34,6 +36,32 @@ export default function MessagesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const handleSpacesUpdated = () => {
+      fetch("/api/messages")
+        .then((r) => r.json())
+        .then((data) => setConversations(data.conversations ?? []))
+        .catch(() => {});
+    };
+
+    const handleSpaceJoined = (ev: Event) => {
+      try {
+        // @ts-ignore custom event
+        const id = (ev as CustomEvent).detail?.spaceId;
+        if (id) router.push(`/messages/space-${id}`);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    window.addEventListener("spaces-updated", handleSpacesUpdated);
+    window.addEventListener("space-joined", handleSpaceJoined as EventListener);
+    return () => {
+      window.removeEventListener("spaces-updated", handleSpacesUpdated);
+      window.removeEventListener("space-joined", handleSpaceJoined as EventListener);
+    };
+  }, []);
+
   // Socket — update conversation list when a new message arrives
   useEffect(() => {
     if (!myId) return;
@@ -51,7 +79,29 @@ export default function MessagesPage() {
         return [
           {
             userId: partnerId,
+            kind: "direct",
             name: existing?.name ?? partnerId,
+            avatarUrl: existing?.avatarUrl ?? null,
+            lastMessage: msg.content,
+            lastAt: msg.createdAt,
+            unread: msg.senderId !== myId ? (existing?.unread ?? 0) + 1 : 0,
+          },
+          ...updated,
+        ];
+      });
+    }
+
+    function onNewSpaceMessage(msg: SpaceChatMessage) {
+      const convKey = `space-${msg.spaceId}`;
+      setConversations((prev) => {
+        const updated = prev.filter((c) => c.userId !== convKey);
+        const existing = prev.find((c) => c.userId === convKey);
+        return [
+          {
+            userId: convKey,
+            kind: "space",
+            name: existing?.name ?? `Space ${msg.spaceId}`,
+            avatarUrl: null,
             lastMessage: msg.content,
             lastAt: msg.createdAt,
             unread: msg.senderId !== myId ? (existing?.unread ?? 0) + 1 : 0,
@@ -63,6 +113,7 @@ export default function MessagesPage() {
 
     socket.on("connect", onConnect);
     socket.on("new_message", onNewMessage);
+    socket.on("new_space_message", onNewSpaceMessage);
 
     if (!socket.connected) {
       socket.connect();
@@ -73,12 +124,58 @@ export default function MessagesPage() {
     return () => {
       socket.off("connect", onConnect);
       socket.off("new_message", onNewMessage);
+      socket.off("new_space_message", onNewSpaceMessage);
     };
   }, [myId]);
 
   const filtered = conversations.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
+  const directConversations = filtered.filter((c) => c.kind !== "space" && !c.userId.startsWith("space-"));
+  const groupConversations = filtered.filter((c) => c.kind === "space" || c.userId.startsWith("space-"));
+
+  const renderConversation = (conv: Conversation) => {
+    const isGroup = conv.kind === "space" || conv.userId.startsWith("space-");
+    return (
+      <button
+        key={conv.userId}
+        onClick={() => router.push(`/messages/${conv.userId}`)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition text-left"
+      >
+        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
+          {isGroup ? (
+            <svg className="w-5 h-5 text-teal-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 2a5 5 0 100 10A5 5 0 0010 2zm0 12c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+            </svg>
+          ) : conv.avatarUrl ? (
+            <img src={conv.avatarUrl} alt={conv.name} className="w-full h-full object-cover" />
+          ) : (
+            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+            </svg>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="text-sm font-semibold text-gray-900 truncate">
+              {isGroup ? `Collab Space: ${conv.name}` : conv.name}
+            </span>
+            <span className="text-xs text-gray-400 shrink-0 ml-1">
+              {formatDistanceToNow(new Date(conv.lastAt), { addSuffix: true })}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400 truncate">{conv.lastMessage}</span>
+            {conv.unread > 0 && (
+              <span className="ml-1 shrink-0 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}>
+                {conv.unread}
+              </span>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <>
@@ -114,7 +211,7 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+        <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Loading…</div>
           ) : filtered.length === 0 ? (
@@ -125,35 +222,20 @@ export default function MessagesPage() {
               No conversations yet
             </div>
           ) : (
-            filtered.map((conv) => (
-              <button
-                key={conv.userId}
-                onClick={() => router.push(`/messages/${conv.userId}`)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition text-left"
-              >
-                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-sm font-semibold text-gray-900 truncate">{conv.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0 ml-1">
-                      {formatDistanceToNow(new Date(conv.lastAt), { addSuffix: true })}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400 truncate">{conv.lastMessage}</span>
-                    {conv.unread > 0 && (
-                      <span className="ml-1 shrink-0 w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}>
-                        {conv.unread}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))
+            <>
+              <div className="px-4 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Personal Chats</div>
+              <div className="divide-y divide-gray-50">
+                {directConversations.length > 0 ? directConversations.map(renderConversation) : (
+                  <div className="px-4 py-3 text-sm text-gray-400">No personal chats</div>
+                )}
+              </div>
+              <div className="px-4 pt-5 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Groups</div>
+              <div className="divide-y divide-gray-50">
+                {groupConversations.length > 0 ? groupConversations.map(renderConversation) : (
+                  <div className="px-4 py-3 text-sm text-gray-400">No group chats</div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
