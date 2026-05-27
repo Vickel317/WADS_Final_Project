@@ -6,7 +6,9 @@ export type ApiErrorCode =
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "CONFLICT"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "AI_ERROR"
+  | "AI_UNAVAILABLE";
 
 export type ApiErrorDetail = {
   field?: string;

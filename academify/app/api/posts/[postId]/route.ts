@@ -98,6 +98,7 @@ export async function GET(
   { params }: { params: Promise<{ postId: string }> }
 ) {
   try {
+    const decoded = await verifyToken(request);
     const { postId } = await params;
     const post = await prisma.post.findUnique({
       where: { postID: postId },
@@ -110,6 +111,12 @@ export async function GET(
     });
 
     if (!post) {
+      return apiError(404, "Post not found", "NOT_FOUND");
+    }
+    const role = String(decoded?.role ?? "").toLowerCase();
+    const canSeeHidden = role === "admin" || role === "moderator";
+    const isOwner = decoded?.id === post.authorID;
+    if (post.moderationStatus !== "APPROVED" && !canSeeHidden && !isOwner) {
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
@@ -177,17 +184,25 @@ export async function PUT(
 
     const existing = await prisma.post.findUnique({
       where: { postID: postId },
-      select: { postID: true, authorID: true },
+      select: { postID: true, authorID: true, moderationStatus: true },
     });
 
     if (!existing) {
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    if (existing.authorID !== decoded.id) {
+    const isModerator = decoded.role === "moderator" || decoded.role === "admin";
+    if (existing.authorID !== decoded.id && !isModerator) {
       return apiError(
         403,
         "Forbidden: You can only edit your own posts",
+        "FORBIDDEN"
+      );
+    }
+    if (existing.moderationStatus !== "APPROVED" && !isModerator) {
+      return apiError(
+        403,
+        "Forbidden: Flagged/blocked posts cannot be edited",
         "FORBIDDEN"
       );
     }
@@ -239,7 +254,8 @@ export async function DELETE(
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    if (existing.authorID !== decoded.id) {
+    const isModerator = decoded.role === "moderator" || decoded.role === "admin";
+    if (existing.authorID !== decoded.id && !isModerator) {
       return apiError(
         403,
         "Forbidden: You can only delete your own posts",

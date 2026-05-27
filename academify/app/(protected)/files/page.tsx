@@ -362,9 +362,9 @@ export default function FilesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">File Sharing</h1>
+          <h1 className="text-2xl font-bold text-gray-900">My uploads</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Share and collaborate on files with your community
+            Your library of uploads — attach files from a thread or collab space when sharing.
           </p>
         </div>
         <button

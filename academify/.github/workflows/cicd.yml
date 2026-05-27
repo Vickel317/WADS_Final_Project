@@ -136,8 +136,6 @@ jobs:
           BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}
           NEXT_PUBLIC_BETTER_AUTH_URL=${{ secrets.NEXT_PUBLIC_BETTER_AUTH_URL }}
 
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-
           FIREBASE_WEB_API_KEY=${{ secrets.FIREBASE_WEB_API_KEY }}
           NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
@@ -154,6 +152,10 @@ jobs:
           MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
           MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
           MINIO_FORCE_PATH_STYLE=${{ secrets.MINIO_FORCE_PATH_STYLE }}
+
+          OLLAMA_API_BASE=${{ secrets.OLLAMA_API_BASE }}
+          OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
+          OLLAMA_TIMEOUT_MS=${{ secrets.OLLAMA_TIMEOUT_MS }}
           EOF
 
       - name: Login to Docker Hub

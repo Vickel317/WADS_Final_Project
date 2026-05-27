@@ -184,7 +184,7 @@ export async function PUT(
       data: {
         ...(name.value ? { name: name.value } : {}),
         ...(description.value !== undefined ? { description: description.value } : {}),
-        ...(slug.value ? { name: slug.value } : {}),
+        ...(slug.value && !name.value ? { name: slug.value.replace(/[-_]+/g, " ") } : {}),
       },
     });
 

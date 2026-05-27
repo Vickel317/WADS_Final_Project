@@ -49,16 +49,17 @@ export async function POST(request: NextRequest) {
     console.log("Create collaboration payload:", { name, description, forumID, user: session.user.userId });
     let space;
     try {
-      let finalForumID = forumID ?? "";
-      if (!finalForumID || finalForumID.trim() === "") {
-        // No forum provided — create a lightweight ForumHub to satisfy FK
-        const forum = await prisma.forumHub.create({
-          data: {
-            name: `forum-for-${Date.now()}`,
-            description: `Auto-created for space ${name}`,
-          },
-        });
-        finalForumID = forum.forumID;
+      const finalForumID = forumID?.trim();
+      if (!finalForumID) {
+        return apiError(400, "Missing required field: forumID", "BAD_REQUEST");
+      }
+
+      const forumExists = await prisma.forumHub.findUnique({
+        where: { forumID: finalForumID },
+        select: { forumID: true },
+      });
+      if (!forumExists) {
+        return apiError(404, "Forum not found", "NOT_FOUND");
       }
 
       space = await prisma.collabSpace.create({

@@ -60,7 +60,11 @@ export async function GET(request: NextRequest) {
     }
 
     const queue = await prisma.post.findMany({
-      where: { moderationStatus: ModerationStatus.PENDING },
+      where: {
+        moderationStatus: {
+          in: [ModerationStatus.PENDING, ModerationStatus.FLAGGED],
+        },
+      },
       include: {
         author: { select: { name: true } },
         forum: { select: { name: true } },
@@ -81,6 +85,9 @@ export async function GET(request: NextRequest) {
           replyCount: post.comments.length,
           createdAt: post.createdAt.toISOString(),
           status: post.moderationStatus.toLowerCase(),
+          aiScore: post.aiScore,
+          aiLabel: post.aiLabel,
+          aiReason: post.aiReason,
         })),
         total: queue.length,
       },

@@ -22,6 +22,19 @@ export async function GET(
       return NextResponse.redirect(user.avatarUrl, 302);
     }
 
+    if (user.avatarUrl.startsWith("data:")) {
+      const match = user.avatarUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return apiError(400, "Invalid avatar data URL", "BAD_REQUEST");
+      const body = Buffer.from(match[2], "base64");
+      return new NextResponse(body, {
+        status: 200,
+        headers: {
+          "Content-Type": match[1],
+          "Cache-Control": "private, max-age=31536000, immutable",
+        },
+      });
+    }
+
     if (!isMinioEnabled()) {
       return apiError(400, "MinIO not configured", "BAD_REQUEST");
     }

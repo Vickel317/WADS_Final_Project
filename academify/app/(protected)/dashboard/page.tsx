@@ -1,195 +1,223 @@
-// app/(protected)/dashboard/page.tsx
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/get-session";
+import { format, formatDistanceToNow } from "date-fns";
 import { redirect } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
+import { getSession } from "@/lib/get-session";
+import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // Fetch real stats and data directly from Prisma in parallel
+  const userId = session.user.userId;
+  const now = new Date();
+
   const [
-    user,
-    eventsCount,
-    postsCount,
-    filesCount,
+    eventsJoinedCount,
+    filesUploadedCount,
+    collabSpacesCount,
     connectionsCount,
     upcomingEvents,
-    trendingPosts,
-    recentComments
+    recentFiles,
+    collabSpaces,
+    recentMessages,
   ] = await Promise.all([
-    prisma.user.findUnique({ where: { userId: session.user.userId } }),
-    prisma.eventAttendee.count({ where: { userID: session.user.userId } }),
-    prisma.post.count({ where: { authorID: session.user.userId } }),
-    prisma.file.count({ where: { uploadedByID: session.user.userId } }),
+    prisma.eventAttendee.count({ where: { userID: userId } }),
+    prisma.file.count({ where: { uploadedByID: userId } }),
+    prisma.spaceMember.count({ where: { userID: userId } }),
     prisma.follow.count({
       where: {
-        followerId: session.user.userId,
-        following: {
-          following: {
-            some: { followingId: session.user.userId },
-          },
-        },
+        OR: [{ followerId: userId }, { followingId: userId }],
       },
     }),
     prisma.event.findMany({
-      where: { dateTime: { gte: new Date() } },
+      where: {
+        attendees: { some: { userID: userId } },
+        dateTime: { gte: now },
+      },
       orderBy: { dateTime: "asc" },
-      take: 2,
-      include: { _count: { select: { attendees: true } } }
+      take: 5,
+      select: { eventID: true, title: true, dateTime: true, location: true },
     }),
-    prisma.post.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 3,
-      include: { author: true, forum: true, _count: { select: { comments: true } } }
+    prisma.file.findMany({
+      where: { uploadedByID: userId },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: { fileID: true, fileName: true, updatedAt: true, spaceID: true },
     }),
-    prisma.comment.findMany({
-      take: 4,
+    prisma.collabSpace.findMany({
+      where: { members: { some: { userID: userId } } },
       orderBy: { createdAt: "desc" },
-      include: { author: true, post: true }
-    })
+      take: 5,
+      select: { spaceID: true, name: true, forumID: true },
+    }),
+    prisma.message.findMany({
+      where: { OR: [{ senderID: userId }, { receiverID: userId }] },
+      orderBy: { sentAt: "desc" },
+      take: 40,
+      include: {
+        sender: { select: { userId: true, name: true } },
+        receiver: { select: { userId: true, name: true } },
+      },
+    }),
   ]);
 
-  const statCards = [
-    { label: "Connections",     value: connectionsCount,    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-    ), color: "text-blue-500", bg: "bg-blue-50" },
-    { label: "Forum Posts",     value: postsCount,     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-    ), color: "text-teal-600", bg: "bg-teal-50" },
-    { label: "Files Shared",    value: filesCount,    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-    ), color: "text-orange-500", bg: "bg-orange-50" },
-    { label: "Events Joined", value: eventsCount, icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-    ), color: "text-purple-500", bg: "bg-purple-50" },
-  ];
+  const conversationMap = new Map<
+    string,
+    { userId: string; name: string; lastMessage: string; lastAt: Date }
+  >();
+
+  for (const message of recentMessages) {
+    const partnerId =
+      message.senderID === userId ? message.receiverID : message.senderID;
+    const partnerName =
+      message.senderID === userId
+        ? message.receiver.name
+        : message.sender.name;
+    if (!conversationMap.has(partnerId)) {
+      conversationMap.set(partnerId, {
+        userId: partnerId,
+        name: partnerName,
+        lastMessage: message.content,
+        lastAt: message.sentAt,
+      });
+    }
+  }
+
+  const recentChats = Array.from(conversationMap.values())
+    .sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime())
+    .slice(0, 5);
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Welcome back, <span style={{ color: "#0d9488" }}>{user?.name?.toUpperCase() || "STUDENT"}</span>!
-        </h1>
-        <p className="text-gray-400 text-sm mt-0.5">Here&apos;s what&apos;s happening in your community today</p>
+    <div className="space-y-6 max-w-5xl">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Your calendar, files, collab spaces, and chats — forums stay the main discussion hub.
+          </p>
+        </div>
+        <Link
+          href="/forums"
+          className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-medium text-white shrink-0"
+          style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
+        >
+          Browse forums
+        </Link>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {statCards.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl p-4 border border-gray-100 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-400 mb-1">{s.label}</p>
-              <p className="text-2xl font-bold text-gray-800">{s.value}</p>
-            </div>
-            <div className={`w-12 h-12 rounded-xl ${s.bg} ${s.color} flex items-center justify-center`}>
-              {s.icon}
-            </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: "Events joined", value: eventsJoinedCount },
+          { label: "My uploads", value: filesUploadedCount },
+          { label: "Collab spaces", value: collabSpacesCount },
+          { label: "Connections", value: connectionsCount },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{stat.label}</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900">{stat.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Recent Activity */}
-        <div className="col-span-1 lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-700 text-sm mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            {recentComments.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">No recent activity yet.</p>
-            ) : (
-              recentComments.map((comment) => (
-                <div key={comment.commentID} className="flex flex-col sm:flex-row sm:gap-3 gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                    <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-semibold">{comment.author.name}</span>
-                      <span className="text-gray-400"> commented on </span>
-                      <Link href={`/post/${comment.postID}`} className="font-medium text-teal-600 hover:underline">
-                        {comment.post.title}
-                      </Link>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">&quot;{comment.content}&quot;</p>
-                    <div className="flex items-center gap-1 mt-1.5">
-                      <span className="text-[11px] text-gray-400">
-                        {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Upcoming Events */}
-        <div className="col-span-1 bg-white rounded-2xl border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-700 text-sm mb-4">Upcoming Events</h2>
-          <div className="space-y-3">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-800">Upcoming events</h2>
+          <p className="text-xs text-gray-500 mt-1">Events you joined</p>
+          <ul className="mt-4 space-y-3">
             {upcomingEvents.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">No upcoming events.</p>
+              <li className="text-sm text-gray-400">No upcoming events.</li>
             ) : (
-              upcomingEvents.map((ev) => (
-                <Link key={ev.eventID} href={`/events/${ev.eventID}`}
-                  className="block border border-gray-100 hover:border-teal-200 rounded-xl p-3.5 transition group">
-                  <p className="text-sm font-semibold text-gray-700 group-hover:text-teal-600 transition mb-2">{ev.title}</p>
-                  <div className="space-y-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 text-[11px] text-gray-400 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        {formatDistanceToNow(new Date(ev.dateTime), { addSuffix: true })}
-                      </div>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 text-[11px] text-gray-400 flex-wrap">
-                      <div className="flex items-center gap-1.5">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        {ev.location}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                      {ev._count.attendees} participants
-                    </div>
-                  </div>
-                </Link>
+              upcomingEvents.map((event) => (
+                <li key={event.eventID}>
+                  <Link
+                    href={`/events/${event.eventID}`}
+                    className="block rounded-xl border border-gray-50 p-3 hover:border-teal-200 transition"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{event.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {format(new Date(event.dateTime), "PPp")} · {event.location}
+                    </p>
+                  </Link>
+                </li>
               ))
             )}
-          </div>
-        </div>
+          </ul>
+          <Link href="/events" className="mt-3 inline-block text-xs font-medium text-teal-600 hover:underline">
+            View all events
+          </Link>
+        </section>
 
-        {/* Trending Discussions */}
-        <div className="col-span-1 lg:col-span-3 bg-white rounded-2xl border border-gray-100 p-5">
-          <h2 className="font-semibold text-gray-700 text-sm mb-4">Trending Discussions</h2>
-          <div className="space-y-3">
-            {trendingPosts.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">No trending posts right now.</p>
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-800">Recent chats</h2>
+          <p className="text-xs text-gray-500 mt-1">Latest conversations</p>
+          <ul className="mt-4 space-y-3">
+            {recentChats.length === 0 ? (
+              <li className="text-sm text-gray-400">No messages yet.</li>
             ) : (
-              trendingPosts.map((t) => (
-                <Link key={t.postID} href={`/post/${t.postID}`}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl hover:bg-gray-50 transition group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700 group-hover:text-teal-600 transition truncate">{t.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">by {t.author.name}</p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <span className="flex items-center gap-1 text-xs text-gray-400">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                        {t._count.comments} replies
-                      </span>
-                    </div>
-                  </div>
-                  <span className="mt-3 sm:mt-0 sm:ml-4 px-3 py-1 text-xs font-medium text-teal-700 bg-teal-50 rounded-full shrink-0">{t.forum.name}</span>
-                </Link>
+              recentChats.map((chat) => (
+                <li key={chat.userId}>
+                  <Link
+                    href={`/messages/${chat.userId}`}
+                    className="block rounded-xl border border-gray-50 p-3 hover:border-teal-200 transition"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{chat.name}</p>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{chat.lastMessage}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {formatDistanceToNow(chat.lastAt, { addSuffix: true })}
+                    </p>
+                  </Link>
+                </li>
               ))
             )}
-          </div>
-        </div>
+          </ul>
+          <Link href="/messages" className="mt-3 inline-block text-xs font-medium text-teal-600 hover:underline">
+            Open messages
+          </Link>
+        </section>
+
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-800">My recent uploads</h2>
+          <ul className="mt-4 space-y-3">
+            {recentFiles.length === 0 ? (
+              <li className="text-sm text-gray-400">No files uploaded yet.</li>
+            ) : (
+              recentFiles.map((file) => (
+                <li key={file.fileID} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate text-gray-800">{file.fileName}</span>
+                  <span className="text-xs text-gray-400 shrink-0">
+                    {formatDistanceToNow(file.updatedAt, { addSuffix: true })}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+          <Link href="/files" className="mt-3 inline-block text-xs font-medium text-teal-600 hover:underline">
+            My uploads library
+          </Link>
+        </section>
+
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-800">Collab spaces</h2>
+          <ul className="mt-4 space-y-3">
+            {collabSpaces.length === 0 ? (
+              <li className="text-sm text-gray-400">No collab spaces yet.</li>
+            ) : (
+              collabSpaces.map((space) => (
+                <li key={space.spaceID}>
+                  <Link
+                    href={`/collaboration/${space.spaceID}`}
+                    className="block rounded-xl border border-gray-50 p-3 hover:border-teal-200 transition"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{space.name}</p>
+                  </Link>
+                </li>
+              ))
+            )}
+          </ul>
+          <Link href="/collaboration" className="mt-3 inline-block text-xs font-medium text-teal-600 hover:underline">
+            All collab spaces
+          </Link>
+        </section>
       </div>
     </div>
   );

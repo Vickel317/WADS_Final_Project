@@ -1,9 +1,14 @@
 import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import CommentForm from "./comment-form";
 import LikeButton from "./like-button";
+import { AiSummary } from "@/components/ai-summary";
+import PostActions from "./post-actions";
+import CommentActions from "./comment-actions";
+import { slugify } from "@/lib/slugify";
 
 export default async function PostDetailPage({
 	params,
@@ -32,6 +37,11 @@ export default async function PostDetailPage({
 	});
 
 	if (!post) notFound();
+  const role = String(session.user.role || "").toLowerCase();
+  const canSeeHidden = role === "admin" || role === "moderator" || post.authorID === session.user.userId;
+  if (post.moderationStatus !== "APPROVED" && !canSeeHidden) {
+    notFound();
+  }
 
 	const [author, forum, file, comments] = await Promise.all([
 		prisma.user.findUnique({
@@ -51,10 +61,22 @@ export default async function PostDetailPage({
 			orderBy: { createdAt: "asc" },
 		}),
 	]);
+  const canManagePost =
+    post.authorID === session.user.userId || role === "admin" || role === "moderator";
+  const isNonPublic = post.moderationStatus !== "APPROVED";
+  const canEditPost = !isNonPublic || role === "admin" || role === "moderator";
 
 	return (
 		<div className="space-y-6">
-			<div className="rounded-2xl border border-gray-100 bg-white p-6">
+      <div>
+        <Link
+          href={`/forums/${slugify(forum?.name ?? "")}`}
+          className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+        >
+          ← Back to forum
+        </Link>
+      </div>
+			<div className={`rounded-2xl border border-gray-100 bg-white p-6 ${isNonPublic ? "opacity-70" : ""}`}>
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 					<div>
 						<span className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
@@ -69,8 +91,14 @@ export default async function PostDetailPage({
 							<span>
 								{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
 							</span>
+              {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 1000 && (
+                <>
+                  <span>•</span>
+                  <span className="font-semibold text-gray-500">edited</span>
+                </>
+              )}
 							<span>•</span>
-							<span className="uppercase">{post.moderationStatus}</span>
+							<span className={`uppercase ${isNonPublic ? "text-amber-600 font-semibold" : ""}`}>{post.moderationStatus}</span>
 						</div>
 					</div>
 					<div className="flex flex-col items-start gap-2 text-xs text-gray-400 sm:items-end">
@@ -78,12 +106,21 @@ export default async function PostDetailPage({
 						<span>
 							Updated {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
 						</span>
+            <PostActions
+              postId={post.postID}
+              title={post.title}
+              content={post.content}
+              canManage={canManagePost}
+              canEdit={canEditPost}
+            />
 					</div>
 				</div>
 
-				<div className="mt-5 whitespace-pre-wrap text-sm text-gray-700">
-					{post.content}
-				</div>
+			<div className="mt-5 whitespace-pre-wrap text-sm text-gray-700">
+				{post.content}
+			</div>
+
+			<AiSummary postId={post.postID} />
 
 				{file && (
 					<div className="mt-6 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
@@ -126,6 +163,15 @@ export default async function PostDetailPage({
 									</span>
 								</div>
 								<p className="mt-2 text-sm text-gray-700">{comment.content}</p>
+                <CommentActions
+                  commentId={comment.commentID}
+                  initialContent={comment.content}
+                  canManage={
+                    comment.authorID === session.user.userId ||
+                    role === "admin" ||
+                    role === "moderator"
+                  }
+                />
 							</div>
 						))
 					)}

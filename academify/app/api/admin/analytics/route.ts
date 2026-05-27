@@ -49,13 +49,27 @@ export async function GET(request: NextRequest) {
       return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const [totalPosts, totalComments, users, reportStatuses, moderationActions] =
+    const [totalPosts, totalComments, users, reportStatuses, moderationActions, recentPosts] =
       await Promise.all([
         prisma.post.count(),
         prisma.comment.count(),
         prisma.user.findMany({ select: { role: true } }),
         prisma.reportReview.findMany({ select: { status: true } }),
         prisma.moderationActionLog.findMany({ select: { actionType: true } }),
+        prisma.post.findMany({
+          select: {
+            postID: true,
+            title: true,
+            moderationStatus: true,
+            aiScore: true,
+            aiLabel: true,
+            aiReason: true,
+            createdAt: true,
+            author: { select: { name: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 12,
+        }),
       ]);
 
     const usersByRole = (users as Array<{ role: string }>).reduce<Record<string, number>>(
@@ -107,6 +121,16 @@ export async function GET(request: NextRequest) {
         totalActions: moderationActions.length,
         byAction: moderationActionCounts,
       },
+      aiModeration: recentPosts.map((post) => ({
+        id: post.postID,
+        title: post.title,
+        status: String(post.moderationStatus).toLowerCase(),
+        aiScore: post.aiScore,
+        aiLabel: post.aiLabel,
+        aiReason: post.aiReason,
+        author: post.author.name,
+        createdAt: post.createdAt.toISOString(),
+      })),
     };
 
     return NextResponse.json({ analytics }, { status: 200 });
