@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
+import { prisma } from "@/lib/prisma";
 
 type SpaceMemberRow = {
   user: { userId: string; name: string };
@@ -10,15 +11,29 @@ type SpaceFileRow = {
   fileID: string;
   fileName: string;
   fileUrl: string;
-  updatedAt: string;
+  updatedAt: Date;
   uploadedBy?: { name: string };
 };
 
-export default async function SpacePage({ params }: { params: { spaceId: string } }) {
-  const { spaceId } = params;
+export default async function SpacePage({ params }: { params: Promise<{ spaceId: string }> }) {
+  const { spaceId } = await params;
 
-  const res = await fetch(`/api/collaboration/${spaceId}`, { cache: "no-store" });
-  if (!res.ok) {
+  const space = await prisma.collabSpace.findUnique({
+    where: { spaceID: spaceId },
+    include: {
+      members: { include: { user: { select: { userId: true, name: true } } } },
+      files: {
+        select: {
+          fileID: true,
+          fileName: true,
+          fileUrl: true,
+          updatedAt: true,
+          uploadedBy: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!space) {
     return (
       <div className="p-6">
         <h1 className="text-xl font-bold">Space not found</h1>
@@ -27,9 +42,6 @@ export default async function SpacePage({ params }: { params: { spaceId: string 
       </div>
     );
   }
-
-  const payload = await res.json().catch(() => ({}));
-  const space = payload.space;
 
   return (
     <div className="p-6">

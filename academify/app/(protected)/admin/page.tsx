@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type AdminAnalytics = {
@@ -7,6 +8,16 @@ type AdminAnalytics = {
 	posts: { total: number; totalReplies: number };
 	reports: { total: number; byStatus: Record<string, number> };
 	moderation: { totalActions: number; byAction: Record<string, number> };
+	aiModeration?: Array<{
+		id: string;
+		title: string;
+		status: string;
+		aiScore?: number | null;
+		aiLabel?: string | null;
+		aiReason?: string | null;
+		author: string;
+		createdAt: string;
+	}>;
 };
 
 export default function AdminPage() {
@@ -44,6 +55,14 @@ export default function AdminPage() {
 				<p className="mt-2 text-sm text-gray-600">
 					Platform insights powered by live admin endpoints.
 				</p>
+				<div className="mt-4 flex flex-wrap gap-2">
+					<Link href="/admin/users" className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+						Manage Users
+					</Link>
+					<Link href="/admin/forums" className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+						Manage Forums
+					</Link>
+				</div>
 			</div>
 
 			<div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -98,6 +117,40 @@ export default function AdminPage() {
 				)}
 				{!error && loading && (
 					<p className="mt-2 text-sm text-gray-500">Loading analytics…</p>
+				)}
+			</div>
+
+			<div className="rounded-xl border border-gray-200 bg-white p-6">
+				<h2 className="text-sm font-semibold text-gray-800">Recent AI Moderation Signals</h2>
+				<p className="mt-1 text-xs text-gray-500">
+					Shows latest posts with AI label, score, and reason. Approved posts do not appear in moderation queue.
+				</p>
+				{!loading && analytics && (
+					<div className="mt-4 space-y-3">
+						{(analytics.aiModeration || []).map((item) => (
+							<div key={item.id} className="rounded-lg border border-gray-100 p-3">
+								<div className="flex flex-wrap items-center gap-2">
+									<p className="text-sm font-medium text-gray-900">{item.title}</p>
+									<span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{item.status}</span>
+									{item.aiScore != null && (
+										<span className="rounded bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
+											Risk {Math.round(item.aiScore * 100)}%
+										</span>
+									)}
+									{item.aiLabel && (
+										<span className="rounded bg-teal-50 px-2 py-0.5 text-xs text-teal-700">{item.aiLabel}</span>
+									)}
+								</div>
+								<p className="mt-1 text-xs text-gray-500">
+									{item.author} · {new Date(item.createdAt).toLocaleString()}
+								</p>
+								<p className="mt-1 text-xs italic text-gray-600">{item.aiReason || "No AI reason recorded."}</p>
+							</div>
+						))}
+						{(analytics.aiModeration || []).length === 0 && (
+							<p className="text-sm text-gray-500">No recent posts found.</p>
+						)}
+					</div>
 				)}
 			</div>
 		</div>

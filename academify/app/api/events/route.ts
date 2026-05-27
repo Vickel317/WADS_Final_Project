@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
             maxAttendees: 0,
             attendees: attendeeIds,
             status: event.dateTime <= now ? "completed" : "scheduled",
+            forumId: event.forumID,
             createdAt: event.createdAt.toISOString(),
             updatedAt: event.createdAt.toISOString(),
           };

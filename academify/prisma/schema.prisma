@@ -214,6 +214,9 @@ model Post {
   title            String
   content          String           @db.Text
   moderationStatus ModerationStatus @default(PENDING)
+  aiScore          Float?
+  aiLabel          String?
+  aiReason         String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

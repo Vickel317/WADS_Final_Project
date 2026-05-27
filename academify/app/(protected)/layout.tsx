@@ -29,6 +29,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     userId: user.userId,
     name: user.name,
     avatarUrl: resolveAvatarUrl(user),
+    role: user.role.toLowerCase(),
   };
 
   // Intercept for forced profile setup

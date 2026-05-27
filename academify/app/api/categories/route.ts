@@ -3,6 +3,7 @@ import { getSessionUser, normalizeRole } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+import { slugify } from "@/lib/slugify";
 
 /**
  * @swagger
@@ -62,7 +63,7 @@ export async function GET() {
           id: category.forumID,
           name: category.name,
           description: category.description ?? "",
-          slug: category.name.toLowerCase(),
+          slug: slugify(category.name),
           createdAt: category.createdAt.toISOString(),
         })),
       },

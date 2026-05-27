@@ -1,13 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import Sidebar from "@/components/sidebar";
 
-const mockPathname = jest.fn(() => "/dashboard");
+const mockPathname = jest.fn(() => "/forums");
 
 jest.mock("next/navigation", () => ({
   usePathname: () => mockPathname(),
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
+}));
+
+jest.mock("@/components/current-user-context", () => ({
+  useCurrentUser: () => ({ userId: "u1", name: "Test", avatarUrl: null, role: "student" }),
 }));
 
 beforeEach(() => {
@@ -20,66 +24,43 @@ describe("Sidebar – rendering", () => {
     expect(screen.getByText("Academify")).toBeInTheDocument();
   });
 
-  it("renders all navigation links", () => {
+  it("renders primary and secondary navigation links", () => {
     render(<Sidebar />);
-    expect(screen.getByRole("link", { name: /dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /forums/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /chat/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /collab space/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /files/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /events/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^dashboard$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^forums$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^chat$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /connections/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /my uploads/i })).toBeInTheDocument();
+  });
+
+  it("does not show removed top-level items", () => {
+    render(<Sidebar />);
+    expect(screen.queryByRole("link", { name: /^events$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /collab space/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^events$/i })).not.toBeInTheDocument();
   });
 
   it("renders navigation links with correct hrefs", () => {
     render(<Sidebar />);
-    expect(screen.getByRole("link", { name: /dashboard/i })).toHaveAttribute("href", "/dashboard");
-    expect(screen.getByRole("link", { name: /forums/i })).toHaveAttribute("href", "/forums");
-    expect(screen.getByRole("link", { name: /chat/i })).toHaveAttribute("href", "/messages");
-    expect(screen.getByRole("link", { name: /collab space/i })).toHaveAttribute("href", "/collaboration");
-    expect(screen.getByRole("link", { name: /files/i })).toHaveAttribute("href", "/files");
-    expect(screen.getByRole("link", { name: /events/i })).toHaveAttribute("href", "/events");
-    expect(screen.getByRole("link", { name: /connections/i })).toHaveAttribute("href", "/connections");
-  });
-
-  it("renders the user section at the bottom", () => {
-    render(<Sidebar />);
-    expect(screen.getByText("Signed in user")).toBeInTheDocument();
-  });
-
-  it("renders the tagline", () => {
-    render(<Sidebar />);
-    expect(screen.getByText(/learn together, grow together/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^dashboard$/i })).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByRole("link", { name: /^forums$/i })).toHaveAttribute("href", "/forums");
+    expect(screen.getByRole("link", { name: /^chat$/i })).toHaveAttribute("href", "/messages");
+    expect(screen.getByRole("link", { name: /my uploads/i })).toHaveAttribute("href", "/files");
   });
 });
 
 describe("Sidebar – active state", () => {
-  it("applies active styles to the Dashboard link when on /dashboard", () => {
-    mockPathname.mockReturnValue("/dashboard");
-    render(<Sidebar />);
-    const dashLink = screen.getByRole("link", { name: /dashboard/i });
-    // Active links have white text (text-white class)
-    expect(dashLink).toHaveClass("text-white");
-  });
-
-  it("does not apply active styles to other links when on /dashboard", () => {
-    mockPathname.mockReturnValue("/dashboard");
-    render(<Sidebar />);
-    const forumsLink = screen.getByRole("link", { name: /forums/i });
-    expect(forumsLink).not.toHaveClass("text-white");
-  });
-
-  it("applies active styles to forums link when on /forums", () => {
+  it("applies active styles to the Forums link when on /forums", () => {
     mockPathname.mockReturnValue("/forums");
     render(<Sidebar />);
-    const forumsLink = screen.getByRole("link", { name: /forums/i });
+    const forumsLink = screen.getByRole("link", { name: /^forums$/i });
     expect(forumsLink).toHaveClass("text-white");
   });
 
-  it("applies active styles to nested routes (e.g. /forums/some-category)", () => {
+  it("applies active styles to nested forum routes", () => {
     mockPathname.mockReturnValue("/forums/computer-science");
     render(<Sidebar />);
-    const forumsLink = screen.getByRole("link", { name: /forums/i });
+    const forumsLink = screen.getByRole("link", { name: /^forums$/i });
     expect(forumsLink).toHaveClass("text-white");
   });
 });

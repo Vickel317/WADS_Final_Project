@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Calendar,
@@ -81,6 +82,7 @@ type ApiEvent = {
   duration?: number;
   attendees?: string[];
   maxAttendees?: number;
+  forumId?: string;
   creator?: {
     id: string;
     name: string;
@@ -394,6 +396,9 @@ function CreateEventModal({
 
 export default function EventsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const forumSlug = searchParams.get("forum");
+  const [forumFilter, setForumFilter] = useState<{ id: string; name: string; slug: string } | null>(null);
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -423,6 +428,28 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
+    if (!forumSlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForumFilter(null);
+      return;
+    }
+    let ignore = false;
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (ignore) return;
+        const match = (data.categories ?? []).find(
+          (c: { slug: string; id: string; name: string }) => c.slug === forumSlug
+        );
+        setForumFilter(match ? { id: match.id, name: match.name, slug: match.slug } : null);
+      })
+      .catch(() => setForumFilter(null));
+    return () => {
+      ignore = true;
+    };
+  }, [forumSlug]);
+
+  useEffect(() => {
     let ignore = false;
     const loadEvents = async () => {
       try {
@@ -437,7 +464,12 @@ export default function EventsPage() {
         }
         if (!eventRes.ok) return;
 
-        const mapped = (data.data ?? []).map((event: ApiEvent) => {
+        const raw = data.data ?? [];
+        const scoped = forumFilter
+          ? raw.filter((event: ApiEvent) => event.forumId === forumFilter.id)
+          : raw;
+
+        const mapped = scoped.map((event: ApiEvent) => {
           const when = new Date(event.date);
           return {
             id: event.id,
@@ -474,7 +506,7 @@ export default function EventsPage() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [forumFilter]);
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
@@ -635,14 +667,33 @@ export default function EventsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+      {forumFilter && (
+        <div className="mb-4 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-800">
+          Showing events for <strong>{forumFilter.name}</strong>.{" "}
+          <Link href={`/forums/${forumFilter.slug}?tab=events`} className="underline font-medium">
+            Back to forum
+          </Link>
+          {" · "}
+          <Link href="/events" className="underline font-medium">
+            All events
+          </Link>
+        </div>
+      )}
+
+      {!forumFilter && (
+        <p className="mb-4 text-sm text-gray-500 rounded-xl border border-gray-100 bg-white px-4 py-3">
+          Events belong to a forum. Open a forum and use the <strong>Events</strong> tab for the best experience.
+        </p>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Study Sessions &amp; Events
+            {forumFilter ? `${forumFilter.name} — Events` : "Study Sessions & Events"}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Organize and join study sessions with your peers
+            Forum-scoped calendar — create events from a forum hub when possible
           </p>
         </div>
         <button

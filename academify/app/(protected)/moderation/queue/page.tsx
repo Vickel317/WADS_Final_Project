@@ -6,11 +6,14 @@ type QueueItem = {
 	id: string;
 	title: string;
 	content: string;
-	category: string;
+	forum: string;
 	author: string;
 	replyCount: number;
 	createdAt: string;
 	status: string;
+	aiScore?: number | null;
+	aiLabel?: string | null;
+	aiReason?: string | null;
 };
 
 export default function ModerationQueuePage() {
@@ -91,7 +94,7 @@ export default function ModerationQueuePage() {
 									<div>
 										<p className="text-sm font-semibold text-gray-900">{item.title}</p>
 										<p className="mt-1 text-xs text-gray-500">
-											{item.category} · {item.author} · {new Date(item.createdAt).toLocaleString()}
+											{item.forum} · {item.author} · {new Date(item.createdAt).toLocaleString()}
 										</p>
 									</div>
 									<span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-600">
@@ -99,6 +102,24 @@ export default function ModerationQueuePage() {
 									</span>
 								</div>
 								<p className="mt-3 text-sm text-gray-700 line-clamp-3">{item.content}</p>
+								{item.aiReason && (
+									<div className="mt-2 flex flex-wrap items-center gap-2">
+										<span className="rounded bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+											AI
+										</span>
+										{item.aiScore != null && (
+											<span className={`rounded px-2 py-0.5 text-xs font-medium ${item.aiScore > 0.6 ? "bg-red-50 text-red-600" : item.aiScore > 0.3 ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-700"}`}>
+												Risk {Math.round(item.aiScore * 100)}%
+											</span>
+										)}
+										{item.aiLabel && (
+											<span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+												{item.aiLabel}
+											</span>
+										)}
+										<span className="text-xs text-gray-500 italic">{item.aiReason}</span>
+									</div>
+								)}
 								<div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
 									<input
 										value={reason[item.id] || ""}

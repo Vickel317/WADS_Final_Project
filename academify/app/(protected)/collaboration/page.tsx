@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 const SPACE_METRICS = [
   { label: "Active spaces", value: "0", note: "loaded from the database" },
@@ -10,8 +11,15 @@ const SPACE_METRICS = [
   { label: "Forums linked", value: "0", note: "spaces attached to forum hubs" },
 ] as const;
 
+type ForumOption = { id: string; name: string; slug: string };
+
 export default function CollaborationPage() {
+  const searchParams = useSearchParams();
+  const forumSlug = searchParams.get("forum");
+  const [forums, setForums] = useState<ForumOption[]>([]);
+  const [forumFilter, setForumFilter] = useState<ForumOption | null>(null);
   const [spaces, setSpaces] = useState<Array<{ spaceID: string; name: string; description: string | null; forumID: string }>>([]);
+  const [allSpaces, setAllSpaces] = useState<Array<{ spaceID: string; name: string; description: string | null; forumID: string }>>([]);
   const [fileCount, setFileCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -19,6 +27,34 @@ export default function CollaborationPage() {
   const [newDescription, setNewDescription] = useState<string | null>(null);
   const [newForumID, setNewForumID] = useState("");
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        const list = (data.categories ?? []).map((c: ForumOption) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+        }));
+        setForums(list);
+        if (forumSlug) {
+          const match = list.find((f: ForumOption) => f.slug === forumSlug);
+          setForumFilter(match ?? null);
+          if (match) setNewForumID(match.id);
+        }
+      })
+      .catch(() => {});
+  }, [forumSlug]);
+
+  useEffect(() => {
+    if (!forumFilter) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSpaces(allSpaces);
+      return;
+    }
+    setSpaces(allSpaces.filter((s) => s.forumID === forumFilter.id));
+  }, [allSpaces, forumFilter]);
 
   useEffect(() => {
     const load = async () => {
@@ -39,7 +75,7 @@ export default function CollaborationPage() {
           throw new Error(filesPayload?.error?.message || "Failed to load files");
         }
 
-        setSpaces(
+        setAllSpaces(
           (spacesPayload.spaces || []).map((space: { spaceID: string; name: string; description: string | null; forumID: string }) => space)
         );
         setFileCount((filesPayload.files || []).length);
@@ -58,12 +94,14 @@ export default function CollaborationPage() {
         <div className="relative flex flex-col gap-5">
           <div className="max-w-3xl space-y-3">
             <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/75">
-              Collaboration Space
+              Collab space · inside a forum
             </span>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">One workspace for shared files, live feedback, and team execution.</h1>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                {forumFilter ? `${forumFilter.name} — group workspaces` : "Team workspaces inside forums"}
+              </h1>
               <p className="mt-3 max-w-2xl text-sm text-white/80 sm:text-base">
-                Keep every assignment, revision pack, and discussion thread attached to the right room so your group can move faster without losing context.
+                Shared files and small teams for assignments — not a replacement for threads. Pick a forum first, then create a space.
               </p>
             </div>
           </div>
@@ -79,8 +117,17 @@ export default function CollaborationPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link href="/files" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-white/90">
-              Back to files
+            {forumFilter ? (
+              <Link href={`/forums/${forumFilter.slug}?tab=collab`} className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-white/90">
+                Back to forum
+              </Link>
+            ) : (
+              <Link href="/forums" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-white/90">
+                Browse forums
+              </Link>
+            )}
+            <Link href="/files" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
+              My uploads
             </Link>
             <Link href="/messages" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
               Open chat
@@ -124,14 +171,8 @@ export default function CollaborationPage() {
                     </div>
 
                     <div className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-4 lg:min-w-55">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Forum ID</span>
-                        <span className="font-semibold text-gray-900 block max-w-40 truncate">{space.forumID}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-linear-to-r from-teal-600 to-cyan-500" />
-                      <p className="text-xs text-gray-500">Created from live database records</p>
-                      <Link href={`/messages/space-${space.spaceID}`} className="rounded-full bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700">
-                        Enter space
+                      <Link href={`/collaboration/${space.spaceID}`} className="rounded-full bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 text-center">
+                        Open space
                       </Link>
                     </div>
                   </div>
@@ -189,14 +230,26 @@ export default function CollaborationPage() {
             <label className="mt-3 block text-xs font-medium text-gray-600">Description (optional)</label>
             <input value={newDescription ?? ""} onChange={(e) => setNewDescription(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
 
-            <label className="mt-3 block text-xs font-medium text-gray-600">Forum ID (optional)</label>
-            <input value={newForumID} onChange={(e) => setNewForumID(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+            <label className="mt-3 block text-xs font-medium text-gray-600">Forum (required)</label>
+            <select
+              value={newForumID}
+              onChange={(e) => setNewForumID(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select a forum</option>
+              {forums.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
 
             <div className="mt-5 flex gap-3">
               <button onClick={() => setShowCreate(false)} className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600">Cancel</button>
               <button
                 onClick={async () => {
                   if (!newName.trim()) return alert("Please provide a name");
+                  if (!newForumID) return alert("Please select a forum");
                   setCreating(true);
                   try {
                     const res = await fetch("/api/collaboration", {
@@ -209,7 +262,7 @@ export default function CollaborationPage() {
                     if (!res.ok) throw new Error(payload?.error?.message || "Create failed");
                     
                     const space = payload.space;
-                    setSpaces((s) => [space, ...s]);
+                    setAllSpaces((s) => [space, ...s]);
                     setShowCreate(false);
                     setNewName("");
                     setNewDescription(null);

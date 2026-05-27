@@ -15,11 +15,9 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# prisma generate does not open a DB connection; fixed placeholder satisfies prisma.config.ts only.
-ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?sslmode=disable
-# Satisfy better-auth during `next build` page-data collection (runtime uses deploy secrets).
-ENV BETTER_AUTH_SECRET=ci-docker-build-placeholder-not-used-at-runtime
-RUN npx prisma generate
+# Build-time-only placeholders (not ENV layers); runtime secrets come from .env.production / compose.
+RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?sslmode=disable \
+  npx prisma generate
 
 # Values come from compose `build.args` — single source: .env.production + compose defaults.
 ARG NEXT_PUBLIC_APP_URL
@@ -44,7 +42,9 @@ ENV NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}
 ENV NEXT_PUBLIC_BETTER_AUTH_URL=${NEXT_PUBLIC_BETTER_AUTH_URL}
 ENV NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
 
-RUN npm run build
+RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?sslmode=disable \
+  BETTER_AUTH_SECRET=ci-docker-build-placeholder-not-used-at-runtime \
+  npm run build
 
 # One-off migrations against Neon (or any Postgres). Run on the VPS with:
 #   docker compose --profile migrate run --rm db-schema-sync
@@ -54,8 +54,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-ENV DATABASE_URL=postgresql://migrate:migrate@127.0.0.1:5432/migrate?sslmode=disable
-RUN npx prisma generate
+RUN DATABASE_URL=postgresql://migrate:migrate@127.0.0.1:5432/migrate?sslmode=disable \
+  npx prisma generate
 CMD ["npx", "prisma", "migrate", "deploy"]
 
 # Socket.IO relay (separate process; exposed on host port 3100 in compose)

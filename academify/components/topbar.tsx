@@ -1,6 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { authClient } from "@/lib/auth-client";
+import { disconnectSocket } from "@/lib/socket-client";
+import { useRouter } from "next/navigation";
+import { useCurrentUser } from "@/components/current-user-context";
 
 type SearchUser = {
   userId: string;
@@ -10,10 +14,15 @@ type SearchUser = {
 };
 
 export default function Topbar() {
+  const router = useRouter();
+  const currentUser = useCurrentUser();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [userName, setUserName] = useState(currentUser?.name ?? "Signed in user");
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(currentUser?.avatarUrl ?? null);
 
   const searchUsers = useCallback(async (searchTerm: string) => {
     setLoading(true);
@@ -44,11 +53,33 @@ export default function Topbar() {
     return () => clearTimeout(delayDebounceFn);
   }, [query, searchUsers]);
 
+  useEffect(() => {
+    let active = true;
+    fetch("/api/users/me", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data?.user) return;
+        const avatar = typeof data.user.avatarUrl === "string" ? data.user.avatarUrl : null;
+        const resolvedAvatar =
+          avatar && (avatar.startsWith("http") || avatar.startsWith("data:") || avatar.startsWith("/api/"))
+            ? avatar
+            : avatar
+            ? `/api/users/${data.user.userId}/avatar`
+            : null;
+        setUserName(data.user.name || "Signed in user");
+        setUserAvatarUrl(resolvedAvatar);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.name, currentUser?.avatarUrl]);
+
   return (
-    <header className="fixed top-0 left-0 md:left-56 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 md:px-6 gap-4 z-30 transition-all duration-300"
+    <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center justify-center pl-14 pr-3 sm:pl-16 sm:pr-4 md:pl-4 md:pr-6 gap-2 sm:gap-4 z-30 transition-all duration-300"
       style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       {/* Search */}
-      <div className="flex-1 max-w-xs md:max-w-sm relative hidden sm:block">
+      <div className="w-full max-w-[320px] md:max-w-sm relative">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
@@ -61,7 +92,7 @@ export default function Topbar() {
           onBlur={() => {
             setTimeout(() => setShowDropdown(false), 200);
           }}
-          placeholder="Search for people..."
+          placeholder="Search people..."
           className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
         />
 
@@ -100,21 +131,52 @@ export default function Topbar() {
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="absolute right-3 sm:right-4 md:right-6 flex items-center gap-1.5 sm:gap-2">
         {/* Notifications */}
-        <button className="relative w-9 h-9 rounded-xl hover:bg-gray-50 flex items-center justify-center transition">
+        <button className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl hover:bg-gray-50 flex items-center justify-center transition">
           <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
           </svg>
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"/>
         </button>
-        {/* Settings */}
-        <button className="w-9 h-9 rounded-xl hover:bg-gray-50 flex items-center justify-center transition">
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-        </button>
+        <div className="relative">
+          <button onClick={() => setProfileOpen((v) => !v)} className="flex items-center gap-2 rounded-xl px-1.5 sm:px-2 py-1.5 hover:bg-gray-50 transition">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+              {userAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={userAvatarUrl} alt={userName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs font-semibold text-gray-500">{userName.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            <span className="hidden md:inline text-sm text-gray-700 font-medium max-w-28 truncate">{userName}</span>
+          </button>
+          {profileOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-50 p-1">
+              <Link onClick={() => setProfileOpen(false)} href="/profile/edit" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg">
+                Profile
+              </Link>
+              <Link onClick={() => setProfileOpen(false)} href="/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg">
+                Settings
+              </Link>
+              <div className="h-px bg-gray-100 my-1 mx-2" />
+              <button
+                onClick={async () => {
+                  setProfileOpen(false);
+                  disconnectSocket();
+                  await authClient.signOut({
+                    fetchOptions: {
+                      onSuccess: () => router.push("/login"),
+                    },
+                  });
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+              >
+                Log out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
