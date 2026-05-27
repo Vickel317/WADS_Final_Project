@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { prisma } from "@/lib/prisma";
+import JoinSpaceButton from "@/components/join-space-button";
 
 type SpaceMemberRow = {
   user: { userId: string; name: string };
@@ -43,6 +43,10 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
     );
   }
 
+  const payload = await res.json().catch(() => ({}));
+  const space = payload.space;
+  const isMember = Boolean(payload.isMember);
+
   return (
     <div className="p-6">
       <div className="mb-6 flex items-start justify-between">
@@ -51,8 +55,9 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
           <p className="text-sm text-gray-600 mt-1">{space.description ?? "No description provided."}</p>
           <p className="text-xs text-gray-400 mt-2">Forum {space.forumID}</p>
         </div>
-        <div className="text-right">
+        <div className="flex flex-col items-end gap-2 text-right">
           <Link href="/collaboration" className="text-sm text-gray-500">Back to spaces</Link>
+          <JoinSpaceButton spaceId={spaceId} isMember={isMember} />
         </div>
       </div>
 

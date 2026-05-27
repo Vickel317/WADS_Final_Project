@@ -243,7 +243,7 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
                 disabled={!shareSpace || sharing}
                 className="flex-1 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {sharing ? "Sharing..." : "Share"}
+                  {sharing ? "Sharing..." : "Share"}
               </button>
               <button
                 onClick={async () => {
