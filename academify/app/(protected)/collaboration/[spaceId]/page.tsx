@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import JoinSpaceButton from "@/components/join-space-button";
+import { prisma } from "@/lib/prisma";
 
 type SpaceMemberRow = {
   user: { userId: string; name: string };
@@ -15,8 +16,8 @@ type SpaceFileRow = {
   uploadedBy?: { name: string };
 };
 
-export default async function SpacePage({ params }: { params: Promise<{ spaceId: string }> }) {
-  const { spaceId } = await params;
+export default async function SpacePage({ params }: { params: { spaceId: string } }) {
+  const { spaceId } = params;
 
   const space = await prisma.collabSpace.findUnique({
     where: { spaceID: spaceId },
@@ -43,9 +44,10 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
     );
   }
 
-  const payload = await res.json().catch(() => ({}));
-  const space = payload.space;
-  const isMember = Boolean(payload.isMember);
+  // We already loaded `space` above from Prisma. Server components don't
+  // have access to a `res` to call `res.json()`; remove the stray client-side
+  // fetch logic. Compute `isMember` on the client or default to false here.
+  const isMember = false;
 
   return (
     <div className="p-6">
