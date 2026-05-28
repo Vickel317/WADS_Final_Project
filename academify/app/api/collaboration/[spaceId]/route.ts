@@ -8,6 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ spaceId: string }> }
 ) {
   try {
+    const session = await getSessionUser(request.headers);
     const { spaceId } = await params;
     const space = await prisma.collabSpace.findUnique({
       where: { spaceID: spaceId },
@@ -16,7 +17,15 @@ export async function GET(
 
     if (!space) return apiError(404, "Space not found", "NOT_FOUND");
 
-    return NextResponse.json({ space }, { status: 200 });
+    const isMember = session
+      ? Boolean(
+          await prisma.spaceMember.findUnique({
+            where: { spaceID_userID: { spaceID: spaceId, userID: session.user.userId } },
+          })
+        )
+      : false;
+
+    return NextResponse.json({ space, isMember }, { status: 200 });
   } catch (err) {
     console.error("Get collaboration space error:", err);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");

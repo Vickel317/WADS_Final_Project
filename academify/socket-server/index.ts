@@ -66,6 +66,18 @@ export interface ChatMessage {
   read: boolean;
 }
 
+export interface SpaceChatMessage {
+  id: string;
+  senderId: string;
+  spaceId: string;
+  content: string;
+  createdAt: string;
+}
+
+function getSpaceRoom(spaceId: string) {
+  return `space:${spaceId}`;
+}
+
 io.on("connection", (socket) => {
   let myUserId: string | null = null;
 
@@ -80,6 +92,21 @@ io.on("connection", (socket) => {
   socket.on("send_message", (msg: ChatMessage) => {
     if (!myUserId || msg.senderId !== myUserId) return;
     emitToUser(msg.receiverId, "new_message", msg);
+  });
+
+  socket.on("join_space", ({ spaceId }: { spaceId: string }) => {
+    if (!myUserId || !spaceId) return;
+    socket.join(getSpaceRoom(spaceId));
+  });
+
+  socket.on("leave_space", ({ spaceId }: { spaceId: string }) => {
+    if (!spaceId) return;
+    socket.leave(getSpaceRoom(spaceId));
+  });
+
+  socket.on("send_space_message", (msg: SpaceChatMessage) => {
+    if (!myUserId || msg.senderId !== myUserId || !msg.spaceId) return;
+    io.to(getSpaceRoom(msg.spaceId)).emit("new_space_message", msg);
   });
 
   socket.on("typing", ({ to }: { to: string }) => {
