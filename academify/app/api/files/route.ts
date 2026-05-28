@@ -4,6 +4,7 @@ import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { getPresignedGetUrl } from "@/lib/storage";
+import { getAccessibleFileWhere } from "@/lib/file-access";
 import { validateFileUpload } from "@/lib/validation";
 
 type FileWithRelations = Prisma.FileGetPayload<{
@@ -88,7 +89,12 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const type = searchParams.get("type");
     const spaceId = searchParams.get("spaceId");
-    const where: Prisma.FileWhereInput = {};
+    const sessionUser = await getSessionUser(request.headers);
+    if (!sessionUser) {
+      return apiError(401, "Unauthorized", "UNAUTHORIZED");
+    }
+
+    const where: Prisma.FileWhereInput = await getAccessibleFileWhere(sessionUser.user.userId);
     if (search) where.fileName = { contains: search, mode: "insensitive" };
     if (type) where.fileType = { contains: type };
     if (spaceId) where.spaceID = spaceId;

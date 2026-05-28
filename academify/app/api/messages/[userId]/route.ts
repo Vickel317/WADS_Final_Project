@@ -183,7 +183,9 @@ export async function POST(
     );
   } catch (error) {
     console.error("Send message error:", error);
-    return apiError(500, "Internal server error", "INTERNAL_ERROR");
+    // Include error message in response for easier debugging in dev.
+    const msg = error instanceof Error ? error.message : String(error);
+    return apiError(500, `Internal server error: ${msg}`, "INTERNAL_ERROR");
   }
 }
 

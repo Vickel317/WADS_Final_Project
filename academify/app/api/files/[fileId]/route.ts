@@ -3,6 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { getPresignedGetUrl, deleteObject } from "@/lib/storage";
+import { canAccessFile } from "@/lib/file-access";
 
 /**
  * @swagger
@@ -61,6 +62,11 @@ export async function GET(
   { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
+    const decoded = await verifyToken(request);
+    if (!decoded) {
+      return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    }
+
     const { fileId } = await params;
     const file = await prisma.file.findUnique({
       where: { fileID: fileId },
@@ -70,6 +76,11 @@ export async function GET(
     if (!file) {
       return apiError(404, "File not found", "NOT_FOUND");
     }
+
+    if (!(await canAccessFile(file, decoded.id))) {
+      return apiError(404, "File not found", "NOT_FOUND");
+    }
+
     const url = await getPresignedGetUrl(file.fileUrl);
 
     return NextResponse.json(
