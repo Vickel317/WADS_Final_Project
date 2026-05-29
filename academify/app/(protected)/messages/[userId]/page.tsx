@@ -6,6 +6,7 @@ import { getSocket } from "@/lib/socket-client";
 import { authClient } from "@/lib/auth-client";
 import type { ChatMessage, SpaceChatMessage } from "@/socket-server/index";
 import NewMessageModal from "@/components/new-message-modal";
+import { ChatAvatar } from "@/components/chat-avatar";
 
 interface Message {
   id: string;
@@ -415,7 +416,7 @@ export default function ConversationPage() {
               <path d="M10 2a5 5 0 100 10A5 5 0 0010 2zm0 12c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
             </svg>
           ) : conv.avatarUrl ? (
-            <img src={conv.avatarUrl} alt={conv.name} className="w-full h-full object-cover" />
+            <ChatAvatar src={conv.avatarUrl} alt={conv.name} />
           ) : (
             <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -514,7 +515,7 @@ export default function ConversationPage() {
                     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
                 ) : partnerProfile?.avatarUrl ? (
-                  <img src={partnerProfile.avatarUrl} alt={partnerProfile.name} className="w-full h-full object-cover" />
+                  <ChatAvatar src={partnerProfile.avatarUrl} alt={partnerProfile.name} size={36} />
                 ) : (
                   <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -561,11 +562,7 @@ export default function ConversationPage() {
                   {!isMe && (
                     <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mb-5 overflow-hidden">
                       {msg.senderAvatarUrl ? (
-                        <img
-                          src={msg.senderAvatarUrl}
-                          alt={senderLabel}
-                          className="w-full h-full object-cover"
-                        />
+                        <ChatAvatar src={msg.senderAvatarUrl} alt={senderLabel} size={32} />
                       ) : (
                         <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
