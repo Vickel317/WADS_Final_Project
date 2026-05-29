@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+
+/** Message rows scoped to a collab space (spaceID exists on schema; assert when client types lag). */
+type SpaceMessageWhere = Prisma.MessageWhereInput & { spaceID: string };
+type SpaceMessageCreate = Prisma.MessageUncheckedCreateInput & { spaceID: string };
+type SpaceMessageCreateMany = Prisma.MessageCreateManyInput & { spaceID: string };
+
+type MessageWithSender = Prisma.MessageGetPayload<{
+  include: {
+    sender: {
+      select: {
+        userId: true;
+        name: true;
+        avatarUrl: true;
+      };
+    };
+  };
+}>;
 
 async function getSpaceMemberIds(spaceId: string) {
   const members = await prisma.spaceMember.findMany({
@@ -58,14 +76,15 @@ export async function GET(
     const sinceParam = request.nextUrl.searchParams.get("since");
     const sinceDate = sinceParam ? new Date(sinceParam) : null;
 
-    const conversation = (await prisma.message.findMany(({
-      where: {
-        // Only include messages that are explicitly associated with this space.
-        spaceID: spaceId,
-        receiverID: currentUserId,
-        senderID: { in: memberIds },
-        ...(sinceDate ? { sentAt: { gt: sinceDate } } : {}),
-      },
+    const where: SpaceMessageWhere = {
+      spaceID: spaceId,
+      receiverID: currentUserId,
+      senderID: { in: memberIds },
+      ...(sinceDate ? { sentAt: { gt: sinceDate } } : {}),
+    };
+
+    const conversation = (await prisma.message.findMany({
+      where,
       orderBy: { sentAt: "asc" },
       include: {
         sender: {
@@ -76,7 +95,7 @@ export async function GET(
           },
         },
       },
-    }) as any)) as Array<any>;
+    })) as MessageWithSender[];
 
     return NextResponse.json(
       {
@@ -134,26 +153,26 @@ export async function POST(
 
     let selfMessage;
     try {
-      selfMessage = await prisma.message.create({
-        data: {
-          senderID: currentUserId,
-          receiverID: currentUserId,
-          spaceID: spaceId,
-          content: content.value!,
-          read: true,
-        } as any,
-      });
+      const selfPayload: SpaceMessageCreate = {
+        senderID: currentUserId,
+        receiverID: currentUserId,
+        spaceID: spaceId,
+        content: content.value!,
+        read: true,
+      };
+
+      selfMessage = await prisma.message.create({ data: selfPayload });
 
       if (recipientIds.length > 0) {
-        await prisma.message.createMany({
-          data: recipientIds.map((receiverID) => ({
-            senderID: currentUserId,
-            receiverID,
-            spaceID: spaceId,
-            content: content.value!,
-            read: false,
-          })) as any,
-        });
+        const batch: SpaceMessageCreateMany[] = recipientIds.map((receiverID) => ({
+          senderID: currentUserId,
+          receiverID,
+          spaceID: spaceId,
+          content: content.value!,
+          read: false,
+        }));
+
+        await prisma.message.createMany({ data: batch });
       }
     } catch (err) {
       // Prisma client may not yet have the updated `spaceID` field (no migration/generate run).

@@ -147,10 +147,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const conversations = Array.from(conversationMap.values()).sort(
-      (a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime()
-    );
-
     // Ensure spaces the user is a member of appear even if no messages exist yet.
     for (const s of spaces) {
       const convKey = `space-${s.spaceID}`;
