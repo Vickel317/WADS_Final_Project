@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import EditProfilePage from "@/app/(protected)/profile/edit/page";
 
@@ -144,7 +144,7 @@ describe("EditProfilePage – submission", () => {
         "/api/users/me",
         expect.objectContaining({
           method: "PATCH",
-          body: JSON.stringify({ name: "Jane Doe" }),
+          body: JSON.stringify({ name: "John Doe Jr." }),
         })
       )
     );

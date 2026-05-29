@@ -93,10 +93,11 @@ export async function GET(request: NextRequest) {
       // If the message has a spaceID set, treat it as a space message
       // regardless of the sender/receiver pairing. This makes space-origin
       // messages distinct from direct messages between two users.
-      if (message.spaceID) {
-        const convKey = `space-${message.spaceID}`;
+      const spaceId = (message as { spaceID?: string | null }).spaceID ?? null;
+      if (spaceId) {
+        const convKey = `space-${spaceId}`;
         const existing = conversationMap.get(convKey);
-        const name = spaceNameById.get(message.spaceID) ?? `Space ${message.spaceID}`;
+        const name = spaceNameById.get(spaceId) ?? `Space ${spaceId}`;
         if (!existing) {
           conversationMap.set(convKey, {
             userId: convKey,
