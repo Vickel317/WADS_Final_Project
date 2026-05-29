@@ -61,6 +61,7 @@ services:
 
   db-schema-sync:
     profiles: ["migrate"]
+    image: ${DOCKER_USERNAME:-local}/academify-migrator:latest
     build:
       context: .
       dockerfile: Dockerfile
