@@ -105,6 +105,16 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/academify-socket:latest
           cache-to: type=inline
 
+      - name: Build and Push DB Migrator Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/academify-migrator:latest
+          target: migrator
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/academify-migrator:latest
+          cache-to: type=inline
+
   # =========================================================================
   #  JOB 3 – Deploy to VPS via self-hosted GitHub Actions runner
   # =========================================================================
@@ -158,6 +168,21 @@ jobs:
           OLLAMA_TIMEOUT_MS=${{ secrets.OLLAMA_TIMEOUT_MS }}
           EOF
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies for DB migration
+        run: npm ci
+
+      # Run migrations on the host (avoids Docker shim v3 errors on older VPS daemons).
+      - name: Run DB migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -169,16 +194,10 @@ jobs:
           docker pull ${{ secrets.DOCKER_USERNAME }}/academify:latest
           docker pull ${{ secrets.DOCKER_USERNAME }}/academify-socket:latest
 
-      - name: Build DB migration image
-        run: docker compose --profile migrate build --pull db-schema-sync
-
-      - name: Run DB migrations
-        run: docker compose --profile migrate run --rm db-schema-sync
-
       - name: Deploy stack
         run: |
-          docker compose pull app socket
-          docker compose up -d app socket minio
+          docker compose --env-file .env.production pull app socket
+          docker compose --env-file .env.production up -d app socket minio
 
       - name: Remove .env.production
         if: always()

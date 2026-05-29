@@ -46,9 +46,11 @@ RUN DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build?sslmode=disable \
   BETTER_AUTH_SECRET=ci-docker-build-placeholder-not-used-at-runtime \
   npm run build
 
-# One-off migrations against Neon (or any Postgres). Run on the VPS with:
-#   docker compose --profile migrate run --rm db-schema-sync
-# Uses DATABASE_URL from `.env.production` (or compose environment).
+# One-off migrations against Neon (or any Postgres).
+# CI deploy runs: npx prisma migrate deploy (on the self-hosted runner).
+# Manual Docker option (Docker Engine 24+):
+#   docker compose --env-file .env.production --profile migrate run --rm db-schema-sync
+#   # or: docker run --rm --env-file .env.production <user>/academify-migrator:latest
 FROM base AS migrator
 COPY package.json package-lock.json ./
 RUN npm ci
