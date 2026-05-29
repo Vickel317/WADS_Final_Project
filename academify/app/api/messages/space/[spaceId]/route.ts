@@ -58,7 +58,7 @@ export async function GET(
     const sinceParam = request.nextUrl.searchParams.get("since");
     const sinceDate = sinceParam ? new Date(sinceParam) : null;
 
-    const conversation = await prisma.message.findMany({
+    const conversation = (await prisma.message.findMany(({
       where: {
         // Only include messages that are explicitly associated with this space.
         spaceID: spaceId,
@@ -76,7 +76,7 @@ export async function GET(
           },
         },
       },
-    });
+    }) as any)) as Array<any>;
 
     return NextResponse.json(
       {
@@ -133,7 +133,6 @@ export async function POST(
     const recipientIds = memberIds.filter((id) => id !== currentUserId);
 
     let selfMessage;
-    let usedSpaceFlag = true;
     try {
       selfMessage = await prisma.message.create({
         data: {
@@ -142,7 +141,7 @@ export async function POST(
           spaceID: spaceId,
           content: content.value!,
           read: true,
-        },
+        } as any,
       });
 
       if (recipientIds.length > 0) {
@@ -153,7 +152,7 @@ export async function POST(
             spaceID: spaceId,
             content: content.value!,
             read: false,
-          })),
+          })) as any,
         });
       }
     } catch (err) {
@@ -161,7 +160,6 @@ export async function POST(
       // Fall back to creating messages without the `spaceID` scalar so the send flow still works.
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("Unknown argument `spaceID`") || msg.includes("Unknown arg \"spaceID\"")) {
-        usedSpaceFlag = false;
         selfMessage = await prisma.message.create({
           data: {
             senderID: currentUserId,

@@ -46,8 +46,7 @@ export default function MessagesPage() {
 
     const handleSpaceJoined = (ev: Event) => {
       try {
-        // @ts-ignore custom event
-        const id = (ev as CustomEvent).detail?.spaceId;
+        const id = (ev as CustomEvent<{ spaceId?: string }>).detail?.spaceId;
         if (id) router.push(`/messages/space-${id}`);
       } catch {
         /* ignore */
@@ -60,7 +59,7 @@ export default function MessagesPage() {
       window.removeEventListener("spaces-updated", handleSpacesUpdated);
       window.removeEventListener("space-joined", handleSpaceJoined as EventListener);
     };
-  }, []);
+  }, [router]);
 
   // Socket — update conversation list when a new message arrives
   useEffect(() => {

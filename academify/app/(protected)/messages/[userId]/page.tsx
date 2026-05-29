@@ -22,6 +22,7 @@ interface Conversation {
   userId: string;
   kind?: "direct" | "space";
   name: string;
+  avatarUrl?: string | null;
   lastMessage: string;
   lastAt: string;
   unread: number;
@@ -114,10 +115,7 @@ export default function ConversationPage() {
   }, []);
 
   useEffect(() => {
-    if (isSpaceChat || !partnerId) {
-      setPartnerProfile(null);
-      return;
-    }
+    if (isSpaceChat || !partnerId) return;
 
     let cancelled = false;
 
