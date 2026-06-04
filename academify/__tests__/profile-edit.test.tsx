@@ -118,7 +118,7 @@ describe("EditProfilePage – validation", () => {
 });
 
 describe("EditProfilePage – submission", () => {
-  it("calls PATCH /api/users/me when profile fields change", async () => {
+  it("calls PATCH /api/users/me and redirects on success", async () => {
     const user = userEvent.setup();
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
@@ -130,13 +130,12 @@ describe("EditProfilePage – submission", () => {
           },
         }),
       }) // GET /api/users/me
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ message: "Profile updated successfully" }) }); // PATCH
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) }); // PATCH /api/users/me
 
     render(<EditProfilePage />);
-    await screen.findByDisplayValue("John Doe");
-    // Change a field so the component has a payload to PATCH
-    await user.clear(screen.getByPlaceholderText(/your full name/i));
-    await user.type(screen.getByPlaceholderText(/your full name/i), "John Doe Jr.");
+    const nameInput = await screen.findByDisplayValue("John Doe");
+    await user.clear(nameInput);
+    await user.type(nameInput, "John Doe Jr.");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() =>
@@ -171,16 +170,12 @@ describe("EditProfilePage – submission", () => {
           },
         }),
       }) // GET
-      .mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: { message: "Server error" } }),
-      }); // PATCH
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ message: "Server error" }) }); // PATCH
 
     render(<EditProfilePage />);
-    await screen.findByDisplayValue("John Doe");
-    // Change a field so PATCH is triggered and returns an error
-    await user.clear(screen.getByPlaceholderText(/your full name/i));
-    await user.type(screen.getByPlaceholderText(/your full name/i), "John Doe Jr.");
+    const nameInput = await screen.findByDisplayValue("John Doe");
+    await user.clear(nameInput);
+    await user.type(nameInput, "John Doe Jr.");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     expect(await screen.findByText(/server error/i)).toBeInTheDocument();

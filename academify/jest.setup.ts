@@ -63,6 +63,7 @@ jest.mock("@/lib/prisma", () => ({
     message: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
     notification: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
     event: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
+    moderationActionLog: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
     moderationLog: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
     eventAttendee: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
     follow: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]), create: jest.fn(), update: jest.fn(), delete: jest.fn(), count: jest.fn().mockResolvedValue(0) },
@@ -105,3 +106,21 @@ jest.mock("next/navigation", () => ({
     throw err;
   }),
 }));
+
+// Silence noisy React "not wrapped in act(...)" warnings in tests.
+// These are non-failing warnings that appear when components perform
+// asynchronous state updates during their effects. We filter them
+// to keep test logs clean; real fixes should wrap test interactions
+// with `act()` or use `waitFor`/`findBy` in specific tests.
+const _origConsoleError = console.error;
+console.error = (...args: unknown[]) => {
+  try {
+    const msg = String(args[0] ?? "");
+    if (msg.includes("not wrapped in act(") || msg.includes("An update to") && msg.includes("inside a test was not wrapped in act")) {
+      return; // ignore this specific React act warning
+    }
+  } catch {
+    // fall through to default
+  }
+  return _origConsoleError.apply(console, args as never[]);
+};

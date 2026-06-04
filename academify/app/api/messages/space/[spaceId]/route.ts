@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+import { isRestrictedAccount } from "@/lib/moderation";
+import { sanitizeText } from "@/lib/sanitization";
 
 /** Message rows scoped to a collab space (spaceID exists on schema; assert when client types lag). */
 type SpaceMessageWhere = Prisma.MessageWhereInput & { spaceID: string };
@@ -66,6 +68,10 @@ export async function GET(
 
     const currentUserId = sessionUser.user.userId;
     const { spaceId } = await params;
+
+    if (isRestrictedAccount(sessionUser.user)) {
+      return apiError(403, "Your account is restricted from sending messages", "FORBIDDEN");
+    }
 
     const isMember = await ensureSpaceMembership(spaceId, currentUserId);
     if (!isMember) {
@@ -140,6 +146,8 @@ export async function POST(
       ]);
     }
 
+    const safeContent = sanitizeText(content.value!);
+
     const currentUserId = sessionUser.user.userId;
     const { spaceId } = await params;
 
@@ -157,7 +165,7 @@ export async function POST(
         senderID: currentUserId,
         receiverID: currentUserId,
         spaceID: spaceId,
-        content: content.value!,
+        content: safeContent,
         read: true,
       };
 
@@ -168,7 +176,7 @@ export async function POST(
           senderID: currentUserId,
           receiverID,
           spaceID: spaceId,
-          content: content.value!,
+          content: safeContent,
           read: false,
         }));
 
@@ -183,7 +191,7 @@ export async function POST(
           data: {
             senderID: currentUserId,
             receiverID: currentUserId,
-            content: content.value!,
+            content: safeContent,
             read: true,
           },
         });
@@ -193,7 +201,7 @@ export async function POST(
             data: recipientIds.map((receiverID) => ({
               senderID: currentUserId,
               receiverID,
-              content: content.value!,
+              content: safeContent,
               read: false,
             })),
           });

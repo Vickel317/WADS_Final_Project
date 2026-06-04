@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
-import { moderationLogs } from "../../queue/route";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalString } from "@/lib/validation";
+import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
 
 
 
@@ -54,7 +54,7 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "moderator" && decoded.role !== "admin") {
+    if (!hasModerationAccess(decoded.role)) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",
@@ -85,14 +85,11 @@ export async function POST(
 
     await prisma.post.delete({ where: { postID: postId } });
 
-    moderationLogs.push({
-      id: `log_${Date.now()}`,
-      action: "delete",
-      targetType: "post",
-      targetId: postId,
-      performedBy: decoded.id,
+    await recordModerationAction({
+      moderatorId: decoded.id,
+      actionType: "DELETE_POST",
+      targetPostID: postId,
       reason: reason.value || "No reason provided",
-      createdAt: new Date().toISOString(),
     });
 
     return NextResponse.json(
