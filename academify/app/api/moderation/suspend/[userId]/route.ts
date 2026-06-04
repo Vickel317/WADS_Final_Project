@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
-import { moderationLogs } from "../../queue/route";
 import { userSanctions } from "../../warn/[userId]/route";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalNumber, parseRequiredString } from "@/lib/validation";
+import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
 
 
 
@@ -59,7 +59,7 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "moderator" && decoded.role !== "admin") {
+    if (!hasModerationAccess(decoded.role)) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",
@@ -104,14 +104,12 @@ export async function POST(
 
     userSanctions.push(sanction);
 
-    moderationLogs.push({
-      id: `log_${Date.now()}`,
-      action: "suspend",
-      targetType: "user",
-      targetId: userId,
-      performedBy: decoded.id,
+    await recordModerationAction({
+      moderatorId: decoded.id,
+      actionType: "SUSPEND_USER",
+      targetUserID: userId,
       reason: reason.value!,
-      createdAt: new Date().toISOString(),
+      duration: durationDays.value ?? null,
     });
 
     return NextResponse.json(

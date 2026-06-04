@@ -20,9 +20,18 @@ type AdminAnalytics = {
 	}>;
 };
 
+type AdminAnalyticsResponse = {
+	analytics: AdminAnalytics;
+	warning?: string;
+	error?: {
+		message?: string;
+	};
+};
+
 export default function AdminPage() {
 	const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [warning, setWarning] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
@@ -30,14 +39,20 @@ export default function AdminPage() {
 		const load = async () => {
 			try {
 				const res = await fetch("/api/admin/analytics");
-				const data = await res.json().catch(() => ({}));
+				const data = (await res.json().catch(() => ({}))) as Partial<AdminAnalyticsResponse>;
 				if (!res.ok) {
 					const message = data?.error?.message || "Failed to load analytics";
 					throw new Error(message);
 				}
-				if (active) setAnalytics(data.analytics || null);
+				if (active) {
+					setAnalytics(data.analytics || null);
+					setWarning(data.warning || null);
+				}
 			} catch (err) {
-				if (active) setError(err instanceof Error ? err.message : "Failed to load analytics");
+				if (active) {
+					setError(err instanceof Error ? err.message : "Failed to load analytics");
+					setWarning(null);
+				}
 			} finally {
 				if (active) setLoading(false);
 			}
@@ -88,6 +103,7 @@ export default function AdminPage() {
 
 			<div className="rounded-xl border border-gray-200 bg-white p-6">
 				<h2 className="text-sm font-semibold text-gray-800">Breakdown</h2>
+				{warning && <p className="mt-2 text-sm text-amber-700">{warning}</p>}
 				{error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 				{!error && !loading && analytics && (
 					<div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -4,6 +4,46 @@ import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 
 
+type AdminAnalytics = {
+  users: { total: number; byRole: Record<string, number>; byStatus: Record<string, number> };
+  posts: { total: number; totalReplies: number };
+  reports: { total: number; byStatus: Record<string, number> };
+  moderation: { totalActions: number; byAction: Record<string, number> };
+  aiModeration: Array<{
+    id: string;
+    title: string;
+    status: string;
+    aiScore?: number | null;
+    aiLabel?: string | null;
+    aiReason?: string | null;
+    author: string;
+    createdAt: string;
+  }>;
+};
+
+function buildEmptyAnalytics(): AdminAnalytics {
+  return {
+    users: {
+      total: 0,
+      byRole: {},
+      byStatus: { active: 0 },
+    },
+    posts: {
+      total: 0,
+      totalReplies: 0,
+    },
+    reports: {
+      total: 0,
+      byStatus: {},
+    },
+    moderation: {
+      totalActions: 0,
+      byAction: {},
+    },
+    aiModeration: [],
+  };
+}
+
 
 
 /**
@@ -136,7 +176,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ analytics }, { status: 200 });
   } catch (error) {
     console.error("Admin analytics error:", error);
-    return apiError(500, "Internal server error", "INTERNAL_ERROR");
+
+    return NextResponse.json(
+      {
+        analytics: buildEmptyAnalytics(),
+        warning: "Database unavailable; showing empty analytics.",
+      },
+      { status: 200 }
+    );
+
   }
 }
 

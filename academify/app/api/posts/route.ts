@@ -7,6 +7,7 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
 import { ollamaGenerate } from "@/lib/ollama";
 import { buildModerationPrompt } from "@/lib/ai/prompts";
 import { ModerationResultSchema } from "@/lib/ai/schemas";
+import { isRestrictedAccount } from "@/lib/moderation";
 
 const slugify = (value: string) =>
   value
@@ -223,6 +224,10 @@ export async function POST(request: NextRequest) {
     const sessionUser = await getSessionUser(request.headers);
     if (!sessionUser) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
+    }
+
+    if (isRestrictedAccount(sessionUser.user)) {
+      return apiError(403, "Your account is restricted from creating posts", "FORBIDDEN");
     }
 
     const contentType = request.headers.get("content-type") || "";
