@@ -166,14 +166,24 @@ export async function POST(
 
     const safeContent = sanitizeText(content.value!);
 
-    const created = await prisma.message.create({
-      data: {
-        senderID: sessionUser.user.userId,
-        receiverID: receiverId,
-        content: safeContent,
-        read: false,
-      },
-    });
+    const [created] = await prisma.$transaction([
+      prisma.message.create({
+        data: {
+          senderID: sessionUser.user.userId,
+          receiverID: receiverId,
+          content: safeContent,
+          read: false,
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          userID: receiverId,
+          type: "new_message",
+          content: `You have a new message from ${sessionUser.user.name}`,
+          link: `/messages/${sessionUser.user.userId}`,
+        },
+      }),
+    ]);
 
     return NextResponse.json(
       {

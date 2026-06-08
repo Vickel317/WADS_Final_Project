@@ -159,6 +159,8 @@ export async function POST(
     const memberIds = await getSpaceMemberIds(spaceId);
     const recipientIds = memberIds.filter((id) => id !== currentUserId);
 
+    const space = await prisma.collabSpace.findUnique({ where: { spaceID: spaceId } });
+
     let selfMessage;
     try {
       const selfPayload: SpaceMessageCreate = {
@@ -182,6 +184,17 @@ export async function POST(
 
         await prisma.message.createMany({ data: batch });
       }
+
+      if (recipientIds.length > 0) {
+        await prisma.notification.createMany({
+          data: recipientIds.map((userID) => ({
+            userID,
+            type: "new_space_message",
+            content: `You have a new message in ${space?.name}`,
+            link: `/messages/space/${spaceId}`,
+          })),
+        });
+      }
     } catch (err) {
       // Prisma client may not yet have the updated `spaceID` field (no migration/generate run).
       // Fall back to creating messages without the `spaceID` scalar so the send flow still works.
@@ -203,6 +216,16 @@ export async function POST(
               receiverID,
               content: safeContent,
               read: false,
+            })),
+          });
+        }
+        if (recipientIds.length > 0) {
+          await prisma.notification.createMany({
+            data: recipientIds.map((userID) => ({
+              userID,
+              type: "new_space_message",
+              content: `You have a new message in ${space?.name}`,
+              link: `/messages/space/${spaceId}`,
             })),
           });
         }

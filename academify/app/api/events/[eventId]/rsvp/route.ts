@@ -38,12 +38,30 @@ export async function POST(
       return apiError(400, "You are already attending this event", "BAD_REQUEST");
     }
 
-    await prisma.eventAttendee.create({
-      data: {
-        eventID: eventId,
-        userID: decoded.id,
-      },
-    });
+    await prisma.$transaction([
+      prisma.eventAttendee.create({
+        data: {
+          eventID: eventId,
+          userID: decoded.id,
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          userID: decoded.id,
+          type: "event_rsvp",
+          content: `You have successfully RSVP'd to "${event.title}"`,
+          link: `/events/${eventId}`,
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          userID: event.creatorID,
+          type: "event_rsvp",
+          content: `${decoded.name} has RSVP'd to your event "${event.title}"`,
+          link: `/events/${eventId}`,
+        },
+      }),
+    ]);
 
     const attendeeIds = [...event.attendees.map((attendee) => attendee.userID), decoded.id];
 
