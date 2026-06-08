@@ -9,6 +9,7 @@ type ForumCategory = {
   id: string;
   name: string;
   description: string;
+  imageUrl?: string | null;
   slug: string;
 };
 
@@ -168,7 +169,12 @@ export default function CategoryForumsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-        <div>
+        <div className="flex-1 min-w-0">
+          {forum?.imageUrl ? (
+            <div className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+              <img src={forum.imageUrl} alt={forum.name} className="h-56 w-full object-cover" />
+            </div>
+          ) : null}
           <h1 className="text-2xl font-bold text-gray-900">{forum?.name ?? category}</h1>
           <p className="text-sm text-gray-500 mt-1 max-w-xl">
             {forum?.description || "Threads, calendar events, and team workspaces for this community."}

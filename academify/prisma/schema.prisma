@@ -134,8 +134,23 @@ model User {
   following          Follow[]              @relation("Following")
   moderatedForums    ForumModerator[]      @relation("ForumModerators")
   collabSpaces       SpaceMember[]         @relation("SpaceMembers")
+  notifications      Notification[]        @relation("UserNotifications")
 
   @@map("User")
+}
+
+model Notification {
+  notificationID String   @id @default(cuid())
+  userID         String
+  user           User     @relation("UserNotifications", fields: [userID], references: [userId], onDelete: Cascade)
+  type           String
+  content        String
+  link           String?
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([userID])
+  @@map("Notification")
 }
 
 model Follow {
@@ -155,6 +170,7 @@ model ForumHub {
   forumID     String   @id @default(cuid())
   name        String   @unique
   description String?  @db.Text
+  imageUrl    String?
   createdAt   DateTime @default(now())
 
   // Relations
@@ -242,6 +258,11 @@ model Comment {
   content   String   @db.Text
   createdAt DateTime @default(now())
 
+  // For nested comments
+  parentId  String?
+  parent    Comment?  @relation("Replies", fields: [parentId], references: [commentID], onDelete: Cascade, onUpdate: NoAction)
+  replies   Comment[] @relation("Replies")
+
   // Relations
   post              Post                  @relation("PostComments", fields: [postID], references: [postID], onDelete: Cascade)
   author            User                  @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
@@ -250,6 +271,7 @@ model Comment {
 
   @@index([postID])
   @@index([authorID])
+  @@index([parentId])
   @@map("Comment")
 }
 
