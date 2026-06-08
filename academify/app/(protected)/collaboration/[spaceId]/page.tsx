@@ -16,8 +16,8 @@ type SpaceFileRow = {
   uploadedBy?: { name: string };
 };
 
-export default async function SpacePage({ params }: { params: { spaceId: string } }) {
-  const { spaceId } = params;
+export default async function SpacePage({ params }: { params: Promise<{ spaceId: string }> }) {
+  const { spaceId } = await params;
 
   const space = await prisma.collabSpace.findUnique({
     where: { spaceID: spaceId },

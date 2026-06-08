@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
-import { disconnectSocket } from "@/lib/socket-client";
+import { disconnectSocket, getSocket } from "@/lib/socket-client";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/current-user-context";
 
@@ -84,20 +84,19 @@ export default function Topbar() {
     };
   }, [currentUser?.name, currentUser?.avatarUrl]);
 
+  // Fetch initial notifications
   useEffect(() => {
     fetch("/api/notifications")
       .then((res) => {
         if (!res.ok) {
-          // Log the error response for debugging
           res.text().then(text => console.error("Error fetching notifications:", res.status, text));
           return Promise.reject(new Error(`HTTP error! status: ${res.status}`));
         }
-        // Check if the response has content before parsing
         const contentType = res.headers.get("content-type");
         if (contentType && contentType.indexOf("application/json") !== -1) {
           return res.json();
         } else {
-          return null; // No JSON content
+          return null;
         }
       })
       .then((data) => {
@@ -107,6 +106,68 @@ export default function Topbar() {
       })
       .catch(error => console.error("Failed to fetch or parse notifications:", error));
   }, []);
+
+  // Poll for upcoming event reminders every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/events/reminders").catch(() => {});
+    }, 5 * 60 * 1000);
+
+    // Initial check
+    fetch("/api/events/reminders").catch(() => {});
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for real-time notifications via socket.io
+  useEffect(() => {
+    const socket = getSocket();
+
+    function onConnect() {
+      if (currentUser?.userId) {
+        socket.emit("authenticate", currentUser.userId);
+      }
+    }
+
+    function onNewNotification(notification: Notification) {
+      setNotifications((prev) => {
+        if (prev.some((n) => n.notificationID === notification.notificationID)) return prev;
+        return [notification, ...prev];
+      });
+    }
+
+    socket.on("connect", onConnect);
+    socket.on("new_notification", onNewNotification);
+
+    if (!socket.connected) {
+      socket.connect();
+    } else if (currentUser?.userId) {
+      socket.emit("authenticate", currentUser.userId);
+    }
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("new_notification", onNewNotification);
+    };
+  }, [currentUser?.userId]);
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await fetch(`/api/notifications/${notificationId}`, { method: "PATCH" });
+      setNotifications((prev) => prev.filter((n) => n.notificationID !== notificationId));
+    } catch {
+      // ignore
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await fetch("/api/notifications", { method: "POST" });
+      setNotifications([]);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center justify-center pl-14 pr-3 sm:pl-16 sm:pr-4 md:pl-4 md:pr-6 gap-2 sm:gap-4 z-30 transition-all duration-300"
@@ -182,22 +243,36 @@ export default function Topbar() {
           </button>
           {notificationsOpen && (
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50">
-              <div className="p-3 border-b border-gray-100">
+              <div className="p-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
+                {notifications.length > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                  >
+                    Mark all read
+                  </button>
+                )}
               </div>
               <ul className="py-1 max-h-96 overflow-y-auto">
                 {notifications.length > 0 ? (
                   notifications.map((notification) => (
                     <li key={notification.notificationID}>
-                      <Link
-                        href={notification.link || "#"}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      <button
+                        onClick={() => {
+                          markAsRead(notification.notificationID);
+                          if (notification.link) {
+                            router.push(notification.link);
+                          }
+                          setNotificationsOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       >
                         <p className="font-medium">{notification.content}</p>
                         <p className="text-xs text-gray-500">
                           {new Date(notification.createdAt).toLocaleString()}
                         </p>
-                      </Link>
+                      </button>
                     </li>
                   ))
                 ) : (

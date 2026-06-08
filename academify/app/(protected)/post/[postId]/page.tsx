@@ -7,7 +7,7 @@ import CommentForm from "./comment-form";
 import LikeButton from "./like-button";
 import { AiSummary } from "@/components/ai-summary";
 import PostActions from "./post-actions";
-import CommentActions from "./comment-actions";
+import CommentItem from "./comment-item";
 import { slugify } from "@/lib/slugify";
 
 export default async function PostDetailPage({
@@ -43,7 +43,7 @@ export default async function PostDetailPage({
     notFound();
   }
 
-	const [author, forum, file, comments] = await Promise.all([
+	const [author, forum, file, topLevelComments, allComments] = await Promise.all([
 		prisma.user.findUnique({
 			where: { userId: post.authorID },
 			select: { name: true },
@@ -56,10 +56,17 @@ export default async function PostDetailPage({
 			where: { postID: post.postID },
 		}),
 		prisma.comment.findMany({
-			where: { postID: post.postID },
-			include: { author: { select: { name: true } } },
+			where: { postID: post.postID, parentId: null },
+			include: {
+				author: { select: { name: true } },
+				replies: {
+					include: { author: { select: { name: true } } },
+					orderBy: { createdAt: "asc" },
+				},
+			},
 			orderBy: { createdAt: "asc" },
 		}),
+		prisma.comment.count({ where: { postID: post.postID } }),
 	]);
   const canManagePost =
     post.authorID === session.user.userId || role === "admin" || role === "moderator";
@@ -142,37 +149,40 @@ export default async function PostDetailPage({
 
 			<div className="rounded-2xl border border-gray-100 bg-white p-6">
 				<h2 className="text-sm font-semibold text-gray-700">
-					Comments ({comments.length})
+					Comments ({allComments})
 				</h2>
 				<div className="mt-4">
 					<CommentForm postId={post.postID} />
 				</div>
 				<div className="mt-4 space-y-4">
-					{comments.length === 0 ? (
+					{topLevelComments.length === 0 ? (
 						<p className="text-sm text-gray-400">No comments yet.</p>
 					) : (
-						comments.map((comment) => (
-							<div key={comment.commentID} className="rounded-xl border border-gray-100 px-4 py-3">
-								<div className="flex items-center gap-2 text-xs text-gray-400">
-									<span className="font-medium text-gray-700">
-										{comment.author.name}
-									</span>
-									<span>•</span>
-									<span>
-										{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-									</span>
-								</div>
-								<p className="mt-2 text-sm text-gray-700">{comment.content}</p>
-                <CommentActions
-                  commentId={comment.commentID}
-                  initialContent={comment.content}
-                  canManage={
-                    comment.authorID === session.user.userId ||
-                    role === "admin" ||
-                    role === "moderator"
-                  }
-                />
-							</div>
+						topLevelComments.map((comment) => (
+							<CommentItem
+								key={comment.commentID}
+								comment={{
+									id: comment.commentID,
+									postId: comment.postID,
+									content: comment.content,
+									authorId: comment.authorID,
+									authorName: comment.author.name,
+									parentId: comment.parentId,
+									createdAt: comment.createdAt.toISOString(),
+									replies: (comment.replies ?? []).map((r) => ({
+										id: r.commentID,
+										postId: r.postID,
+										content: r.content,
+										authorId: r.authorID,
+										authorName: r.author.name,
+										parentId: r.parentId,
+										createdAt: r.createdAt.toISOString(),
+										replies: [],
+									})),
+								}}
+								currentUserId={session.user.userId}
+								currentRole={role}
+							/>
 						))
 					)}
 				</div>
