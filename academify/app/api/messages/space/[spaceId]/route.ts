@@ -6,6 +6,7 @@ import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { isRestrictedAccount } from "@/lib/moderation";
 import { sanitizeText } from "@/lib/sanitization";
+import { emitNotificationToUser } from "@/lib/notify";
 
 /** Message rows scoped to a collab space (spaceID exists on schema; assert when client types lag). */
 type SpaceMessageWhere = Prisma.MessageWhereInput & { spaceID: string };
@@ -186,7 +187,7 @@ export async function POST(
       }
 
       if (recipientIds.length > 0) {
-        await prisma.notification.createMany({
+        const notifications = await prisma.notification.createManyAndReturn({
           data: recipientIds.map((userID) => ({
             userID,
             type: "new_space_message",
@@ -194,6 +195,15 @@ export async function POST(
             link: `/messages/space/${spaceId}`,
           })),
         });
+
+        for (const n of notifications) {
+          emitNotificationToUser(n.userID, {
+            notificationID: n.notificationID,
+            content: n.content,
+            link: n.link,
+            createdAt: n.createdAt.toISOString(),
+          });
+        }
       }
     } catch (err) {
       // Prisma client may not yet have the updated `spaceID` field (no migration/generate run).
@@ -220,7 +230,7 @@ export async function POST(
           });
         }
         if (recipientIds.length > 0) {
-          await prisma.notification.createMany({
+          const fallbackNotifications = await prisma.notification.createManyAndReturn({
             data: recipientIds.map((userID) => ({
               userID,
               type: "new_space_message",
@@ -228,6 +238,14 @@ export async function POST(
               link: `/messages/space/${spaceId}`,
             })),
           });
+          for (const n of fallbackNotifications) {
+            emitNotificationToUser(n.userID, {
+              notificationID: n.notificationID,
+              content: n.content,
+              link: n.link,
+              createdAt: n.createdAt.toISOString(),
+            });
+          }
         }
       } else {
         throw err;
