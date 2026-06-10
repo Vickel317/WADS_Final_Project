@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { slugify } from "@/lib/slugify";
+import { generateObjectKey, getPresignedGetUrl, isMinioEnabled, putObjectBytes } from "@/lib/storage";
 
 /**
  * @swagger
@@ -57,15 +58,31 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
 
-    return NextResponse.json(
-      {
-        categories: categories.map((category) => ({
+    const mapped = await Promise.all(
+      categories.map(async (category) => {
+        let imageUrl = category.imageUrl ?? null;
+        if (imageUrl && !imageUrl.startsWith("http") && !imageUrl.startsWith("data:") && !imageUrl.startsWith("/")) {
+          try {
+            imageUrl = await getPresignedGetUrl(imageUrl);
+          } catch {
+            imageUrl = category.imageUrl ?? null;
+          }
+        }
+
+        return {
           id: category.forumID,
           name: category.name,
           description: category.description ?? "",
+          imageUrl,
           slug: slugify(category.name),
           createdAt: category.createdAt.toISOString(),
-        })),
+        };
+      })
+    );
+
+    return NextResponse.json(
+      {
+        categories: mapped,
       },
       { status: 200 }
     );
@@ -83,22 +100,29 @@ export async function POST(request: NextRequest) {
     }
 
     if (normalizeRole(sessionUser.user.role) !== "admin") {
-      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
+      // Allow any authenticated user to create a forum
     }
 
-    const body = await parseJson<{
-      name?: unknown;
-      description?: unknown;
-      slug?: unknown;
-    }>(request);
+    const contentType = request.headers.get("content-type") || "";
+    const formData = contentType.includes("multipart/form-data") ? await request.formData().catch(() => null) : null;
+    const jsonBody = formData ? null : await parseJson<{ name?: unknown; description?: unknown; slug?: unknown }>(request);
+    const body = formData
+      ? {
+          name: formData.get("name"),
+          description: formData.get("description"),
+          slug: formData.get("slug"),
+          imageFile: formData.get("imageFile"),
+        }
+      : jsonBody;
+
     if (!body) {
-      return apiError(400, "Invalid JSON", "BAD_REQUEST");
+      return apiError(400, "Invalid request", "BAD_REQUEST");
     }
 
     const errors = [] as Array<{ field?: string; message: string }>;
     const name = parseRequiredString(body.name);
     const description = parseRequiredString(body.description);
-    const slug = parseRequiredString(body.slug);
+    const slug = body.slug ? parseRequiredString(body.slug) : { value: slugify(String(name.value ?? "")), error: null as string | null };
 
     if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
     if (description.error) {
@@ -121,10 +145,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let imageUrl: string | null = null;
+    const rawFile = formData ? body.imageFile : null;
+    if (rawFile instanceof File && rawFile.size > 0) {
+      if (!rawFile.type.startsWith("image/")) {
+        return apiError(400, "Forum image must be an image file", "BAD_REQUEST");
+      }
+
+      const key = generateObjectKey(rawFile.name);
+      const buffer = Buffer.from(await rawFile.arrayBuffer());
+
+      try {
+        if (isMinioEnabled()) {
+          await putObjectBytes(key, buffer, rawFile.type || "application/octet-stream");
+          imageUrl = key;
+        } else {
+          imageUrl = `data:${rawFile.type || "application/octet-stream"};base64,${buffer.toString("base64")}`;
+        }
+      } catch (storageError) {
+        console.warn("Forum image upload failed, falling back to inline image storage:", storageError);
+        imageUrl = `data:${rawFile.type || "application/octet-stream"};base64,${buffer.toString("base64")}`;
+      }
+    }
+
     const created = await prisma.forumHub.create({
       data: {
         name: name.value!,
         description: description.value!,
+        imageUrl,
       },
     });
 
@@ -132,6 +180,7 @@ export async function POST(request: NextRequest) {
       id: created.forumID,
       name: name.value!,
       description: description.value!,
+      imageUrl,
       slug: slug.value!,
       createdAt: created.createdAt.toISOString(),
     };

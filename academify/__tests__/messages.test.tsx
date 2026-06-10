@@ -2,19 +2,19 @@ import { render, screen } from "@testing-library/react";
 import MessagesPage from "@/app/(protected)/messages/page";
 
 describe("MessagesPage – rendering", () => {
-  it("renders the Messages heading", () => {
+  it("renders the Messages heading", async () => {
     render(<MessagesPage />);
-    expect(screen.getByText("Messages")).toBeInTheDocument();
+    await screen.findByText("Messages");
   });
 
-  it("renders the search input", () => {
+  it("renders the search input", async () => {
     render(<MessagesPage />);
-    expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
+    await screen.findByPlaceholderText(/search/i);
   });
 
-  it("renders the empty-state panel", () => {
+  it("renders the empty-state panel", async () => {
     render(<MessagesPage />);
-    expect(screen.getByText(/your messages/i)).toBeInTheDocument();
-    expect(screen.getByText(/select a conversation/i)).toBeInTheDocument();
+    await screen.findByText(/your messages/i);
+    await screen.findByText(/select a conversation/i);
   });
 });

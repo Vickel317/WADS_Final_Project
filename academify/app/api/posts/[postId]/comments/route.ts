@@ -66,22 +66,41 @@ export async function GET(
   try {
     const { postId  } = await params;
     const postComments = await prisma.comment.findMany({
-      where: { postID: postId },
-      include: { author: { select: { name: true } } },
+      where: { postID: postId, parentId: null },
+      include: {
+        author: { select: { name: true } },
+        replies: {
+          include: { author: { select: { name: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
 
+    type CommentRow = {
+      commentID: string;
+      postID: string;
+      content: string;
+      authorID: string;
+      author: { name: string };
+      parentId: string | null;
+      createdAt: Date;
+      replies?: CommentRow[];
+    };
+
+    const serialize = (c: CommentRow): Record<string, unknown> => ({
+      id: c.commentID,
+      postId: c.postID,
+      content: c.content,
+      authorId: c.authorID,
+      authorName: c.author.name,
+      parentId: c.parentId,
+      createdAt: c.createdAt.toISOString(),
+      replies: (c.replies ?? []).map(serialize),
+    });
+
     return NextResponse.json(
-      {
-        comments: postComments.map((c) => ({
-          id: c.commentID,
-          postId: c.postID,
-          content: c.content,
-          authorId: c.authorID,
-          authorName: c.author.name,
-          createdAt: c.createdAt.toISOString(),
-        })),
-      },
+      { comments: postComments.map(serialize) },
       { status: 200 }
     );
   } catch (error) {
@@ -101,7 +120,7 @@ export async function POST(
     }
 
     const { postId  } = await params;
-    const body = await parseJson<{ content?: unknown }>(request);
+    const body = await parseJson<{ content?: unknown; parentId?: unknown }>(request);
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
@@ -125,11 +144,25 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
+    let parentId: string | null = null;
+    if (body.parentId && typeof body.parentId === "string") {
+      const parentComment = await prisma.comment.findUnique({
+        where: { commentID: body.parentId },
+      });
+      if (!parentComment || parentComment.postID !== postId) {
+        return apiError(400, "Invalid parent comment", "BAD_REQUEST", [
+          { field: "parentId", message: "Parent comment not found in this post" },
+        ]);
+      }
+      parentId = parentComment.commentID;
+    }
+
     const newComment = await prisma.comment.create({
       data: {
         postID: postId,
         content: content.value!,
         authorID: author.userId,
+        parentId,
       },
       include: { author: { select: { name: true } } },
     });

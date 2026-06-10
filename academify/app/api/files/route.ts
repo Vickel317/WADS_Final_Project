@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth-session";
 import { getPresignedGetUrl } from "@/lib/storage";
 import { getAccessibleFileWhere } from "@/lib/file-access";
 import { validateFileUpload } from "@/lib/validation";
+import { isRestrictedAccount } from "@/lib/moderation";
 
 type FileWithRelations = Prisma.FileGetPayload<{
   include: { uploadedBy: true; space: true };
@@ -148,6 +149,9 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get("content-type") || "";
     const sessionUser = await getSessionUser(request.headers);
     if (!sessionUser) return apiError(401, "Unauthorized", "UNAUTHORIZED");
+    if (isRestrictedAccount(sessionUser.user)) {
+      return apiError(403, "Your account is restricted from uploading files", "FORBIDDEN");
+    }
 
     if (!contentType.includes("application/json")) {
       return apiError(400, "MinIO upload metadata must be sent as JSON", "BAD_REQUEST");

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { ModerationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { moderationLogs } from "../../queue/route";
 import { apiError } from "@/lib/api-response";
+import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
 
 
 
@@ -45,7 +45,7 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "moderator" && decoded.role !== "admin") {
+    if (!hasModerationAccess(decoded.role)) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",
@@ -65,13 +65,11 @@ export async function POST(
       data: { moderationStatus: ModerationStatus.APPROVED },
     });
 
-    moderationLogs.push({
-      id: `log_${Date.now()}`,
-      action: "approve",
-      targetType: "post",
-      targetId: postId,
-      performedBy: decoded.id,
-      createdAt: new Date().toISOString(),
+    await recordModerationAction({
+      moderatorId: decoded.id,
+      actionType: "APPROVE_POST",
+      targetPostID: postId,
+      reason: "Post approved by moderator",
     });
 
     return NextResponse.json(

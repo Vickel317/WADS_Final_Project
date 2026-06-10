@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+import { isRestrictedAccount } from "@/lib/moderation";
+import { sanitizeText } from "@/lib/sanitization";
+import { emitNotificationToUser } from "@/lib/notify";
 
 /**
  * @swagger
@@ -158,13 +161,36 @@ export async function POST(
       return apiError(404, "Recipient not found", "NOT_FOUND");
     }
 
-    const created = await prisma.message.create({
-      data: {
-        senderID: sessionUser.user.userId,
-        receiverID: receiverId,
-        content: content.value!,
-        read: false,
-      },
+    if (isRestrictedAccount(sessionUser.user)) {
+      return apiError(403, "Your account is restricted from sending messages", "FORBIDDEN");
+    }
+
+    const safeContent = sanitizeText(content.value!);
+
+    const [created, notification] = await prisma.$transaction([
+      prisma.message.create({
+        data: {
+          senderID: sessionUser.user.userId,
+          receiverID: receiverId,
+          content: safeContent,
+          read: false,
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          userID: receiverId,
+          type: "new_message",
+          content: `You have a new message from ${sessionUser.user.name}`,
+          link: `/messages/${sessionUser.user.userId}`,
+        },
+      }),
+    ]);
+
+    emitNotificationToUser(receiverId, {
+      notificationID: notification.notificationID,
+      content: notification.content,
+      link: notification.link,
+      createdAt: notification.createdAt.toISOString(),
     });
 
     return NextResponse.json(

@@ -8,6 +8,7 @@ type ForumCategory = {
   id: string;
   name: string;
   description: string;
+  imageUrl?: string | null;
   slug: string;
   createdAt: string;
 };
@@ -68,7 +69,10 @@ export default function ForumsPage() {
       ) : categories.length === 0 ? (
         <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center">
           <p className="text-gray-600 font-medium">No forums yet</p>
-          <p className="text-sm text-gray-400 mt-2">An admin can create the first forum from the Admin panel.</p>
+          <p className="text-sm text-gray-400 mt-2">Create the first forum to get started.</p>
+          <Link href="/forums/new" className="mt-4 inline-block px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700">
+            Create Forum
+          </Link>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -78,6 +82,15 @@ export default function ForumsPage() {
               href={`/forums/${forum.slug}`}
               className="group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:border-teal-200 hover:shadow-md"
             >
+              {forum.imageUrl ? (
+                <div className="mb-4 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                  <img src={forum.imageUrl} alt={forum.name} className="h-40 w-full object-cover" />
+                </div>
+              ) : (
+                <div className="mb-4 flex h-40 items-center justify-center rounded-xl border border-gray-100 bg-gradient-to-br from-teal-50 to-cyan-50 text-4xl font-bold text-teal-700">
+                  {forum.name.slice(0, 1).toUpperCase()}
+                </div>
+              )}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-lg font-semibold text-gray-900 group-hover:text-teal-700 transition">
