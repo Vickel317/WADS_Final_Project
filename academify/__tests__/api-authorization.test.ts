@@ -15,6 +15,7 @@ jest.mock("@/lib/prisma", () => ({
   prisma: {
     post: {
       count: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -22,9 +23,19 @@ jest.mock("@/lib/prisma", () => ({
     comment: {
       count: jest.fn(),
     },
+    user: {
+      findMany: jest.fn(),
+    },
     file: {
       findUnique: jest.fn(),
       delete: jest.fn(),
+    },
+    reportReview: {
+      findMany: jest.fn(),
+    },
+    moderationActionLog: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     moderationLog: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -51,6 +62,29 @@ describe("Authorization checks", () => {
     const response = await adminAnalyticsGet(request);
 
     expect(response.status).toBe(403);
+  });
+
+  it("falls back to empty analytics when the database is unavailable", async () => {
+    (verifyToken as jest.Mock).mockResolvedValue({
+      id: "user_admin",
+      email: "admin@example.com",
+      role: "admin",
+    });
+    (prisma.post.count as jest.Mock).mockRejectedValue({ code: "ECONNREFUSED" });
+    (prisma.comment.count as jest.Mock).mockResolvedValue(0);
+    (prisma.user.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.reportReview.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.moderationActionLog.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.post.findMany as jest.Mock).mockResolvedValue([]);
+
+    const request = new NextRequest("http://localhost/api/admin/analytics");
+    const response = await adminAnalyticsGet(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.warning).toBe("Database unavailable; showing empty analytics.");
+    expect(body.analytics.users.total).toBe(0);
+    expect(body.analytics.posts.total).toBe(0);
   });
 
   it("allows moderators on moderation endpoints", async () => {

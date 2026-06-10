@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
-import { disconnectSocket } from "@/lib/socket-client";
+import { disconnectSocket, getSocket } from "@/lib/socket-client";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/current-user-context";
 
@@ -13,6 +13,13 @@ type SearchUser = {
   isConnected?: boolean;
 };
 
+type Notification = {
+  notificationID: string;
+  content: string;
+  link: string | null;
+  createdAt: string;
+};
+
 export default function Topbar() {
   const router = useRouter();
   const currentUser = useCurrentUser();
@@ -21,6 +28,8 @@ export default function Topbar() {
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [userName, setUserName] = useState(currentUser?.name ?? "Signed in user");
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(currentUser?.avatarUrl ?? null);
 
@@ -74,6 +83,91 @@ export default function Topbar() {
       active = false;
     };
   }, [currentUser?.name, currentUser?.avatarUrl]);
+
+  // Fetch initial notifications
+  useEffect(() => {
+    fetch("/api/notifications")
+      .then((res) => {
+        if (!res.ok) {
+          res.text().then(text => console.error("Error fetching notifications:", res.status, text));
+          return Promise.reject(new Error(`HTTP error! status: ${res.status}`));
+        }
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          return res.json();
+        } else {
+          return null;
+        }
+      })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setNotifications(data);
+        }
+      })
+      .catch(error => console.error("Failed to fetch or parse notifications:", error));
+  }, []);
+
+  // Poll for upcoming event reminders every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/events/reminders").catch(() => {});
+    }, 5 * 60 * 1000);
+
+    // Initial check
+    fetch("/api/events/reminders").catch(() => {});
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for real-time notifications via socket.io
+  useEffect(() => {
+    const socket = getSocket();
+
+    function onConnect() {
+      if (currentUser?.userId) {
+        socket.emit("authenticate", currentUser.userId);
+      }
+    }
+
+    function onNewNotification(notification: Notification) {
+      setNotifications((prev) => {
+        if (prev.some((n) => n.notificationID === notification.notificationID)) return prev;
+        return [notification, ...prev];
+      });
+    }
+
+    socket.on("connect", onConnect);
+    socket.on("new_notification", onNewNotification);
+
+    if (!socket.connected) {
+      socket.connect();
+    } else if (currentUser?.userId) {
+      socket.emit("authenticate", currentUser.userId);
+    }
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("new_notification", onNewNotification);
+    };
+  }, [currentUser?.userId]);
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      await fetch(`/api/notifications/${notificationId}`, { method: "PATCH" });
+      setNotifications((prev) => prev.filter((n) => n.notificationID !== notificationId));
+    } catch {
+      // ignore
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await fetch("/api/notifications", { method: "POST" });
+      setNotifications([]);
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center justify-center pl-14 pr-3 sm:pl-16 sm:pr-4 md:pl-4 md:pr-6 gap-2 sm:gap-4 z-30 transition-all duration-300"
@@ -133,12 +227,63 @@ export default function Topbar() {
 
       <div className="absolute right-3 sm:right-4 md:right-6 flex items-center gap-1.5 sm:gap-2">
         {/* Notifications */}
-        <button className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl hover:bg-gray-50 flex items-center justify-center transition">
-          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-          </svg>
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"/>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setNotificationsOpen((v) => !v)}
+            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl hover:bg-gray-50 flex items-center justify-center transition"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            {notifications.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full border-2 border-white text-white text-xs flex items-center justify-center">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+          {notificationsOpen && (
+            <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-50">
+              <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-800">Notifications</h3>
+                {notifications.length > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <ul className="py-1 max-h-96 overflow-y-auto">
+                {notifications.length > 0 ? (
+                  notifications.map((notification) => (
+                    <li key={notification.notificationID}>
+                      <button
+                        onClick={() => {
+                          markAsRead(notification.notificationID);
+                          if (notification.link) {
+                            router.push(notification.link);
+                          }
+                          setNotificationsOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <p className="font-medium">{notification.content}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(notification.createdAt).toLocaleString()}
+                        </p>
+                      </button>
+                    </li>
+                  ))
+                ) : (
+                  <li className="px-4 py-3 text-sm text-gray-500 text-center">
+                    No new notifications
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
         <div className="relative">
           <button onClick={() => setProfileOpen((v) => !v)} className="flex items-center gap-2 rounded-xl px-1.5 sm:px-2 py-1.5 hover:bg-gray-50 transition">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center shrink-0">

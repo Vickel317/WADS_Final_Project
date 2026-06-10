@@ -3,25 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { ModerationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-
-
-// Shared moderation log (imported by other moderation routes)
-export const moderationLogs: Array<{
-  id: string;
-  action:
-    | "approve"
-    | "delete"
-    | "warn"
-    | "suspend"
-    | "ban"
-    | "report_resolved"
-    | "report_dismissed";
-  targetType: "post" | "user";
-  targetId: string;
-  performedBy: string;
-  reason?: string;
-  createdAt: string;
-}> = [];
+import { hasModerationAccess } from "@/lib/moderation";
 
 
 
@@ -51,7 +33,7 @@ export async function GET(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "moderator" && decoded.role !== "admin") {
+    if (!hasModerationAccess(decoded.role)) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",

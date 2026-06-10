@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
-import { moderationLogs } from "../queue/route";
+import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
+import { getRecentModerationLogs } from "@/lib/moderation-log-store";
+import { hasModerationAccess } from "@/lib/moderation";
 
 
 
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "moderator" && decoded.role !== "admin") {
+    if (!hasModerationAccess(decoded.role)) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",
@@ -49,9 +51,35 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
 
-    const logs = moderationLogs.slice(-limit).reverse();
+    const dbLogs = await prisma.moderationActionLog.findMany({
+      orderBy: { timestamp: "desc" },
+      take: limit,
+    });
 
-    return NextResponse.json({ logs, total: moderationLogs.length }, { status: 200 });
+    const logs = dbLogs.length
+      ? dbLogs.map((log) => ({
+          id: log.ModaiID,
+          action:
+            log.actionType === "APPROVE_POST"
+              ? "approve"
+              : log.actionType === "DELETE_POST" || log.actionType === "DELETE_COMMENT"
+              ? "delete"
+              : log.actionType === "WARN_USER"
+              ? "warn"
+              : log.actionType === "SUSPEND_USER"
+              ? "suspend"
+              : log.actionType === "BAN_USER"
+              ? "ban"
+              : "report_resolved",
+          targetType: log.targetUserID ? "user" : "post",
+          targetId: log.targetUserID ?? log.targetPostID ?? log.targetCommentID ?? log.relatedReportID ?? "unknown",
+          performedBy: log.modID,
+          reason: log.reason,
+          createdAt: log.timestamp.toISOString(),
+        }))
+      : getRecentModerationLogs(limit);
+
+    return NextResponse.json({ logs, total: logs.length }, { status: 200 });
   } catch (error) {
     console.error("Get moderation logs error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");

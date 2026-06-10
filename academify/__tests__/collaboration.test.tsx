@@ -2,14 +2,15 @@ import { render, screen } from "@testing-library/react";
 import CollaborationPage from "@/app/(protected)/collaboration/page";
 
 describe("CollaborationPage", () => {
-  it("renders the collaboration hero and spaces", () => {
+  it("renders the collaboration hero and spaces", async () => {
     render(<CollaborationPage />);
 
     // "Collaboration Space" appears in both the hero badge and the empty-state text,
-    // so use getAllByText and assert at least one is present
-    expect(screen.getAllByText(/collaboration space/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/team workspaces inside forums/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /active spaces/i })).toBeInTheDocument();
-    expect(screen.getByText(/live activity/i)).toBeInTheDocument();
+    // so use findAllByText and assert at least one is present
+    const collabHits = await screen.findAllByText(/collaboration space/i);
+    expect(collabHits.length).toBeGreaterThan(0);
+    await screen.findByText(/team workspaces inside forums/i);
+    await screen.findByRole("heading", { name: /active spaces/i });
+    await screen.findByText(/live activity/i);
   });
 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
+import { emitNotificationToUser } from "@/lib/notify";
 
 const DEFAULT_DURATION_MINUTES = 60;
 const DEFAULT_CATEGORY = "General";
@@ -38,12 +39,49 @@ export async function POST(
       return apiError(400, "You are already attending this event", "BAD_REQUEST");
     }
 
-    await prisma.eventAttendee.create({
-      data: {
-        eventID: eventId,
-        userID: decoded.id,
-      },
+    const [, selfNotif] = await prisma.$transaction([
+      prisma.eventAttendee.create({
+        data: {
+          eventID: eventId,
+          userID: decoded.id,
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          userID: decoded.id,
+          type: "event_rsvp",
+          content: `You have successfully RSVP'd to "${event.title}"`,
+          link: `/events/${eventId}`,
+        },
+      }),
+    ]);
+
+    let creatorNotification = null;
+    if (event.creatorID !== decoded.id) {
+      creatorNotification = await prisma.notification.create({
+        data: {
+          userID: event.creatorID,
+          type: "event_rsvp",
+          content: `${decoded.name} has RSVP'd to your event "${event.title}"`,
+          link: `/events/${eventId}`,
+        },
+      });
+    }
+
+    emitNotificationToUser(decoded.id, {
+      notificationID: selfNotif.notificationID,
+      content: selfNotif.content,
+      link: selfNotif.link,
+      createdAt: selfNotif.createdAt.toISOString(),
     });
+    if (creatorNotification) {
+      emitNotificationToUser(event.creatorID, {
+        notificationID: creatorNotification.notificationID,
+        content: creatorNotification.content,
+        link: creatorNotification.link,
+        createdAt: creatorNotification.createdAt.toISOString(),
+      });
+    }
 
     const attendeeIds = [...event.attendees.map((attendee) => attendee.userID), decoded.id];
 
