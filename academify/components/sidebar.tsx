@@ -93,6 +93,7 @@ export default function Sidebar() {
   const [forumName, setForumName] = useState("");
   const [forumDescription, setForumDescription] = useState("");
   const [creatingForum, setCreatingForum] = useState(false);
+  const [forumNameError, setForumNameError] = useState<string | null>(null);
 
   const roleNav = useMemo(() => {
     const role = currentUser?.role ?? "";
@@ -263,7 +264,17 @@ export default function Sidebar() {
             <h3 className="text-lg font-semibold text-gray-900">Create forum</h3>
             <p className="text-sm text-gray-500 mt-1">Forums should be course/topic based and meaningful (e.g. Computer Science).</p>
             <label className="mt-4 block text-xs font-medium text-gray-600">Forum name</label>
-            <input value={forumName} onChange={(e) => setForumName(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              <input
+                value={forumName}
+                onChange={(e) => {
+                  setForumName(e.target.value);
+                  setForumNameError(null);
+                }}
+                placeholder="e.g. Computer Science"
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+              {forumNameError && <p className="mt-1 text-xs text-red-500">{forumNameError}</p>}
+              <p className="mt-1 text-xs text-gray-400">Letters, numbers, spaces, hyphens, apostrophes, and ampersands only.</p>
             <label className="mt-3 block text-xs font-medium text-gray-600">Description</label>
             <textarea value={forumDescription} onChange={(e) => setForumDescription(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
             <div className="mt-4 flex justify-end gap-2">
@@ -272,6 +283,10 @@ export default function Sidebar() {
                 disabled={creatingForum}
                 onClick={async () => {
                   if (!forumName.trim()) return;
+                  if (!/^[a-zA-Z0-9\s&'-]+$/.test(forumName.trim()) || forumName.trim().length < 2) {
+                    setForumNameError("Name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands.");
+                    return;
+                  }
                   setCreatingForum(true);
                   try {
                     const res = await fetch("/api/categories", {

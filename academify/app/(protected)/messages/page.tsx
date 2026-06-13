@@ -158,7 +158,7 @@ export default function MessagesPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-0.5">
             <span className="text-sm font-semibold text-gray-900 truncate">
-              {isGroup ? `Collab Space: ${conv.name}` : conv.name}
+              {isGroup ? `Collab Space: ${conv.name.replace(/^Space\s+/, "")}` : conv.name}
             </span>
             <span className="text-xs text-gray-400 shrink-0 ml-1">
               {formatDistanceToNow(new Date(conv.lastAt), { addSuffix: true })}
