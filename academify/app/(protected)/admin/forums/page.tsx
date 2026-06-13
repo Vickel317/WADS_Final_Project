@@ -17,6 +17,14 @@ type ForumForm = {
 
 const emptyForm: ForumForm = { name: "", description: "" };
 
+function isValidForumName(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) return "Name must be at least 2 characters.";
+  if (trimmed.length > 100) return "Name must be 100 characters or fewer.";
+  if (!/^[a-zA-Z0-9\s&'-]+$/.test(trimmed)) return "Name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands.";
+  return null;
+}
+
 export default function AdminForumsPage() {
   const [forums, setForums] = useState<ForumItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +62,11 @@ export default function AdminForumsPage() {
 
   const createForum = async () => {
     if (!canCreate) return;
+    const nameError = isValidForumName(createForm.name);
+    if (nameError) {
+      setError(nameError);
+      return;
+    }
     setCreating(true);
     try {
       const name = createForm.name.trim();
@@ -79,6 +92,11 @@ export default function AdminForumsPage() {
   const saveForum = async (forumId: string) => {
     const form = editing[forumId];
     if (!form || !form.name.trim()) return;
+    const nameError = isValidForumName(form.name);
+    if (nameError) {
+      setError(nameError);
+      return;
+    }
     setUpdatingId(forumId);
     try {
       const payload = {
@@ -142,6 +160,7 @@ export default function AdminForumsPage() {
             className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
           />
         </div>
+        <p className="text-xs text-gray-400">Name: letters, numbers, spaces, hyphens, apostrophes, and ampersands only (2-100 chars).</p>
         <button
           disabled={!canCreate || creating}
           onClick={createForum}

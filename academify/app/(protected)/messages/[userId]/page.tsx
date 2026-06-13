@@ -48,8 +48,13 @@ export default function ConversationPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [partnerProfile, setPartnerProfile] = useState<PartnerProfile | null>(null);
+  const [spaceName, setSpaceName] = useState<string | null>(null);
+  const [spaceNameLoading, setSpaceNameLoading] = useState(isSpaceChat);
+  const resolvedSpaceName = spaceName
+    ?? conversations.find((c) => c.userId === `space-${spaceId}`)?.name
+    ?? (spaceNameLoading ? null : `Space ${spaceId.slice(0, 8)}...`);
   const partnerName = isSpaceChat
-    ? `Space ${spaceId}`
+    ? resolvedSpaceName ?? "Loading..."
     : conversations.find((c) => c.userId === partnerId)?.name ?? String(partnerId ?? "");
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [input, setInput] = useState("");
@@ -102,6 +107,23 @@ export default function ConversationPage() {
       .then((data) => setConversations(data.conversations ?? []))
       .catch(() => {});
   }, []);
+
+  // Fetch space name for space chats
+  useEffect(() => {
+    if (!isSpaceChat || !spaceId) return;
+    let cancelled = false;
+    setSpaceNameLoading(true);
+    fetch("/api/collaboration")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const space = (data.spaces ?? []).find((s: { spaceID: string }) => s.spaceID === spaceId);
+        if (space?.name) setSpaceName(space.name);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setSpaceNameLoading(false); });
+    return () => { cancelled = true; };
+  }, [isSpaceChat, spaceId]);
 
   useEffect(() => {
     const handleSpacesUpdated = () => {
@@ -426,7 +448,7 @@ export default function ConversationPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-0.5">
             <span className={`text-sm font-semibold truncate ${isActive ? "text-teal-700" : "text-gray-900"}`}>
-              {isGroupConv ? `Collab Space: ${conv.name}` : conv.name}
+              {isGroupConv ? `Collab Space: ${conv.name.replace(/^Space\s+/, "")}` : conv.name}
             </span>
             <span className="text-xs text-gray-400 shrink-0 ml-1">
               {formatDistanceToNow(new Date(conv.lastAt), { addSuffix: true })}
