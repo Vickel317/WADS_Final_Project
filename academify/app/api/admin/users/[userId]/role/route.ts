@@ -64,7 +64,12 @@ export async function PUT(
       return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const { userId  } = await params;
+    const { userId } = await params;
+
+    if (userId === decoded.id) {
+      return apiError(400, "Cannot change your own role", "BAD_REQUEST");
+    }
+
     const body = await parseJson<{ role?: unknown }>(request);
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
