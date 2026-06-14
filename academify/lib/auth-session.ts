@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -23,9 +24,9 @@ async function createAppUser(sessionUser: { id: string; email: string; name?: st
       },
     });
   } catch {
-    const existing =
-      (await prisma.user.findUnique({ where: { userId: sessionUser.id } })) ||
-      (await prisma.user.findUnique({ where: { email: sessionUser.email } }));
+    const existing = await prisma.user.findFirst({
+      where: { OR: [{ userId: sessionUser.id }, { email: sessionUser.email }] },
+    });
 
     if (existing) {
       return existing;
@@ -37,20 +38,20 @@ async function createAppUser(sessionUser: { id: string; email: string; name?: st
 
 import { auth } from "@/lib/auth";
 
-export async function getSessionUser(headers: Headers) {
+export const getSessionUser = cache(async (headers: Headers) => {
   const session = await auth.api.getSession({ headers });
   if (!session?.user?.id || !session.user.email) {
     return null;
   }
 
-  const existingUser =
-    (await prisma.user.findUnique({ where: { userId: session.user.id } })) ||
-    (await prisma.user.findUnique({ where: { email: session.user.email } }));
+  const existingUser = await prisma.user.findFirst({
+    where: { OR: [{ userId: session.user.id }, { email: session.user.email }] },
+  });
 
   const user = existingUser || (await createAppUser(session.user));
 
   return { session, user };
-}
+});
 
 export function normalizeRole(role: string) {
   return role.toLowerCase();

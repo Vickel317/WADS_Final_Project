@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
@@ -10,9 +11,9 @@ function buildUsername(email: string, userId: string) {
 }
 
 async function ensureAppUser(userId: string, email: string, name?: string | null) {
-  const existing =
-    (await prisma.user.findUnique({ where: { userId } })) ||
-    (await prisma.user.findUnique({ where: { email } }));
+  const existing = await prisma.user.findFirst({
+    where: { OR: [{ userId }, { email }] },
+  });
 
   if (existing) {
     return existing;
@@ -31,7 +32,7 @@ async function ensureAppUser(userId: string, email: string, name?: string | null
   });
 }
 
-export async function getSession() {
+export const getSession = cache(async () => {
   const requestHeaders = await headers();
 
   const betterSession = await auth.api.getSession({ headers: requestHeaders });
@@ -46,4 +47,4 @@ export async function getSession() {
   }
 
   return null;
-}
+});
