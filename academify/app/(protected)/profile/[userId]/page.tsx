@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
+import { ReportProfileModal } from "@/components/report-profile-modal";
 
 interface Profile {
   id: string;
@@ -16,6 +17,7 @@ interface Profile {
   website: string;
   email: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   connections: number;
   posts: number;
   filesShared: number;
@@ -66,6 +68,7 @@ function mapApiUserToProfile(user: Record<string, unknown>, isOwn: boolean): Pro
     website: String(user.website ?? ""),
     email: typeof user.email === "string" ? user.email : null,
     avatarUrl: user.avatarUrl === null || user.avatarUrl === undefined ? null : String(user.avatarUrl),
+    bannerUrl: user.bannerUrl === null || user.bannerUrl === undefined ? null : String(user.bannerUrl),
     connections: Number(user.connections ?? 0),
     posts: Number(user.posts ?? 0),
     filesShared: Number(user.filesShared ?? 0),
@@ -100,6 +103,7 @@ export default function ProfilePage() {
   const [recentPosts, setRecentPosts] = useState<UserPost[]>([]);
   const [recentEvents, setRecentEvents] = useState<UserEvent[]>([]);
   const [activeTab, setActiveTab] = useState<"posts" | "events">("posts");
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     fetch(`/api/users/${userId}`)
@@ -177,7 +181,10 @@ export default function ProfilePage() {
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div
           className="h-32 w-full"
-          style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #134e4a 100%)" }}
+          style={profile.bannerUrl
+            ? { backgroundImage: `url(${profile.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+            : { background: "linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #134e4a 100%)" }
+          }
         />
 
         <div className="px-6 pb-5">
@@ -205,18 +212,29 @@ export default function ProfilePage() {
                   Edit Profile
                 </button>
               ) : (
-                <button
-                  onClick={handleConnectToggle}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition ${
-                    isFollowing ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "text-white"
-                  }`}
-                  style={!isFollowing ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isConnected ? "M5 13l4 4L19 7" : "M12 4v16m8-8H4"} />
-                  </svg>
-                  {buttonText}
-                </button>
+                <>
+                  <button
+                    onClick={handleConnectToggle}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                      isFollowing ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "text-white"
+                    }`}
+                    style={!isFollowing ? { background: "linear-gradient(135deg, #0d9488, #0f766e)" } : {}}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isConnected ? "M5 13l4 4L19 7" : "M12 4v16m8-8H4"} />
+                    </svg>
+                    {buttonText}
+                  </button>
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 border border-gray-200 hover:bg-gray-50 hover:text-red-600 hover:border-red-200 transition"
+                    title="Report profile"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -511,6 +529,15 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <ReportProfileModal
+          userId={profile.id}
+          userName={profile.name}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </div>
   );
 }

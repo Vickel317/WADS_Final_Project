@@ -15,6 +15,7 @@ interface Profile {
   website: string;
   email: string | null;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   connections: number;
   posts: number;
   filesShared: number;
@@ -40,6 +41,7 @@ function mapApiUserToProfile(user: Record<string, unknown>, isOwn: boolean): Pro
     website: String(user.website ?? ""),
     email: typeof user.email === "string" ? user.email : null,
     avatarUrl: user.avatarUrl === null || user.avatarUrl === undefined ? null : String(user.avatarUrl),
+    bannerUrl: user.bannerUrl === null || user.bannerUrl === undefined ? null : String(user.bannerUrl),
     connections: Number(user.connections ?? 0),
     posts: Number(user.posts ?? 0),
     filesShared: Number(user.filesShared ?? 0),
@@ -155,7 +157,10 @@ function ProfileModalContent() {
               
               <div
                 className="h-32 w-full"
-                style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #134e4a 100%)" }}
+                style={profile.bannerUrl
+                  ? { backgroundImage: `url(${profile.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+                  : { background: "linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #134e4a 100%)" }
+                }
               />
             </div>
 

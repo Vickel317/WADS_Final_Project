@@ -12,6 +12,7 @@ interface FormState {
     website: string;
     skills: string;
   avatarUrl: string;
+  bannerUrl: string;
     currentPassword: string;
     newPassword: string;
     confirmPassword: string;
@@ -26,6 +27,7 @@ const defaultForm: FormState = {
   website: "",
   skills: "",
   avatarUrl: "",
+  bannerUrl: "",
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
@@ -45,6 +47,10 @@ export default function EditProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState(currentUser?.avatarUrl ?? "");
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState("");
+  const [bannerUploading, setBannerUploading] = useState(false);
 
   useEffect(() => {
     fetch("/api/users/me")
@@ -52,6 +58,7 @@ export default function EditProfilePage() {
       .then((d) => {
         if (d.user) {
           const resolvedAvatar = typeof d.user.avatarUrl === "string" ? d.user.avatarUrl : "";
+          const resolvedBanner = typeof d.user.bannerUrl === "string" ? d.user.bannerUrl : "";
           const loadedForm: FormState = {
             name: d.user.name ?? "",
             major: d.user.major ?? "",
@@ -61,6 +68,7 @@ export default function EditProfilePage() {
             website: d.user.website ?? "",
             skills: Array.isArray(d.user.skills) ? d.user.skills.join(", ") : "",
             avatarUrl: resolvedAvatar,
+            bannerUrl: resolvedBanner,
             currentPassword: "",
             newPassword: "",
             confirmPassword: "",
@@ -69,6 +77,7 @@ export default function EditProfilePage() {
           setForm(loadedForm);
           setInitialForm(loadedForm);
           setAvatarPreview(resolvedAvatar);
+          setBannerPreview(resolvedBanner);
         }
       })
       .catch(() => {});
@@ -81,6 +90,14 @@ export default function EditProfilePage() {
       }
     };
   }, [avatarPreview]);
+
+  useEffect(() => {
+    return () => {
+      if (bannerPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(bannerPreview);
+      }
+    };
+  }, [bannerPreview]);
 
   const set = (field: keyof FormState) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -135,6 +152,55 @@ export default function EditProfilePage() {
     }
   };
 
+  const handleBannerPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrors((prev) => ({ ...prev, bannerUrl: "Please choose an image file" }));
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((prev) => ({ ...prev, bannerUrl: "Image must be 5MB or smaller" }));
+      return;
+    }
+
+    if (bannerPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(bannerPreview);
+    }
+
+    const preview = URL.createObjectURL(file);
+    setBannerFile(file);
+    setBannerPreview(preview);
+    setErrors((prev) => ({ ...prev, bannerUrl: undefined }));
+  };
+
+  const uploadBanner = async () => {
+    if (!bannerFile) return null;
+
+    setBannerUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", bannerFile);
+
+      const uploadResponse = await fetch("/api/storage/upload-banner", {
+        method: "POST",
+        body: formData,
+      });
+
+      const uploadData = await uploadResponse.json().catch(() => ({}));
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData?.message || uploadData?.error?.message || "Failed to upload banner image");
+      }
+
+      return uploadData.key as string;
+    } finally {
+      setBannerUploading(false);
+    }
+  };
+
   const validate = () => {
     const e: Partial<FormState> = {};
     if (!form.name.trim()) e.name = "Name is required";
@@ -154,9 +220,12 @@ export default function EditProfilePage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     let uploadedAvatarKey: string | null = null;
+    let uploadedBannerKey: string | null = null;
     try {
       let avatarKey: string | null = null;
       let avatarUploadError: string | null = null;
+      let bannerKey: string | null = null;
+      let bannerUploadError: string | null = null;
 
       try {
         avatarKey = await uploadAvatar();
@@ -164,6 +233,13 @@ export default function EditProfilePage() {
         avatarUploadError = error instanceof Error ? error.message : "Failed to upload avatar image";
       }
       uploadedAvatarKey = avatarKey;
+
+      try {
+        bannerKey = await uploadBanner();
+      } catch (error) {
+        bannerUploadError = error instanceof Error ? error.message : "Failed to upload banner image";
+      }
+      uploadedBannerKey = bannerKey;
 
       const payload: Record<string, unknown> = {};
 
@@ -183,12 +259,15 @@ export default function EditProfilePage() {
       if (avatarKey) {
         payload.avatarUrl = avatarKey;
       }
+      if (bannerKey) {
+        payload.bannerUrl = bannerKey;
+      }
       if (form.newPassword) {
         payload.currentPassword = form.currentPassword;
         payload.newPassword = form.newPassword;
       }
 
-      if (Object.keys(payload).length === 0 && !avatarKey && !form.newPassword) {
+      if (Object.keys(payload).length === 0 && !avatarKey && !bannerKey && !form.newPassword) {
         setSaved(true);
         return;
       }
@@ -208,6 +287,9 @@ export default function EditProfilePage() {
       setErrors({});
       if (avatarUploadError) {
         setErrors({ avatarUrl: avatarUploadError });
+      }
+      if (bannerUploadError) {
+        setErrors({ bannerUrl: bannerUploadError });
       }
       setSaved(true);
     } catch (err: unknown) {
@@ -291,6 +373,61 @@ export default function EditProfilePage() {
               <p className="text-xs text-gray-400 mt-1.5">JPG, PNG or GIF. Max 2MB.</p>
               {errors.avatarUrl && <p className="mt-1 text-xs text-red-500">{errors.avatarUrl}</p>}
             </div>
+          </div>
+        </div>
+
+        {/* Banner Section */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h2 className="text-sm font-bold text-gray-800 mb-4">Profile Banner</h2>
+          <div className="relative">
+            <div
+              className="h-32 w-full rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center"
+              style={!bannerPreview ? { background: "linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #134e4a 100%)" } : {}}
+            >
+              {bannerPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element -- blob/data/api banner URLs are dynamic
+                <img src={bannerPreview} alt="Banner preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center">
+                  <svg className="w-8 h-8 text-white/50 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-xs text-white/70">Default banner</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => bannerInputRef.current?.click()}
+                className="px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+              >
+                {bannerFile ? "Change Banner" : "Upload Banner"}
+              </button>
+              {bannerPreview && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (bannerPreview.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+                    setBannerFile(null);
+                    setBannerPreview("");
+                    setForm((prev) => ({ ...prev, bannerUrl: "" }));
+                  }}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition"
+                >
+                  Remove
+                </button>
+              )}
+              <input
+                ref={bannerInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                className="hidden"
+                onChange={handleBannerPick}
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">JPG, PNG or GIF. Max 5MB. Recommended: 1200x400px.</p>
+            {errors.bannerUrl && <p className="mt-1 text-xs text-red-500">{errors.bannerUrl}</p>}
           </div>
         </div>
 

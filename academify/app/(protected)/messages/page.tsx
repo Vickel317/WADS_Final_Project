@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import type { ChatMessage, SpaceChatMessage } from "@/socket-server/index";
 import NewMessageModal from "@/components/new-message-modal";
 import { ChatAvatar } from "@/components/chat-avatar";
+import { ChatProfilePopover } from "@/components/chat-profile-popover";
 
 interface Conversation {
   userId: string;
@@ -136,25 +137,35 @@ export default function MessagesPage() {
 
   const renderConversation = (conv: Conversation) => {
     const isGroup = conv.kind === "space" || conv.userId.startsWith("space-");
+    const avatarContent = (
+      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
+        {isGroup ? (
+          <svg className="w-5 h-5 text-teal-500" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 2a5 5 0 100 10A5 5 0 0010 2zm0 12c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+          </svg>
+        ) : conv.avatarUrl ? (
+          <ChatAvatar src={conv.avatarUrl} alt={conv.name} />
+        ) : (
+          <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          </svg>
+        )}
+      </div>
+    );
+
     return (
       <button
         key={conv.userId}
         onClick={() => router.push(`/messages/${conv.userId}`)}
         className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition text-left"
       >
-        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0 overflow-hidden">
-          {isGroup ? (
-            <svg className="w-5 h-5 text-teal-500" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 2a5 5 0 100 10A5 5 0 0010 2zm0 12c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
-            </svg>
-          ) : conv.avatarUrl ? (
-            <ChatAvatar src={conv.avatarUrl} alt={conv.name} />
-          ) : (
-            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-            </svg>
-          )}
-        </div>
+        {isGroup ? (
+          avatarContent
+        ) : (
+          <ChatProfilePopover userId={conv.userId} side="right">
+            {avatarContent}
+          </ChatProfilePopover>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-0.5">
             <span className="text-sm font-semibold text-gray-900 truncate">
