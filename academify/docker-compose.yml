@@ -24,6 +24,7 @@ services:
       # Server-side S3: internal Docker DNS. Browser presign uses MINIO_PUBLIC_ENDPOINT from .env.production.
       MINIO_ENDPOINT: http://minio:9000
       MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-https://minio-e2526-wads-b4ac-02.csbihub.id}
+      SOCKET_SERVER_URL: http://socket:3100
     ports:
       - "3011:3011"
     depends_on:

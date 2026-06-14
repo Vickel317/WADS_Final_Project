@@ -290,7 +290,6 @@ export default function FilesPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>([]);
-  const [forumMap, setForumMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -332,7 +331,6 @@ export default function FilesPage() {
         (categoriesPayload.categories || []).forEach((c: { id: string; name: string }) => {
           fMap[c.id] = c.name;
         });
-        setForumMap(fMap);
 
         setSpaces(
           (spacesPayload.spaces || []).map((space: { spaceID: string; name: string; description: string | null; forumID: string; createdAt: string }) => ({

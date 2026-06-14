@@ -43,6 +43,32 @@ type Tab = "Trending" | "Recent" | "Most Popular" | "Unanswered";
 
 const THREAD_TABS: Tab[] = ["Trending", "Recent", "Most Popular", "Unanswered"];
 
+function postFeedbackMessage(status: string | null) {
+  switch (status) {
+    case "approved":
+      return {
+        tone: "success" as const,
+        text: "Your thread is live and visible to the community.",
+      };
+    case "blocked":
+      return {
+        tone: "error" as const,
+        text: "Your thread was blocked by moderation.",
+      };
+    case "flagged":
+      return {
+        tone: "warning" as const,
+        text: "Your thread is under review. You can see it, but others may not yet.",
+      };
+    case "pending":
+    default:
+      return {
+        tone: "warning" as const,
+        text: "Your thread was submitted and is being reviewed.",
+      };
+  }
+}
+
 function parseHubTab(value: string | null): ForumHubTab {
   if (value === "events" || value === "collab") return value;
   return "threads";
@@ -53,6 +79,8 @@ export default function CategoryForumsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const hubTab = parseHubTab(searchParams.get("tab"));
+  const postedStatus = searchParams.get("posted");
+  const postFeedback = postFeedbackMessage(postedStatus);
 
   const [forum, setForum] = useState<ForumCategory | null>(null);
   const [threads, setThreads] = useState<ForumThread[]>([]);
@@ -210,6 +238,20 @@ export default function CategoryForumsPage() {
       </div>
 
       {category && <ForumHubNav forumSlug={category} activeTab={hubTab} />}
+
+      {postedStatus && hubTab === "threads" && (
+        <div
+          className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+            postFeedback.tone === "success"
+              ? "border-green-200 bg-green-50 text-green-800"
+              : postFeedback.tone === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {postFeedback.text}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-gray-400 py-8">Loading...</p>

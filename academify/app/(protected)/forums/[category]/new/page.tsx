@@ -77,8 +77,11 @@ export default function NewThreadPage() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to create thread");
-      router.push(`/forums/${category}`);
+      if (!res.ok) {
+        throw new Error(data.error?.message || data.message || "Failed to create thread");
+      }
+      const status = data.thread?.status ?? "pending";
+      router.push(`/forums/${category}?posted=${encodeURIComponent(status)}`);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to create thread");
     } finally {
@@ -116,7 +119,7 @@ export default function NewThreadPage() {
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-3xl">
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-3xl mx-auto w-full">
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Category badge */}
           <div>

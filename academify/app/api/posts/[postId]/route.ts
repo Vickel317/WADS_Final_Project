@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { ModerationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+import { applyPostModeration } from "@/lib/ai/post-moderation";
+import { canViewPost } from "@/lib/post-visibility";
 
 /**
  * @swagger
@@ -113,10 +117,7 @@ export async function GET(
     if (!post) {
       return apiError(404, "Post not found", "NOT_FOUND");
     }
-    const role = String(decoded?.role ?? "").toLowerCase();
-    const canSeeHidden = role === "admin" || role === "moderator";
-    const isOwner = decoded?.id === post.authorID;
-    if (post.moderationStatus !== "APPROVED" && !canSeeHidden && !isOwner) {
+    if (!canViewPost(post, decoded ? { id: decoded.id, role: decoded.role } : null)) {
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
@@ -184,7 +185,14 @@ export async function PUT(
 
     const existing = await prisma.post.findUnique({
       where: { postID: postId },
-      select: { postID: true, authorID: true, moderationStatus: true },
+      select: {
+        postID: true,
+        authorID: true,
+        forumID: true,
+        title: true,
+        content: true,
+        moderationStatus: true,
+      },
     });
 
     if (!existing) {
@@ -207,21 +215,52 @@ export async function PUT(
       );
     }
 
+    const titleChanged = title.value! !== existing.title;
+    const contentChanged = content.value! !== existing.content;
+    const shouldRemoderate = titleChanged || contentChanged;
+
     const post = await prisma.post.update({
       where: { postID: postId },
       data: {
         title: title.value!,
         content: content.value!,
+        ...(shouldRemoderate
+          ? {
+              moderationStatus: ModerationStatus.PENDING,
+              aiLabel: "moderation_pending",
+              aiReason: "Edited content is being reviewed by AI",
+              summaryJson: Prisma.DbNull,
+              summaryAt: null,
+              summaryCommentCount: null,
+            }
+          : {}),
       },
     });
 
+    if (shouldRemoderate) {
+      const forum = await prisma.forumHub.findUnique({
+        where: { forumID: existing.forumID },
+        select: { name: true },
+      });
+      const nextTitle = title.value!;
+      const nextContent = content.value!;
+      const forumName = forum?.name ?? "Forum";
+
+      after(async () => {
+        await applyPostModeration(postId, nextTitle, nextContent, forumName);
+      });
+    }
+
     return NextResponse.json(
       {
-        message: "Post updated successfully",
+        message: shouldRemoderate
+          ? "Post updated and sent for review"
+          : "Post updated successfully",
         post: {
           id: post.postID,
           title: post.title,
           content: post.content,
+          status: post.moderationStatus.toLowerCase(),
           createdAt: post.createdAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
         },

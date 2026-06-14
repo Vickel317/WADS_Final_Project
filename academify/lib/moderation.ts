@@ -1,7 +1,13 @@
-import { ActionType, UserStatus } from "@prisma/client";
+import { ActionType, ModerationStatus, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { appendModerationLog, type ModerationLogEntry } from "@/lib/moderation-log-store";
 import { sanitizeText } from "@/lib/sanitization";
+
+export const MODERATION_QUEUE_STATUSES = [
+  ModerationStatus.PENDING,
+  ModerationStatus.FLAGGED,
+  ModerationStatus.BLOCKED,
+] as const;
 
 export function hasModerationAccess(role?: string | null) {
   const normalized = String(role ?? "").toLowerCase();
@@ -32,6 +38,8 @@ function actionTypeToLogAction(actionType: ActionType): ModerationLogEntry["acti
       return "suspend";
     case ActionType.BAN_USER:
       return "ban";
+    case ActionType.FLAG_POST:
+      return "warn";
     default:
       return "report_resolved";
   }

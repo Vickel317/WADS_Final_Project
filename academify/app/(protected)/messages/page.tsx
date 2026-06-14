@@ -180,7 +180,7 @@ export default function MessagesPage() {
   return (
     <>
     {showNewMessage && <NewMessageModal onClose={() => setShowNewMessage(false)} />}
-    <div className="relative flex flex-col lg:flex-row h-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div className="relative flex flex-col lg:flex-row min-h-[calc(100vh-6rem)] w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
       {/* Conversation List */}
       <div className="w-full lg:w-72 lg:shrink-0 border-r border-gray-100 flex flex-col">
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
