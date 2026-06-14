@@ -189,7 +189,9 @@ export default function Topbar() {
       <BrandLogo showName className="shrink-0 hidden sm:flex" />
       <BrandLogo showName={false} size="sm" className="shrink-0 flex sm:hidden" />
 
-      <div className="flex-1 min-w-0 max-w-xl relative">
+      <div className="flex-1" />
+
+      <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
           fill="none"

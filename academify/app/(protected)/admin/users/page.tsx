@@ -18,6 +18,7 @@ export default function AdminUsersPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [saving, setSaving] = useState<Record<string, boolean>>({});
+	const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
 	const loadUsers = async () => {
 		setLoading(true);
@@ -39,6 +40,10 @@ export default function AdminUsersPage() {
 
 	useEffect(() => {
 		void Promise.resolve().then(() => loadUsers());
+		fetch("/api/users/me")
+			.then((r) => r.json())
+			.then((data) => setCurrentUserId(data.user?.userId ?? null))
+			.catch(() => {});
 	}, []);
 
 	const updateRole = async (userId: string, role: string) => {
@@ -108,18 +113,21 @@ export default function AdminUsersPage() {
 								</tr>
 							</thead>
 							<tbody className="text-gray-700">
-								{users.map((user) => (
+								{users.map((user) => {
+									const isSelf = user.id === currentUserId;
+									return (
 									<tr key={user.id} className="border-t border-gray-100">
 										<td className="py-3 pr-4 font-medium text-gray-900">
 											{user.name}
+											{isSelf && <span className="ml-1.5 text-xs text-gray-400">(you)</span>}
 										</td>
 										<td className="py-3 pr-4">{user.email}</td>
 										<td className="py-3 pr-4">
 											<select
 												value={user.role}
 												onChange={(e) => updateRole(user.id, e.target.value)}
-												className="rounded-lg border border-gray-200 px-2 py-1 text-sm"
-												disabled={saving[user.id]}
+												className="rounded-lg border border-gray-200 px-2 py-1 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+												disabled={saving[user.id] || isSelf}
 											>
 												{roleOptions.map((role) => (
 													<option key={role} value={role}>
@@ -132,14 +140,15 @@ export default function AdminUsersPage() {
 										<td className="py-3 pr-4">
 											<button
 												onClick={() => deleteUser(user.id)}
-												className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-												disabled={saving[user.id]}
+												className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+												disabled={saving[user.id] || isSelf}
 											>
 												Delete
 											</button>
 										</td>
 									</tr>
-								))}
+									);
+								})}
 							</tbody>
 						</table>
 					</div>
