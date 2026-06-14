@@ -3,6 +3,8 @@ import { format, formatDistanceToNow } from "date-fns";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/get-session";
 import { prisma } from "@/lib/prisma";
+import { slugify } from "@/lib/slugify";
+import DashboardCalendar from "@/components/dashboard-calendar";
 
 const fileIconColor: Record<string, { bg: string; text: string }> = {
   pdf: { bg: "bg-red-100", text: "text-red-600" },
@@ -73,11 +75,12 @@ export default async function DashboardPage() {
     }),
     prisma.event.findMany({
       where: {
-        attendees: { some: { userID: userId } },
-        dateTime: { gte: now },
+        OR: [
+          { attendees: { some: { userID: userId } } },
+          { creatorID: userId },
+        ],
       },
       orderBy: { dateTime: "asc" },
-      take: 4,
       select: {
         eventID: true,
         title: true,
@@ -255,7 +258,7 @@ export default async function DashboardPage() {
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Upcoming events */}
+        {/* Calendar */}
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <SectionHeader
             icon={
@@ -263,12 +266,12 @@ export default async function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             }
-            title="Upcoming events"
-            subtitle="Events you RSVP'd to"
+            title="My events"
+            subtitle="Events you joined or created"
           />
-          <ul className="mt-4 space-y-2">
+          <div className="mt-4">
             {upcomingEvents.length === 0 ? (
-              <li className="py-8 text-center">
+              <div className="py-8 text-center">
                 <div
                   className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
                   style={{ background: "linear-gradient(135deg, #ccfbf1, #99f6e4)" }}
@@ -277,46 +280,22 @@ export default async function DashboardPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <p className="text-sm text-gray-500 font-medium">No upcoming events</p>
+                <p className="text-sm text-gray-500 font-medium">No events yet</p>
                 <p className="text-xs text-gray-400 mt-1">Browse forums to find events</p>
-              </li>
+              </div>
             ) : (
-              upcomingEvents.map((event) => (
-                <li key={event.eventID}>
-                  <Link
-                    href={`/events/${event.eventID}`}
-                    className="group block rounded-xl border border-gray-50 p-3.5 transition hover:border-teal-200 hover:shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-teal-700 transition truncate">
-                          {event.title}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-500">
-                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span>{format(new Date(event.dateTime), "EEE, MMM d · h:mm a")}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
-                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span className="truncate">{event.location}</span>
-                        </div>
-                      </div>
-                      <div className="shrink-0 pt-0.5">
-                        <span className="inline-block rounded-lg bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 uppercase">
-                          {event.forum.name}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              ))
+              <DashboardCalendar
+                events={upcomingEvents.map((e) => ({
+                  eventID: e.eventID,
+                  title: e.title,
+                  dateTime: e.dateTime.toISOString(),
+                  location: e.location,
+                  forumName: e.forum.name,
+                  forumSlug: slugify(e.forum.name),
+                }))}
+              />
             )}
-          </ul>
+          </div>
           <Link
             href="/events"
             className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline transition"

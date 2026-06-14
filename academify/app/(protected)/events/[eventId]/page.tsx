@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import EventActions from "./event-actions";
+import EventBannerUpload from "@/components/event-banner-upload";
 
 const DEFAULT_DURATION_MINUTES = 60;
 
@@ -65,25 +66,39 @@ export default async function EventDetailPage({
 
 	return (
 		<div className="space-y-6">
+			<div
+				className="relative h-48 rounded-2xl overflow-hidden"
+				style={
+					event.bannerUrl
+						? { backgroundImage: `url(${event.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+						: { background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }
+				}
+			>
+				<div className="absolute inset-0 bg-black/20" />
+				<EventBannerUpload eventId={eventId} isHost={isHost} />
+				<div className="absolute bottom-4 left-6 right-6">
+					<div className="flex flex-wrap items-center gap-2 text-xs text-white/80 mb-2">
+						<Link
+							href="/forums"
+							className="rounded-full bg-white/20 backdrop-blur-sm px-3 py-1 font-medium text-white"
+						>
+							{event.forum.name}
+						</Link>
+						<span className={`rounded-full px-3 py-1 text-xs font-medium ${statusTone}`}>
+							{statusLabel}
+						</span>
+						<span>•</span>
+						<span>
+							{formatDistanceToNow(new Date(event.dateTime), { addSuffix: true })}
+						</span>
+					</div>
+					<h1 className="text-2xl font-bold text-white">{displayTitle}</h1>
+				</div>
+			</div>
+
 			<div className="rounded-2xl border border-gray-100 bg-white p-6">
 				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 					<div className="space-y-2">
-						<div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-							<Link
-								href="/forums"
-								className="rounded-full bg-teal-50 px-3 py-1 font-medium text-teal-700"
-							>
-								{event.forum.name}
-							</Link>
-							<span className={`rounded-full px-3 py-1 text-xs font-medium ${statusTone}`}>
-								{statusLabel}
-							</span>
-							<span>•</span>
-							<span>
-								{formatDistanceToNow(new Date(event.dateTime), { addSuffix: true })}
-							</span>
-						</div>
-						<h1 className="text-2xl font-semibold text-gray-900">{displayTitle}</h1>
 						<p className="text-sm text-gray-600">{event.description}</p>
 						<div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
 							<span>

@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { disconnectSocket, getSocket } from "@/lib/socket-client";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { useCurrentUser } from "@/components/current-user-context";
 import { useSidebarLayout } from "@/components/sidebar-layout-context";
@@ -25,6 +25,9 @@ type Notification = {
 
 export default function Topbar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const currentUser = useCurrentUser();
   const { toggleMobileOpen } = useSidebarLayout();
   const [query, setQuery] = useState("");
@@ -129,6 +132,7 @@ export default function Topbar() {
     }
 
     function onNewNotification(notification: Notification) {
+      if (notification.link && pathnameRef.current.startsWith("/messages")) return;
       setNotifications((prev) => {
         if (prev.some((n) => n.notificationID === notification.notificationID)) return prev;
         return [notification, ...prev];
