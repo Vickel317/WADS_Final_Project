@@ -171,6 +171,16 @@ export async function PUT(
     }
     if (slug.error) errors.push({ field: "slug", message: `slug ${slug.error}` });
 
+    if (name.value && name.value.length < 2) {
+      errors.push({ field: "name", message: "name must be at least 2 characters" });
+    }
+    if (name.value && name.value.length > 100) {
+      errors.push({ field: "name", message: "name must be 100 characters or fewer" });
+    }
+    if (name.value && !/^[a-zA-Z0-9\s&'-]+$/.test(name.value)) {
+      errors.push({ field: "name", message: "name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands" });
+    }
+
     if (errors.length) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }

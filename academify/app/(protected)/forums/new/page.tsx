@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+function isValidForumName(value: string): string | null {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) return "Name must be at least 2 characters.";
+  if (trimmed.length > 100) return "Name must be 100 characters or fewer.";
+  if (!/^[a-zA-Z0-9\s&'-]+$/.test(trimmed)) return "Name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands.";
+  return null;
+}
+
 export default function NewForumPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -15,6 +23,13 @@ export default function NewForumPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    const nameError = isValidForumName(name);
+    if (nameError) {
+      setError(nameError);
+      setLoading(false);
+      return;
+    }
 
     try {
       const formData = new FormData();
@@ -54,9 +69,11 @@ export default function NewForumPage() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Computer Science"
             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
             required
           />
+          <p className="mt-1 text-xs text-gray-400">Letters, numbers, spaces, hyphens, apostrophes, and ampersands only.</p>
         </div>
         <div className="mb-6">
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">

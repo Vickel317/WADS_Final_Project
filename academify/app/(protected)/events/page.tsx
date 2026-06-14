@@ -37,14 +37,15 @@ interface Event {
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-const TYPE_STYLES: Record<Event["type"], { badge: string; border: string }> = {
+const TYPE_STYLES: Record<Event["type"], { badge: string; border: string; dot: string }> = {
   "Study Session": {
     badge: "bg-teal-500 text-white",
     border: "border-teal-200",
+    dot: "bg-teal-500",
   },
-  Workshop: { badge: "bg-indigo-500 text-white", border: "border-indigo-200" },
-  Seminar: { badge: "bg-amber-500 text-white", border: "border-amber-200" },
-  Social: { badge: "bg-pink-500 text-white", border: "border-pink-200" },
+  Workshop: { badge: "bg-indigo-500 text-white", border: "border-indigo-200", dot: "bg-indigo-500" },
+  Seminar: { badge: "bg-amber-500 text-white", border: "border-amber-200", dot: "bg-amber-500" },
+  Social: { badge: "bg-pink-500 text-white", border: "border-pink-200", dot: "bg-pink-500" },
 };
 
 const formatGCalDate = (value: Date) =>
@@ -232,6 +233,7 @@ type EventForm = {
   maxParticipants: string;
   description: string;
   virtualLink: string;
+  forumID: string;
 };
 
 function CreateEventModal({
@@ -241,6 +243,7 @@ function CreateEventModal({
   onSubmit,
   loading,
   error,
+  forums,
 }: {
   form: EventForm;
   onChange: (updates: Partial<EventForm>) => void;
@@ -248,6 +251,7 @@ function CreateEventModal({
   onSubmit: () => void;
   loading: boolean;
   error: string | null;
+  forums: Array<{ id: string; name: string }>;
 }) {
   return (
     <div
@@ -295,6 +299,23 @@ function CreateEventModal({
               <option value="Workshop">Workshop</option>
               <option value="Seminar">Seminar</option>
               <option value="Social">Social</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
+              Forum
+            </label>
+            <select
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500 bg-white"
+              value={form.forumID}
+              onChange={(e) => onChange({ forumID: e.target.value })}
+            >
+              <option value="">Select a forum</option>
+              {forums.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -414,9 +435,11 @@ export default function EventsPage() {
     maxParticipants: "",
     description: "",
     virtualLink: "",
+    forumID: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [forumsList, setForumsList] = useState<Array<{ id: string; name: string }>>([]);
 
   const normalizeType = (value?: string): Event["type"] => {
     if (!value) return "Study Session";
@@ -448,6 +471,15 @@ export default function EventsPage() {
       ignore = true;
     };
   }, [forumSlug]);
+
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        setForumsList((data.categories ?? []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -529,6 +561,11 @@ export default function EventsPage() {
       return;
     }
 
+    if (!form.forumID) {
+      setFormError("Please select a forum.");
+      return;
+    }
+
     const trimmedLink = form.virtualLink.trim();
     if (trimmedLink && !/^https?:\/\//i.test(trimmedLink)) {
       setFormError("Virtual link must start with http:// or https://");
@@ -558,6 +595,7 @@ export default function EventsPage() {
           date: dateTime.toISOString(),
           location: form.location,
           category: form.type,
+          forumID: form.forumID,
           maxAttendees: form.maxParticipants ? Number(form.maxParticipants) : undefined,
         }),
       });
@@ -576,6 +614,7 @@ export default function EventsPage() {
         maxParticipants: "",
         description: "",
         virtualLink: "",
+        forumID: "",
       });
       setFormError(null);
       const refreshRes = await fetch("/api/events?filter=upcoming");
@@ -654,6 +693,17 @@ export default function EventsPage() {
       total: events.length,
       counts,
     };
+  }, [events]);
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, Event["type"][]> = {};
+    for (const event of events) {
+      const d = event.startsAt instanceof Date ? event.startsAt : new Date(event.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!map[key]) map[key] = [];
+      if (!map[key].includes(event.type)) map[key].push(event.type);
+    }
+    return map;
   }, [events]);
 
   const prevMonth = () => {
@@ -758,15 +808,25 @@ export default function EventsPage() {
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
+                const dateKey = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dayTypes = eventsByDate[dateKey] ?? [];
                 return (
-                  <button
-                    key={day}
-                    className="w-8 h-8 mx-auto flex items-center justify-center rounded-full text-xs font-medium text-gray-700 transition-all duration-150 hover:text-white"
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0d9488"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = ""; }}
-                  >
-                    {day}
-                  </button>
+                  <div key={day} className="flex flex-col items-center">
+                    <button
+                      className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-medium text-gray-700 transition-all duration-150 hover:text-white"
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#0d9488"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = ""; }}
+                    >
+                      {day}
+                    </button>
+                    {dayTypes.length > 0 && (
+                      <div className="flex gap-0.5 mt-0.5 h-1.5">
+                        {dayTypes.slice(0, 4).map((t, idx) => (
+                          <span key={idx} className={`w-1.5 h-1.5 rounded-full ${TYPE_STYLES[t].dot}`} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -831,6 +891,7 @@ export default function EventsPage() {
           onSubmit={handleCreateEvent}
           loading={formLoading}
           error={formError}
+          forums={forumsList}
         />
       )}
     </div>

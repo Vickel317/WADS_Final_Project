@@ -29,6 +29,7 @@ interface CollaborationSpace {
   name: string;
   description: string | null;
   forumID: string;
+  forumName?: string;
   createdAt: string;
 }
 type FileApiRecord = {
@@ -289,6 +290,7 @@ export default function FilesPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [spaces, setSpaces] = useState<CollaborationSpace[]>([]);
+  const [forumMap, setForumMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -297,13 +299,15 @@ export default function FilesPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [filesResponse, spacesResponse] = await Promise.all([
+        const [filesResponse, spacesResponse, categoriesResponse] = await Promise.all([
           fetch("/api/files"),
           fetch("/api/collaboration"),
+          fetch("/api/categories"),
         ]);
 
         const filesPayload = await filesResponse.json().catch(() => ({}));
         const spacesPayload = await spacesResponse.json().catch(() => ({}));
+        const categoriesPayload = await categoriesResponse.json().catch(() => ({}));
 
         if (!filesResponse.ok) {
           throw new Error(filesPayload?.error?.message || "Failed to load files");
@@ -324,12 +328,19 @@ export default function FilesPage() {
           }))
         );
 
+        const fMap: Record<string, string> = {};
+        (categoriesPayload.categories || []).forEach((c: { id: string; name: string }) => {
+          fMap[c.id] = c.name;
+        });
+        setForumMap(fMap);
+
         setSpaces(
           (spacesPayload.spaces || []).map((space: { spaceID: string; name: string; description: string | null; forumID: string; createdAt: string }) => ({
             id: space.spaceID,
             name: space.name,
             description: space.description,
             forumID: space.forumID,
+            forumName: fMap[space.forumID] ?? space.forumID,
             createdAt: space.createdAt,
           }))
         );
@@ -428,7 +439,7 @@ export default function FilesPage() {
                     <p className="text-sm font-semibold">{space.name}</p>
                     <p className="mt-1 text-xs text-white/75">{space.description ?? "No description provided."}</p>
                     <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/70">
-                      <span className="inline-block max-w-48 align-middle overflow-hidden whitespace-nowrap text-ellipsis truncate">Forum {space.forumID}</span>
+                      <span className="inline-block max-w-48 align-middle overflow-hidden whitespace-nowrap text-ellipsis truncate">Forum {space.forumName}</span>
                     </p>
                   </div>
                 ))
