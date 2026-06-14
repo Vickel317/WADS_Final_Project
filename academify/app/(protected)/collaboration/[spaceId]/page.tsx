@@ -32,6 +32,7 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
           uploadedBy: { select: { name: true } },
         },
       },
+      forum: { select: { name: true } },
     },
   });
   if (!space) {
@@ -55,7 +56,7 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
         <div>
           <h1 className="text-2xl font-bold">{space.name}</h1>
           <p className="text-sm text-gray-600 mt-1">{space.description ?? "No description provided."}</p>
-          <p className="text-xs text-gray-400 mt-2">Forum {space.forumID}</p>
+          <p className="text-xs text-gray-400 mt-2">Forum {space.forum?.name ?? "Unknown"}</p>
         </div>
         <div className="flex flex-col items-end gap-2 text-right">
           <Link href="/collaboration" className="text-sm text-gray-500">Back to spaces</Link>
