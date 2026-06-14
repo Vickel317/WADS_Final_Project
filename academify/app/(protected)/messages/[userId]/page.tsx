@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import type { ChatMessage, SpaceChatMessage } from "@/socket-server/index";
 import NewMessageModal from "@/components/new-message-modal";
 import { ChatAvatar } from "@/components/chat-avatar";
+import { ChatProfilePopover } from "@/components/chat-profile-popover";
 
 interface Message {
   id: string;
@@ -538,26 +539,40 @@ export default function ConversationPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div className="relative">
-              <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                {isSpaceChat ? (
+            {!isSpaceChat && partnerId ? (
+              <ChatProfilePopover userId={partnerId} side="bottom">
+                <div className="relative">
+                  <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                    {partnerProfile?.avatarUrl ? (
+                      <ChatAvatar src={partnerProfile.avatarUrl} alt={partnerProfile.name} size={36} />
+                    ) : (
+                      <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  {partnerOnline && (
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
+                  )}
+                </div>
+              </ChatProfilePopover>
+            ) : (
+              <div className="relative">
+                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                   <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
-                ) : partnerProfile?.avatarUrl ? (
-                  <ChatAvatar src={partnerProfile.avatarUrl} alt={partnerProfile.name} size={36} />
-                ) : (
-                  <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                )}
+                </div>
               </div>
-              {partnerOnline && (
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white" />
-              )}
-            </div>
+            )}
             <div>
-              <p className="text-sm font-bold text-gray-900">{isSpaceChat ? partnerName : partnerProfile?.name ?? partnerName}</p>
+              {!isSpaceChat && partnerId ? (
+                <ChatProfilePopover userId={partnerId} side="bottom">
+                  <p className="text-sm font-bold text-gray-900 hover:text-teal-700 transition cursor-pointer">{isSpaceChat ? partnerName : partnerProfile?.name ?? partnerName}</p>
+                </ChatProfilePopover>
+              ) : (
+                <p className="text-sm font-bold text-gray-900">{partnerName}</p>
+              )}
               {isSpaceChat ? (
                 <p className="text-xs font-medium text-gray-400">Collaboration space chat</p>
               ) : (
@@ -590,15 +605,17 @@ export default function ConversationPage() {
               return (
                 <div key={msg.id} className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}>
                   {!isMe && (
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mb-5 overflow-hidden">
-                      {msg.senderAvatarUrl ? (
-                        <ChatAvatar src={msg.senderAvatarUrl} alt={senderLabel} size={32} />
-                      ) : (
-                        <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
+                    <ChatProfilePopover userId={msg.senderId} side="right">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0 mb-5 overflow-hidden">
+                        {msg.senderAvatarUrl ? (
+                          <ChatAvatar src={msg.senderAvatarUrl} alt={senderLabel} size={32} />
+                        ) : (
+                          <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </ChatProfilePopover>
                   )}
                   <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                     {!isMe && isSpaceChat && (

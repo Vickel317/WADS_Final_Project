@@ -15,6 +15,7 @@ function mapProfile(
     major: string | null;
     bio: string | null;
     avatarUrl: string | null;
+    bannerUrl: string | null;
     location: string | null;
     website: string | null;
     academicLevel: string | null;
@@ -38,6 +39,13 @@ function mapProfile(
         ? `/api/users/${user.userId}/avatar`
         : null;
 
+  const bannerUrl =
+    user.bannerUrl && (user.bannerUrl.startsWith("http") || user.bannerUrl.startsWith("data:"))
+      ? user.bannerUrl
+      : user.bannerUrl
+        ? `/api/users/${user.userId}/banner`
+        : null;
+
   return {
     id: user.userId,
     email: user.showEmail ? user.email : null,
@@ -50,6 +58,7 @@ function mapProfile(
     location: user.location ?? "",
     website: user.website ?? "",
     avatarUrl,
+    bannerUrl,
     connections: counts.connections,
     posts: counts.posts,
     filesShared: counts.filesShared,
