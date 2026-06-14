@@ -7,6 +7,7 @@ import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { applyPostModeration } from "@/lib/ai/post-moderation";
 import { canViewPost } from "@/lib/post-visibility";
+import { sanitizeText } from "@/lib/sanitization";
 
 /**
  * @swagger
@@ -215,15 +216,18 @@ export async function PUT(
       );
     }
 
-    const titleChanged = title.value! !== existing.title;
-    const contentChanged = content.value! !== existing.content;
+    const safeTitle = sanitizeText(title.value!);
+    const safeContent = sanitizeText(content.value!);
+
+    const titleChanged = safeTitle !== existing.title;
+    const contentChanged = safeContent !== existing.content;
     const shouldRemoderate = titleChanged || contentChanged;
 
     const post = await prisma.post.update({
       where: { postID: postId },
       data: {
-        title: title.value!,
-        content: content.value!,
+        title: safeTitle,
+        content: safeContent,
         ...(shouldRemoderate
           ? {
               moderationStatus: ModerationStatus.PENDING,
@@ -242,8 +246,8 @@ export async function PUT(
         where: { forumID: existing.forumID },
         select: { name: true },
       });
-      const nextTitle = title.value!;
-      const nextContent = content.value!;
+      const nextTitle = safeTitle;
+      const nextContent = safeContent;
       const forumName = forum?.name ?? "Forum";
 
       after(async () => {

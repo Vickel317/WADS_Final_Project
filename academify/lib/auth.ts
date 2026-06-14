@@ -22,7 +22,7 @@ const options: BetterAuthOptions = {
     useSecureCookies: isProd,
     defaultCookieAttributes: {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "strict",
       secure: isProd,
     },
   },

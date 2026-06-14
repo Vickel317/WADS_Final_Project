@@ -11,10 +11,16 @@ export async function emitNotificationToUser(
   userId: string,
   notification: NotificationPayload
 ): Promise<void> {
+  const secret = process.env.SOCKET_EMIT_SECRET;
+  if (!secret) return;
+
   try {
     await fetch(`${SOCKET_SERVER_URL}/emit-notification`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Socket-Emit-Secret": secret,
+      },
       body: JSON.stringify({ userId, notification }),
     });
   } catch {

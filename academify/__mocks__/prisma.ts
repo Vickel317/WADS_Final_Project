@@ -16,6 +16,7 @@ export const prisma = {
   file: makeMock(),
   space: makeMock(),
   forum: makeMock(),
+  forumHub: makeMock(),
   category: makeMock(),
   report: makeMock(),
   message: makeMock(),
