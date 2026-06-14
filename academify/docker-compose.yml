@@ -58,7 +58,6 @@ services:
       - minio_data:/data
     ports:
       - "3099:9000"
-      - "9001:9001"
     restart: unless-stopped
 
   db-schema-sync:
