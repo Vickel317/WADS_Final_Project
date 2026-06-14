@@ -5,20 +5,32 @@ import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalString } from "@/lib/validation";
 import { deleteObject } from "@/lib/storage";
 
-function mapProfile(user: {
-  userId: string;
-  email: string;
-  name: string;
-  role: string;
-  major: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-  location: string | null;
-  website: string | null;
-  academicLevel: string | null;
-  skillTags: string[];
-  createdAt: Date;
-}) {
+function mapProfile(
+  user: {
+    userId: string;
+    email: string;
+    username: string;
+    name: string;
+    role: string;
+    major: string | null;
+    bio: string | null;
+    avatarUrl: string | null;
+    location: string | null;
+    website: string | null;
+    academicLevel: string | null;
+    skillTags: string[];
+    portfolioLinks: string[];
+    department: string | null;
+    specializations: string[];
+    consultationHours: string | null;
+    verifiedPublications: string[];
+    askMeAbout: string[];
+    createdAt: Date;
+    showEmail: boolean;
+    showAcademicLevel: boolean;
+  },
+  counts: { connections: number; posts: number; filesShared: number }
+) {
   const avatarUrl =
     user.avatarUrl && (user.avatarUrl.startsWith("http") || user.avatarUrl.startsWith("data:"))
       ? user.avatarUrl
@@ -28,22 +40,27 @@ function mapProfile(user: {
 
   return {
     id: user.userId,
-    email: user.email,
+    email: user.showEmail ? user.email : null,
+    username: user.username,
     name: user.name,
     role: user.role.toLowerCase(),
     major: user.major ?? "",
-    year: user.academicLevel ?? "",
+    year: user.showAcademicLevel ? (user.academicLevel ?? "") : "",
     bio: user.bio ?? "",
     location: user.location ?? "",
     website: user.website ?? "",
     avatarUrl,
-    connections: 0,
-    posts: 0,
-    filesShared: 0,
+    connections: counts.connections,
+    posts: counts.posts,
+    filesShared: counts.filesShared,
     skills: user.skillTags ?? [],
-    isConnected: false,
+    portfolioLinks: user.portfolioLinks ?? [],
+    department: user.department ?? "",
+    specializations: user.specializations ?? [],
+    consultationHours: user.consultationHours ?? "",
+    verifiedPublications: user.verifiedPublications ?? [],
+    askMeAbout: user.askMeAbout ?? [],
     createdAt: user.createdAt.toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -75,9 +92,20 @@ export async function GET(
     const isFollowing = !isOwn && user.followers.length > 0;
     const isFollower = !isOwn && user.following.length > 0;
 
+    const [connectionsCount, postsCount, filesCount] = await Promise.all([
+      prisma.follow.count({
+        where: { OR: [{ followerId: resolvedUserId }, { followingId: resolvedUserId }] },
+      }),
+      prisma.post.count({ where: { authorID: resolvedUserId } }),
+      prisma.file.count({ where: { uploadedByID: resolvedUserId } }),
+    ]);
+
     return NextResponse.json({ 
       user: { 
-        ...mapProfile({ ...user, role: user.role, avatarUrl: user.avatarUrl }), 
+        ...mapProfile(
+          { ...user, role: user.role, avatarUrl: user.avatarUrl },
+          { connections: connectionsCount, posts: postsCount, filesShared: filesCount }
+        ), 
         isOwn,
         isFollowing,
         isFollower,
@@ -200,7 +228,7 @@ async function updateUserProfile(
     }
 
     return NextResponse.json(
-      { message: "Profile updated successfully", user: { ...mapProfile(updated), isOwn: true } },
+      { message: "Profile updated successfully", user: { ...mapProfile(updated, { connections: 0, posts: 0, filesShared: 0 }), isOwn: true } },
       { status: 200 }
     );
   } catch (error) {

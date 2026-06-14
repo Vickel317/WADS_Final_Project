@@ -5,17 +5,22 @@ import { useEffect, useState, Suspense } from "react";
 
 interface Profile {
   id: string;
+  username: string;
   name: string;
+  role: string;
   major: string;
   year: string;
   bio: string;
   location: string;
   website: string;
+  email: string | null;
   avatarUrl: string | null;
   connections: number;
   posts: number;
   filesShared: number;
   skills: string[];
+  portfolioLinks: string[];
+  createdAt: string;
   isOwn: boolean;
   isFollowing: boolean;
   isFollower: boolean;
@@ -25,17 +30,22 @@ interface Profile {
 function mapApiUserToProfile(user: Record<string, unknown>, isOwn: boolean): Profile {
   return {
     id: String(user.id ?? ""),
+    username: String(user.username ?? ""),
     name: String(user.name ?? "User"),
+    role: String(user.role ?? "student"),
     major: String(user.major ?? ""),
     year: String(user.year ?? ""),
     bio: String(user.bio ?? ""),
     location: String(user.location ?? ""),
     website: String(user.website ?? ""),
+    email: typeof user.email === "string" ? user.email : null,
     avatarUrl: user.avatarUrl === null || user.avatarUrl === undefined ? null : String(user.avatarUrl),
     connections: Number(user.connections ?? 0),
     posts: Number(user.posts ?? 0),
     filesShared: Number(user.filesShared ?? 0),
     skills: Array.isArray(user.skills) ? user.skills.map((s) => String(s)) : [],
+    portfolioLinks: Array.isArray(user.portfolioLinks) ? user.portfolioLinks.map((s) => String(s)) : [],
+    createdAt: String(user.createdAt ?? ""),
     isOwn,
     isFollowing: Boolean(user.isFollowing ?? false),
     isFollower: Boolean(user.isFollower ?? false),
@@ -191,10 +201,28 @@ function ProfileModalContent() {
               </div>
 
               <div className="mb-4">
-                <h1 className="text-xl font-bold text-gray-900">{profile.name}</h1>
-                {profile.major && <p className="text-sm text-teal-600 font-medium">{profile.major}</p>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-xl font-bold text-gray-900">{profile.name}</h1>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                    profile.role === "lecturer" ? "bg-purple-50 text-purple-700" :
+                    profile.role === "admin" ? "bg-amber-50 text-amber-700" :
+                    "bg-blue-50 text-blue-700"
+                  }`}>
+                    {profile.role === "lecturer" ? "Lecturer" : profile.role === "admin" ? "Admin" : "Student"}
+                  </span>
+                </div>
+                {profile.username && <p className="text-sm text-gray-400 mt-0.5">@{profile.username}</p>}
+                {profile.major && <p className="text-sm text-teal-600 font-medium mt-1">{profile.major}{profile.year ? ` · ${profile.year}` : ""}</p>}
                 {profile.bio && (
                   <p className="text-sm text-gray-500 mt-2 leading-relaxed">{profile.bio}</p>
+                )}
+                {profile.createdAt && (
+                  <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Member since {new Date(profile.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                  </p>
                 )}
               </div>
 
@@ -221,6 +249,29 @@ function ProfileModalContent() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {profile.portfolioLinks.length > 0 && (
+                <div className={profile.skills.length > 0 ? "mt-5" : ""}>
+                  <h2 className="text-sm font-bold text-gray-800 mb-3">Portfolio</h2>
+                  <ul className="space-y-1.5">
+                    {profile.portfolioLinks.map((link) => (
+                      <li key={link}>
+                        <a
+                          href={link.startsWith("http") ? link : `https://${link}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-sm text-teal-600 hover:underline"
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          <span className="truncate">{link.replace(/^https?:\/\//, "")}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
