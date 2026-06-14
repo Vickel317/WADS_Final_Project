@@ -30,6 +30,7 @@ Minimum required for Better Auth (tutorial style):
 - `BETTER_AUTH_URL`
 - `BETTER_AUTH_SECRET`
 - `NEXT_PUBLIC_BETTER_AUTH_URL`
+- `SOCKET_EMIT_SECRET` (shared secret for socket `/emit-notification`; must match on app and socket services)
 
 Firebase auth flow is retired in this codebase. Use BetterAuth endpoints only.
 

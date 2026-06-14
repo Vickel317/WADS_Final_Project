@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+import { sanitizeText } from "@/lib/sanitization";
 
 
 
@@ -112,7 +113,7 @@ export async function PUT(
 
     const updated = await prisma.comment.update({
       where: { commentID: commentId },
-      data: { content: content.value! },
+      data: { content: sanitizeText(content.value!) },
     });
 
     return NextResponse.json(
