@@ -3,7 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { ModerationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-import { hasModerationAccess } from "@/lib/moderation";
+import { hasModerationAccess, MODERATION_QUEUE_STATUSES } from "@/lib/moderation";
 
 
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const queue = await prisma.post.findMany({
       where: {
         moderationStatus: {
-          in: [ModerationStatus.PENDING, ModerationStatus.FLAGGED],
+          in: [...MODERATION_QUEUE_STATUSES],
         },
       },
       include: {
@@ -55,22 +55,43 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
+    const approvedForReview = await prisma.post.findMany({
+      where: {
+        moderationStatus: ModerationStatus.APPROVED,
+        OR: [
+          { aiReason: { not: null } },
+          { aiScore: { not: null } },
+          { aiLabel: { not: null } },
+        ],
+      },
+      include: {
+        author: { select: { name: true } },
+        forum: { select: { name: true } },
+        comments: { select: { commentID: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    const mapPost = (post: (typeof queue)[number]) => ({
+      id: post.postID,
+      title: post.title,
+      content: post.content,
+      forumId: post.forumID,
+      forum: post.forum.name,
+      author: post.author.name,
+      replyCount: post.comments.length,
+      createdAt: post.createdAt.toISOString(),
+      status: post.moderationStatus.toLowerCase(),
+      aiScore: post.aiScore,
+      aiLabel: post.aiLabel,
+      aiReason: post.aiReason,
+    });
+
     return NextResponse.json(
       {
-        queue: queue.map((post) => ({
-          id: post.postID,
-          title: post.title,
-          content: post.content,
-          forumId: post.forumID,
-          forum: post.forum.name,
-          author: post.author.name,
-          replyCount: post.comments.length,
-          createdAt: post.createdAt.toISOString(),
-          status: post.moderationStatus.toLowerCase(),
-          aiScore: post.aiScore,
-          aiLabel: post.aiLabel,
-          aiReason: post.aiReason,
-        })),
+        queue: queue.map(mapPost),
+        approvedForReview: approvedForReview.map(mapPost),
         total: queue.length,
       },
       { status: 200 }

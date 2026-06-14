@@ -8,7 +8,8 @@ export type ApiErrorCode =
   | "CONFLICT"
   | "INTERNAL_ERROR"
   | "AI_ERROR"
-  | "AI_UNAVAILABLE";
+  | "AI_UNAVAILABLE"
+  | "RATE_LIMITED";
 
 export type ApiErrorDetail = {
   field?: string;

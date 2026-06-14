@@ -66,6 +66,7 @@ export async function verifyToken(request: import("next/server").NextRequest) {
   return {
     id: sessionUser.user.userId,
     email: sessionUser.user.email,
+    name: sessionUser.user.name,
     role: normalizeRole(sessionUser.user.role),
   };
 }

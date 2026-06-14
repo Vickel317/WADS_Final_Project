@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { ModerationStatus } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
-import { ollamaGenerate } from "@/lib/ollama";
-import { buildModerationPrompt } from "@/lib/ai/prompts";
-import { ModerationResultSchema } from "@/lib/ai/schemas";
+import { applyPostModeration } from "@/lib/ai/post-moderation";
 import { isRestrictedAccount } from "@/lib/moderation";
 
 const slugify = (value: string) =>
@@ -42,35 +41,6 @@ const toForumName = (value: string) =>
     .filter(Boolean)
     .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
     .join(" ");
-
-const sanitizeAiReason = (value: string) => {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (!normalized) return normalized;
-
-  const tokens = normalized.split(" ");
-  const compact: string[] = [];
-  let prev = "";
-  let repeatCount = 0;
-
-  for (const token of tokens) {
-    if (token === prev) {
-      repeatCount += 1;
-      if (repeatCount <= 2) compact.push(token);
-      continue;
-    }
-    prev = token;
-    repeatCount = 1;
-    compact.push(token);
-  }
-
-  return compact.join(" ").slice(0, 320);
-};
-
-const containsProfanity = (text: string) => {
-  const lowered = text.toLowerCase();
-  const keywords = ["fuck", "shit", "bitch", "asshole", "bastard"];
-  return keywords.some((word) => lowered.includes(word));
-};
 
 /**
  * @swagger
@@ -298,57 +268,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Run AI moderation; result determines initial status (never blocks the request)
-    let aiStatus: ModerationStatus = ModerationStatus.PENDING;
-    let aiScore: number | null = null;
-    let aiLabel: string | null = null;
-    let aiReason: string | null = null;
-
-    try {
-      const raw = await ollamaGenerate(
-        buildModerationPrompt(title.value!, content.value!, forum.name)
-      );
-      const ai = ModerationResultSchema.safeParse(raw);
-      if (ai.success) {
-        aiScore = Math.max(ai.data.toxicity, ai.data.spam);
-        aiLabel = ai.data.labels.join(",") || ai.data.decision;
-        aiReason = sanitizeAiReason(ai.data.reason);
-        if (ai.data.decision === "approve") {
-          aiStatus = ModerationStatus.APPROVED;
-        } else if (ai.data.decision === "flag") {
-          aiStatus = ModerationStatus.FLAGGED;
-        } else if (ai.data.decision === "reject") {
-          aiStatus = ModerationStatus.BLOCKED;
-        }
-      } else {
-        aiLabel = "ai_parse_error";
-        aiReason = "AI moderation output invalid; sent to human review";
-        aiStatus = ModerationStatus.PENDING;
-      }
-    } catch {
-      // AI unavailable → apply lightweight fallback heuristic then human review
-      const combined = `${title.value!} ${content.value!}`;
-      if (containsProfanity(combined)) {
-        aiScore = 0.75;
-        aiLabel = "profanity,fallback";
-        aiReason = "Potential profanity detected by fallback filter";
-        aiStatus = ModerationStatus.FLAGGED;
-      } else {
-        aiLabel = "ai_unavailable";
-        aiReason = "AI moderation unavailable; sent to human review";
-      }
-    }
-
     const created = await prisma.post.create({
       data: {
         title: title.value!,
         content: content.value!,
         forumID: forum.forumID,
         authorID: sessionUser.user.userId,
-        moderationStatus: aiStatus,
-        aiScore,
-        aiLabel,
-        aiReason,
+        moderationStatus: ModerationStatus.PENDING,
+        aiLabel: "moderation_pending",
+        aiReason: "Content is being reviewed by AI",
       },
       include: {
         author: { select: { name: true } },
@@ -369,9 +297,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const postTitle = title.value!;
+    const postContent = content.value!;
+    const forumName = forum.name;
+
+    after(async () => {
+      await applyPostModeration(created.postID, postTitle, postContent, forumName);
+    });
+
     return NextResponse.json(
       {
-        message: "Thread created successfully",
+        message: "Thread submitted for review",
         thread: {
           id: created.postID,
           title: created.title,
@@ -390,5 +326,3 @@ export async function POST(request: NextRequest) {
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
-
-

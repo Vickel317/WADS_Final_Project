@@ -1,12 +1,21 @@
 const OLLAMA_BASE = process.env.OLLAMA_API_BASE ?? "https://ollama.csbihub.id";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "gemma4:26b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
 const OLLAMA_TIMEOUT = Number(process.env.OLLAMA_TIMEOUT_MS ?? 60000);
 const OLLAMA_RETRY_MAX = Number(process.env.OLLAMA_RETRY_MAX ?? 2);
 const OLLAMA_RETRY_BASE_MS = Number(process.env.OLLAMA_RETRY_BASE_MS ?? 300);
 
+export function getOllamaConfig() {
+  return {
+    baseUrl: OLLAMA_BASE,
+    model: OLLAMA_MODEL,
+    timeoutMs: OLLAMA_TIMEOUT,
+  };
+}
+
 export interface OllamaOptions {
   model?: string;
   timeoutMs?: number;
+  maxRetries?: number;
 }
 
 const sleep = (ms: number) =>
@@ -36,7 +45,7 @@ export async function ollamaGenerate(
 ): Promise<unknown> {
   const model = options.model ?? OLLAMA_MODEL;
   const timeoutMs = options.timeoutMs ?? OLLAMA_TIMEOUT;
-  const maxRetries = Math.max(0, OLLAMA_RETRY_MAX);
+  const maxRetries = Math.max(0, options.maxRetries ?? OLLAMA_RETRY_MAX);
 
   let lastError: unknown;
 

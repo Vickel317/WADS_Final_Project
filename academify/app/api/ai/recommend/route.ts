@@ -6,28 +6,34 @@ import { ollamaGenerate } from "@/lib/ollama";
 import { buildRecommendPrompt } from "@/lib/ai/prompts";
 import { RecommendResultSchema } from "@/lib/ai/schemas";
 import { ModerationStatus } from "@prisma/client";
+import { getRecommendUserContext } from "@/lib/ai/recommend-context";
+import {
+  buildThreadHeuristicRecommendations,
+  RECOMMEND_AI_TIMEOUT_MS,
+} from "@/lib/ai/recommend-heuristics";
+import { checkAiRateLimit } from "@/lib/ai/rate-limit";
 
 /**
  * GET /api/ai/recommend
- * Returns up to 5 thread recommendations based on the user's profile and forums.
- * Requires authentication.
+ * Returns paginated thread recommendations based on profile, skills, and forum activity.
  */
 export async function GET(request: NextRequest) {
   const decoded = await verifyToken(request);
   if (!decoded) return apiError(401, "Not authenticated", "UNAUTHORIZED");
 
-  const user = await prisma.user.findUnique({
-    where: { userId: decoded.id },
-    select: { major: true, bio: true, skillTags: true },
-  });
+  const rate = checkAiRateLimit(decoded.id, "recommend");
+  if (!rate.ok) {
+    return apiError(429, "Too many recommendation requests. Try again shortly.", "RATE_LIMITED");
+  }
 
-  const userForums = await prisma.post.findMany({
-    where: { authorID: decoded.id },
-    select: { forum: { select: { name: true } } },
-    distinct: ["forumID"],
-    take: 8,
-  });
-  const forumNames = userForums.map((p) => p.forum.name);
+  const { searchParams } = new URL(request.url);
+  const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
+  const limit = Math.min(8, Math.max(1, Number.parseInt(searchParams.get("limit") || "5", 10) || 5));
+  const heuristicOnly = searchParams.get("heuristic") === "1";
+  const candidateTake = 25;
+  const skip = (page - 1) * candidateTake;
+
+  const context = await getRecommendUserContext(decoded.id);
 
   const threads = await prisma.post.findMany({
     where: {
@@ -35,7 +41,8 @@ export async function GET(request: NextRequest) {
       authorID: { not: decoded.id },
     },
     orderBy: { createdAt: "desc" },
-    take: 25,
+    skip,
+    take: candidateTake,
     select: {
       postID: true,
       title: true,
@@ -43,37 +50,70 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const hasMore = skip + threads.length < 200 && threads.length === candidateTake;
+
   if (threads.length === 0) {
-    return NextResponse.json({ recommendations: [] }, { status: 200 });
+    return NextResponse.json(
+      { recommendations: [], page, limit, hasMore: false },
+      { status: 200 }
+    );
+  }
+
+  const threadRows = threads.map((t) => ({
+    postID: t.postID,
+    title: t.title,
+    forum: t.forum.name,
+  }));
+
+  const fallback = buildThreadHeuristicRecommendations(threadRows, context, limit);
+
+  if (heuristicOnly) {
+    return NextResponse.json(
+      { recommendations: fallback, page, limit, hasMore, fallback: true },
+      { status: 200 }
+    );
   }
 
   try {
     const raw = await ollamaGenerate(
-      buildRecommendPrompt(
-        { major: user?.major, bio: user?.bio },
-        forumNames,
-        threads.map((t) => ({ postID: t.postID, title: t.title, forum: t.forum.name }))
-      )
+      buildRecommendPrompt(context.profile, context.joinedForumNames, threadRows),
+      { timeoutMs: RECOMMEND_AI_TIMEOUT_MS, maxRetries: 0 }
     );
 
     const result = RecommendResultSchema.safeParse(raw);
     if (!result.success) {
       console.error("[AI recommend] schema mismatch", raw);
-      return apiError(502, "AI response invalid", "AI_ERROR");
+      return NextResponse.json(
+        { recommendations: fallback, page, limit, hasMore, fallback: true },
+        { status: 200 }
+      );
     }
 
-    // Enrich with post title + forum for the frontend
-    const postMap = new Map(threads.map((t) => [t.postID, t]));
+    const postMap = new Map(threadRows.map((t) => [t.postID, t]));
     const enriched = result.data.recommendations
       .filter((r) => postMap.has(r.postID))
+      .slice(0, limit)
       .map((r) => {
         const post = postMap.get(r.postID)!;
-        return { ...r, title: post.title, forum: post.forum.name };
+        return { ...r, title: post.title, forum: post.forum };
       });
 
-    return NextResponse.json({ recommendations: enriched }, { status: 200 });
+    if (enriched.length === 0) {
+      return NextResponse.json(
+        { recommendations: fallback, page, limit, hasMore, fallback: true },
+        { status: 200 }
+      );
+    }
+
+    return NextResponse.json(
+      { recommendations: enriched, page, limit, hasMore },
+      { status: 200 }
+    );
   } catch (err) {
-    console.error("[AI recommend] Ollama error:", err);
-    return apiError(503, "AI service unavailable", "AI_UNAVAILABLE");
+    console.error("[AI recommend] Ollama error, using heuristics:", err);
+    return NextResponse.json(
+      { recommendations: fallback, page, limit, hasMore, fallback: true },
+      { status: 200 }
+    );
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, normalizeRole } from "@/lib/auth-session";
+import { getSessionUser } from "@/lib/auth-session";
+import { canCreateForum } from "@/lib/forum-access";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
@@ -99,8 +100,8 @@ export async function POST(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (normalizeRole(sessionUser.user.role) !== "admin") {
-      // Allow any authenticated user to create a forum
+    if (!canCreateForum(sessionUser.user.role)) {
+      return apiError(403, "Only lecturers and admins can create forums", "FORBIDDEN");
     }
 
     const contentType = request.headers.get("content-type") || "";
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
     }
 
     let imageUrl: string | null = null;
-    const rawFile = formData ? body.imageFile : null;
+    const rawFile = formData?.get("imageFile") ?? null;
     if (rawFile instanceof File && rawFile.size > 0) {
       if (!rawFile.type.startsWith("image/")) {
         return apiError(400, "Forum image must be an image file", "BAD_REQUEST");

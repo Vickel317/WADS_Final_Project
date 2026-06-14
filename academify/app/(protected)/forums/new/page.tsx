@@ -1,26 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCurrentUser } from "@/components/current-user-context";
+import { canCreateForum } from "@/lib/forum-access";
 
 function isValidForumName(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed.length < 2) return "Name must be at least 2 characters.";
   if (trimmed.length > 100) return "Name must be 100 characters or fewer.";
-  if (!/^[a-zA-Z0-9\s&'-]+$/.test(trimmed)) return "Name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands.";
+  if (!/^[a-zA-Z0-9\s&'-]+$/.test(trimmed)) {
+    return "Name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands.";
+  }
   return null;
 }
 
 export default function NewForumPage() {
   const router = useRouter();
+  const currentUser = useCurrentUser();
+  const allowed = canCreateForum(currentUser?.role);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (currentUser && !allowed) {
+      router.replace("/forums");
+    }
+  }, [allowed, currentUser, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!allowed) return;
+
     setLoading(true);
     setError(null);
 
@@ -45,7 +59,7 @@ export default function NewForumPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to create forum");
+        throw new Error(data?.error?.message || data.message || "Failed to create forum");
       }
 
       router.push(`/forums/${data.category.slug}`);
@@ -55,6 +69,10 @@ export default function NewForumPage() {
       setLoading(false);
     }
   };
+
+  if (!currentUser || !allowed) {
+    return null;
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -73,7 +91,9 @@ export default function NewForumPage() {
             className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
             required
           />
-          <p className="mt-1 text-xs text-gray-400">Letters, numbers, spaces, hyphens, apostrophes, and ampersands only.</p>
+          <p className="mt-1 text-xs text-gray-400">
+            Letters, numbers, spaces, hyphens, apostrophes, and ampersands only.
+          </p>
         </div>
         <div className="mb-6">
           <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
@@ -98,7 +118,9 @@ export default function NewForumPage() {
             onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
             className="block w-full text-sm text-gray-600 file:mr-4 file:rounded-lg file:border-0 file:bg-teal-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-teal-700 hover:file:bg-teal-100"
           />
-          <p className="mt-2 text-xs text-gray-400">Optional. Upload an image to show on the forum card and page.</p>
+          <p className="mt-2 text-xs text-gray-400">
+            Optional. Upload an image to show on the forum card and page.
+          </p>
         </div>
         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
         <button

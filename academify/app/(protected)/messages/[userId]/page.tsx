@@ -112,17 +112,25 @@ export default function ConversationPage() {
   useEffect(() => {
     if (!isSpaceChat || !spaceId) return;
     let cancelled = false;
-    setSpaceNameLoading(true);
-    fetch("/api/collaboration")
-      .then((r) => r.json())
-      .then((data) => {
+
+    void (async () => {
+      setSpaceNameLoading(true);
+      try {
+        const r = await fetch("/api/collaboration");
+        const data = await r.json();
         if (cancelled) return;
         const space = (data.spaces ?? []).find((s: { spaceID: string }) => s.spaceID === spaceId);
         if (space?.name) setSpaceName(space.name);
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setSpaceNameLoading(false); });
-    return () => { cancelled = true; };
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setSpaceNameLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isSpaceChat, spaceId]);
 
   useEffect(() => {
@@ -197,7 +205,7 @@ export default function ConversationPage() {
         setLoadingMsgs(false);
       }
     },
-    [isSpaceChat, partnerId, spaceId]
+    [isSpaceChat, partnerId, spaceId, setMessages]
   );
 
   useEffect(() => {
@@ -470,7 +478,7 @@ export default function ConversationPage() {
   return (
     <>
     {showNewMessage && <NewMessageModal onClose={() => setShowNewMessage(false)} />}
-    <div className="flex h-[calc(100vh-80px)] bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div className="flex min-h-[calc(100vh-6rem)] w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
       {/* Sidebar — conversation list */}
       <div className="hidden lg:flex w-72 shrink-0 border-r border-gray-100 flex-col">
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
