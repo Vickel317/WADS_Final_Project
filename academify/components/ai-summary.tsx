@@ -6,6 +6,8 @@ type Summary = {
   summary: string;
   keyPoints: string[];
   openQuestions: string[];
+  model?: string;
+  cached?: boolean;
 };
 
 export function AiSummary({ postId }: { postId: string }) {
@@ -56,9 +58,16 @@ export function AiSummary({ postId }: { postId: string }) {
 
   return (
     <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50 p-4 space-y-3">
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-violet-600 text-xs font-bold">✦ AI SUMMARY</span>
-        <span className="rounded bg-violet-200 px-1.5 py-0.5 text-[10px] text-violet-800">gemma4:26b</span>
+        {data?.model && (
+          <span className="rounded bg-violet-200 px-1.5 py-0.5 text-[10px] text-violet-800">
+            {data.model}
+          </span>
+        )}
+        {data?.cached && (
+          <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] text-gray-600">cached</span>
+        )}
       </div>
       <p className="text-sm text-gray-700">{data?.summary}</p>
       {(data?.keyPoints ?? []).length > 0 && (
