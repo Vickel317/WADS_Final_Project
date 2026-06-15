@@ -98,18 +98,38 @@ Academify is a full-stack web platform where users:
 
 Interactive documentation: **`/api-docs`** (Swagger UI). Machine-readable spec: **`/api/swagger`**.
 
-### 6.1 Quick links
+### 6.1 API Documentation
 
-- **Interactive Documentation**: Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs) to explore the API with Swagger UI
-- **OpenAPI Spec**: [/public/swagger.json](/public/swagger.json)
+- **Swagger / Postman link (if available)**
+    - Interactive Documentation: Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs) to explore the API with Swagger UI
+    - OpenAPI Spec: [/public/swagger.json](/public/swagger.json)
+    - Base URL: `http://localhost:3000/api`
+- **Example request & response (JSON)**
 
-### 6.2 Base URL
+Example: **POST /api/auth/sign-in/email**
 
+Request JSON:
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
 ```
-http://localhost:3000/api
+
+Response JSON:
+```json
+{
+  "success": true,
+  "user": {
+    "id": "user_123",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "role": "STUDENT"
+  }
+}
 ```
 
-### 6.3 Authentication
+### 6.2 Authentication
 
 The API uses [Better Auth](https://www.better-auth.com/) with **HTTP-only session cookies**. After signing in through `/api/auth/*`, the browser automatically sends the session cookie on same-origin requests. Protected endpoints reject unauthenticated callers with `401 Unauthorized`.
 
@@ -123,7 +143,7 @@ Better Auth sets an HTTP-only session cookie (configured in `lib/auth.ts`):
 
 For same-origin browser clients, no manual `Authorization` header is required. API route handlers read the session via `getSessionUser()` / `verifyToken()`.
 
-### 6.4 API endpoints
+### 6.3 API endpoints
 
 ### Authentication Endpoints
 
@@ -694,7 +714,7 @@ GET /api/events/:eventId/attendees
 }
 ```
 
-### 6.5 Error responses
+### 6.4 Error responses
 
 All error responses follow a consistent format:
 
@@ -713,7 +733,7 @@ All error responses follow a consistent format:
 - **404 Not Found**: Resource not found
 - **500 Internal Server Error**: Server-side error
 
-### 6.6 Rate limiting
+### 6.5 Rate limiting
 
 Global API rate limiting is enforced in `proxy.ts` (Next.js middleware) using client IP:
 
@@ -729,13 +749,13 @@ AI-specific routes (`/api/ai/recommend`, `/api/ai/summarize`) additionally enfor
 
 Limits are configurable through environment variables: `RATE_LIMIT_READ_MAX`, `RATE_LIMIT_WRITE_MAX`, `RATE_LIMIT_AUTH_MAX`, and corresponding `*_WINDOW_MS` values.
 
-### 6.7 CORS policy
+### 6.6 CORS policy
 
 The API accepts requests from:
 - `http://localhost:3000` (development)
 - `https://academify.example.com` (production)
 
-### 6.8 Testing the API
+### 6.7 Testing the API
 
 ### Using cURL
 
@@ -840,7 +860,7 @@ curl -X DELETE http://localhost:3000/api/events/event_1 \
 4. Fill in the required parameters
 5. Click "Execute" to send the request
 
-### 6.9 Security considerations
+### 6.8 Security considerations
 
 1. **Session-based auth (Better Auth)**: Sessions are stored server-side; cookies are HTTP-only and cannot be read by client JavaScript.
 2. **Password hashing**: Passwords are hashed by Better Auth before storage.
@@ -855,11 +875,11 @@ curl -X DELETE http://localhost:3000/api/events/event_1 \
     - **Virus/malware scanning**: Production Docker images run `clamscan` with definitions from `freshclam` at build time. Local dev skips scanning when `clamscan` is not installed.
     - **Image moderation**: Text content is AI-moderated; image attachments and avatars are not scanned for explicit content.
 
-### 6.10 Additional endpoints
+### 6.9 Additional endpoints
 
 Forums, threads, posts, comments, messages, files, collaboration spaces, moderation, reports, AI routes, and admin APIs are implemented — explore them in Swagger UI at `/api-docs` or via route handlers under `app/api/`.
 
-### 6.11 Support
+### 6.10 Support
 
 For API issues or questions, please contact: support@academify.com
 
@@ -867,13 +887,40 @@ For API issues or questions, please contact: support@academify.com
 
 ## 7. Database Design
 
-### 7.1 Database choice
+### 7.1 Database Choice
 
-**PostgreSQL** — relational data (users, forums, posts, comments, events, messages, moderation logs) with strong consistency and Prisma migrations.
+Explain why you chose:
 
-### 7.2 Schema
+- **PostgreSQL** — We chose PostgreSQL because our application requires strong relational integrity for complex data relationships between users, forums, posts, comments, events, messages, and moderation logs. PostgreSQL provides ACID compliance, robust indexing, and mature support for the relational queries our platform demands. Combined with Prisma ORM, we get type-safe database access, automatic migrations, and protection against SQL injection. Hosting on Neon provides serverless scaling with connection pooling for production reliability.
 
-Key models: `User`, `ForumHub`, `ForumMember`, `ForumModerator`, `Post`, `Comment`, `CommentLike`, `Message`, `Event`, `File`, `CollabSpace`, `ReportReview`, `ModerationActionLog`, plus Better Auth tables (`AuthUser`, `AuthSession`, `AuthAccount`).
+### 7.2 Schema / Data Structure
+
+Insert ERD or data structure diagram.
+
+Key models in our schema:
+
+| Model | Description |
+|-------|-------------|
+| `User` | Core user profile with role-based attributes (STUDENT, LECTURER, ADMIN), privacy settings, and collaboration metadata |
+| `ForumHub` | Discussion forums with moderators and members |
+| `ForumMember` | Many-to-many relationship between users and forums |
+| `ForumModerator` | Moderator assignments per forum |
+| `Post` | Forum posts with moderation status, AI scoring, and summaries |
+| `Comment` | Nested comments on posts with like support |
+| `CommentLike` | Like tracking for comments |
+| `PostLike` | Like tracking for posts |
+| `Event` | Scheduled events with RSVP and attendee tracking |
+| `EventAttendee` | Event participation with roles (GUEST, HOST) |
+| `File` | File attachments linked to posts or collaboration spaces |
+| `Message` | Direct messaging between users and within collaboration spaces |
+| `CollabSpace` | Collaboration spaces within forums with role-based access |
+| `SpaceMember` | Membership in collaboration spaces |
+| `ReportReview` | User-submitted reports for content moderation |
+| `ModerationActionLog` | Audit log for all moderation actions taken |
+| `Follow` | User follow relationships |
+| `AuthUser` | Better Auth user table |
+| `AuthSession` | Better Auth session table |
+| `AuthAccount` | Better Auth account/provider table |
 
 ERD: generate with `npx prisma generate` and your preferred diagram tool from `prisma/schema.prisma`, or export from Neon/Prisma Studio.
 
@@ -890,22 +937,27 @@ ERD: generate with `npx prisma generate` and your preferred diagram tool from `p
 | Thread recommendations | Suggest posts based on profile & activity | Recommendation |
 | Forum recommendations | Suggest forums to join | Recommendation |
 
-### 8.2 AI integration flow
+### 8.2 AI Integration Flow
 
-```
-User submits post
-    → lib/ai/post-moderation.ts
-    → Ollama prompt (or profanity heuristic fallback)
-    → moderationStatus stored on Post
-    → Visible per visibility rules
+Explain:
 
-User opens thread
-    → GET /api/ai/summarize/:postId
-    → Top 20 comments by likes + post body → Ollama
-    → Cached JSON on Post when unchanged
-```
+**Content Moderation:**
+- Input → AI processing → Output
+    - User submits a post or comment → Text is sent to local Ollama instance for classification → AI returns moderation decision (APPROVED, FLAGGED, or BLOCKED) → Result stored in `moderationStatus` field on the Post → Content visibility enforced based on status
+- How AI results are used in the system
+    - Posts with `PENDING` status are held for review. `APPROVED` posts are immediately visible. `FLAGGED` posts enter the moderation queue for moderator action. If Ollama is unavailable, profanity-based heuristic fallback is used.
 
-Detailed test cases: **§10.4** below.
+**Thread Summarization:**
+- Input → AI processing → Output
+    - User opens a thread → Top 20 comments by likes + post body are collected → Text sent to Ollama for summarization → AI returns key points and open questions → Summary cached as JSON on the Post model
+- How AI results are used in the system
+    - Cached summaries are displayed at the top of thread views. Summaries are regenerated only when comment count changes significantly, reducing unnecessary AI calls.
+
+**Topic & Forum Recommendations:**
+- Input → AI processing → Output
+    - User's profile interests + forum metadata are collected → Semantic similarity computed via Ollama → Ranked list of relevant forums returned → Personalized feed filtered by engagement patterns
+- How AI results are used in the system
+    - Recommendations appear in the sidebar and "Recommended for You" section. Results are personalized per user and refreshed on each session.
 
 ---
 
