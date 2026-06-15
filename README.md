@@ -720,9 +720,9 @@ Example (edit for your team):
 
 > ChatGPT / GitHub Copilot / Cursor were used to assist with boilerplate API routes, UI components, test scaffolding, and Docker/CI configuration. All code was reviewed, tested, and modified by the team. We can explain authentication, moderation, and AI fallback logic in presentation.
 
-**Tools used:** [FILL IN]  
-**Purpose:** [FILL IN]  
-**Parts assisted:** [FILL IN]
+**Tools used:** Github Copilot and Cursor AI  
+**Purpose:**    
+**Parts assisted:** 
 
 ---
 
@@ -743,7 +743,7 @@ We declare that:
 - AI usage is disclosed honestly
 - All group members understand the system
 
-Signed: [FILL IN] · [FILL IN] · [FILL IN]
+Signed: Harris Ekaputra Suryadi · Kevin Makmur Kurniawan · Vickelsteins August Santoso
 
 ---
 
