@@ -25,9 +25,9 @@ export default function CommentActions({
   if (!canEdit && !canDelete) return null;
 
   return (
-    <div className="mt-2">
+    <>
       {!editing ? (
-        <div className="flex items-center gap-2">
+        <>
           {canEdit && (
             <button
               onClick={() => setEditing(true)}
@@ -62,9 +62,9 @@ export default function CommentActions({
               {deleting ? "Deleting..." : "Delete"}
             </button>
           )}
-        </div>
+        </>
       ) : (
-        <div className="space-y-2">
+        <div className="w-full basis-full space-y-2">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -116,10 +116,10 @@ export default function CommentActions({
           </div>
         </div>
       )}
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 w-full basis-full text-xs text-red-600">{error}</p>}
       {edited && !editing && !error && (
-        <p className="mt-1 text-[11px] font-semibold text-gray-500">edited</p>
+        <p className="mt-1 w-full basis-full text-[11px] font-semibold text-gray-500">edited</p>
       )}
-    </div>
+    </>
   );
 }

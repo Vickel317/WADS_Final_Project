@@ -93,7 +93,15 @@ export default async function PostDetailPage({
 							{post.title}
 						</h1>
 						<div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
-							  <span>by {author?.name ?? "Unknown"}</span>
+							  <span>
+                by{" "}
+                <Link
+                  href={`?profileId=${post.authorID}`}
+                  className="font-medium text-gray-600 hover:text-teal-600 hover:underline"
+                >
+                  {author?.name ?? "Unknown"}
+                </Link>
+              </span>
 							<span>•</span>
 							<span>
 								{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
@@ -101,7 +109,9 @@ export default async function PostDetailPage({
               {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 1000 && (
                 <>
                   <span>•</span>
-                  <span className="font-semibold text-gray-500">edited</span>
+                  <span className="font-semibold text-gray-500">
+                    edited {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
+                  </span>
                 </>
               )}
               {shouldShowModerationStatus(post.moderationStatus) && (
@@ -115,7 +125,6 @@ export default async function PostDetailPage({
 						</div>
 					</div>
 					<div className="flex flex-col items-start gap-2 text-xs text-gray-400 sm:items-end">
-						<LikeButton postId={post.postID} />
 						{post.authorID !== session.user.userId && (
 							<ReportButton
 								targetType="post"
@@ -124,9 +133,6 @@ export default async function PostDetailPage({
 								label="Report"
 							/>
 						)}
-						<span>
-							Updated {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
-						</span>
             <PostActions
               postId={post.postID}
               title={post.title}
@@ -141,8 +147,6 @@ export default async function PostDetailPage({
 			<div className="mt-5 whitespace-pre-wrap text-sm text-gray-700">
 				{post.content}
 			</div>
-
-			<AiSummary postId={post.postID} />
 
 				{file && (
 					<div className="mt-6 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
@@ -160,6 +164,13 @@ export default async function PostDetailPage({
 						</div>
 					</div>
 				)}
+
+			<div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+				<div className="min-w-0 flex-1">
+					<AiSummary postId={post.postID} />
+				</div>
+				<LikeButton postId={post.postID} />
+			</div>
 			</div>
 
 			<div className="rounded-2xl border border-gray-100 bg-white p-6">

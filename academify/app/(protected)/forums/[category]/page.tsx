@@ -425,6 +425,18 @@ export default function CategoryForumsPage() {
         </div>
       )}
 
+      {forum && (
+        <div className="-mt-2 mb-3 flex justify-end">
+          <ReportButton
+            targetType="forum"
+            targetId={forum.id}
+            targetLabel={forum.name}
+            label="Report forum"
+            className="gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-500 shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
+          />
+        </div>
+      )}
+
       {forum && canEditForum && (
         <ForumModeratorSettings
           key={`${forum.id}-${showForumEdit}`}
@@ -469,14 +481,6 @@ export default function CategoryForumsPage() {
                 setIsMember(joined);
                 setMemberCount(count);
               }}
-            />
-          )}
-          {forum && (
-            <ReportButton
-              targetType="forum"
-              targetId={forum.id}
-              targetLabel={forum.name}
-              label="Report forum"
             />
           )}
           {hubTab === "threads" && (
