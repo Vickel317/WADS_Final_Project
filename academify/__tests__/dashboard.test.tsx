@@ -16,6 +16,7 @@ jest.mock("@/lib/get-session", () => ({
 
 jest.mock("@/lib/prisma", () => ({
   prisma: {
+    user: { findUnique: jest.fn().mockResolvedValue({ name: "Test User", role: "STUDENT" }) },
     eventAttendee: { count: jest.fn() },
     file: { count: jest.fn(), findMany: jest.fn() },
     spaceMember: { count: jest.fn() },
@@ -25,6 +26,7 @@ jest.mock("@/lib/prisma", () => ({
     message: { findMany: jest.fn() },
   },
 }));
+
 
 import { getSession } from "@/lib/get-session";
 import { prisma } from "@/lib/prisma";
@@ -56,9 +58,11 @@ describe("DashboardPage", () => {
   it("renders personalized dashboard sections", async () => {
     const page = await DashboardPage();
     render(page);
-    expect(screen.getByRole("heading", { name: /^dashboard$/i })).toBeInTheDocument();
+expect(screen.getByRole("heading", { name: /test user/i })).toBeInTheDocument();
+
     expect(screen.getByRole("link", { name: /browse forums/i })).toHaveAttribute("href", "/forums");
-    expect(screen.getByRole("heading", { name: /upcoming events/i })).toBeInTheDocument();
+expect(screen.getByRole("heading", { name: /my events/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /recent chats/i })).toBeInTheDocument();
+
   });
 });

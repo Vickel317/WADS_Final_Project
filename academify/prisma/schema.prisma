@@ -88,6 +88,7 @@ model User {
   major     String?
   bio       String?  @db.Text
   avatarUrl String?
+  bannerUrl String?
   location  String?
   website   String?
   createdAt DateTime @default(now())
@@ -198,6 +199,7 @@ model CollabSpace {
   forumID     String
   name        String
   description String?  @db.Text
+  bannerUrl   String?
   createdAt   DateTime @default(now())
 
   // Relations
@@ -286,6 +288,7 @@ model Event {
   description String   @db.Text
   dateTime    DateTime
   location    String
+  bannerUrl   String?
   createdAt   DateTime @default(now())
 
   // Relations

@@ -10,36 +10,126 @@ jest.mock("next/navigation", () => ({
   useParams: () => ({ userId: mockUserId }),
 }));
 
+function makeResponse(payload: any) {
+  return {
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    headers: new Headers(),
+    redirected: false,
+    type: "basic",
+    url: "",
+    useFinalURL: false,
+    clone: () => makeResponse(payload),
+    body: null,
+    bodyUsed: false,
+    arrayBuffer: async () => new ArrayBuffer(0),
+    blob: async () => new Blob(),
+    formData: async () => new FormData(),
+    json: async () => payload,
+    text: async () => JSON.stringify(payload),
+  } as any;
+}
+
+
+
 beforeEach(() => {
   mockUserId = "me";
   jest.clearAllMocks();
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      user: {
-        id: "me",
-        name: "John Doe",
-        major: "Computer Science",
-        year: "3rd Year",
-        bio: "Building useful things.",
-        location: "Jakarta",
-        website: "johndoe.dev",
-        connections: 248,
-        posts: 67,
-        filesShared: 142,
-        skills: ["React", "TypeScript", "Python"],
-        isConnected: false,
-      },
-    }),
-  } as Response);
+
+  // Default fetch mock for ProfilePage
+  global.fetch = jest.fn((url: any) => {
+    const s = String(url);
+
+    // Profile fetch
+    if (s.includes("/api/users/other-user-123")) {
+      return Promise.resolve(
+        makeResponse({
+          user: {
+            id: "other-user-123",
+            name: "Other User",
+            major: "Computer Science",
+            year: "3rd Year",
+            bio: "Other user bio",
+            location: "Jakarta",
+            website: "otheruser.dev",
+            connections: 1,
+            posts: 1,
+            filesShared: 1,
+            skills: ["React"],
+            isOwn: false,
+            isFollowing: false,
+            isFollower: false,
+            isConnected: false,
+          },
+        })
+      );
+    }
+
+    if (s.includes("/api/users/api-user")) {
+      return Promise.resolve(
+        makeResponse({
+          user: {
+            id: "api-user",
+            name: "API User",
+            major: "Physics",
+            year: "2nd Year",
+            bio: "Science lover",
+            location: "Bandung",
+            website: "apiuser.com",
+            connections: 10,
+            posts: 5,
+            filesShared: 3,
+            skills: ["Math", "Physics"],
+            isOwn: false,
+            isFollowing: false,
+            isFollower: false,
+            isConnected: false,
+          },
+        })
+      );
+    }
+
+    if (s.includes("/api/users/me")) {
+      return Promise.resolve(
+        makeResponse({
+          user: {
+            id: "me",
+            name: "John Doe",
+            major: "Computer Science",
+            year: "3rd Year",
+            bio: "Building useful things.",
+            location: "Jakarta",
+            website: "johndoe.dev",
+            connections: 248,
+            posts: 67,
+            filesShared: 142,
+            skills: ["React", "TypeScript", "Python"],
+            isOwn: true,
+            isFollowing: false,
+            isFollower: false,
+            isConnected: false,
+          },
+        })
+      );
+    }
+
+    // Recent posts/events calls
+    if (s.includes("/posts") || s.includes("/events")) {
+      return Promise.resolve(makeResponse({ data: [] }));
+    }
+
+    // fallback
+    return Promise.resolve(makeResponse({}));
+  });
 });
 
 describe("ProfilePage – loading state", () => {
   it("shows a loading spinner initially", () => {
-    // Keep fetch hanging
     global.fetch = jest.fn().mockImplementation(() => new Promise(() => {}));
+
     render(<ProfilePage />);
-    // Loading spinner is a spinning div; check loading container exists
+
     const spinner = document.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();
   });
@@ -98,37 +188,20 @@ describe("ProfilePage – other user's profile", () => {
 
   it("shows Follow button for another user's profile", async () => {
     render(<ProfilePage />);
-    // The CTA button reads "Follow" (or "Following" / "Follow Back") for other users
     expect(await screen.findByRole("button", { name: /follow/i })).toBeInTheDocument();
   });
 });
 
 describe("ProfilePage – API success", () => {
   it("renders profile data returned from the API", async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        user: {
-          id: "api-user",
-          name: "API User",
-          major: "Physics",
-          year: "2nd Year",
-          bio: "Science lover",
-          location: "Bandung",
-          website: "apiuser.com",
-          connections: 10,
-          posts: 5,
-          filesShared: 3,
-          skills: ["Math", "Physics"],
-          isOwn: false,
-          isConnected: false,
-        },
-      }),
-    });
+    // Override userId route param to api-user
+    mockUserId = "api-user";
 
     render(<ProfilePage />);
+
     expect(await screen.findByText("API User")).toBeInTheDocument();
     expect(screen.getByText("Physics")).toBeInTheDocument();
     expect(screen.getByText("Math")).toBeInTheDocument();
   });
 });
+

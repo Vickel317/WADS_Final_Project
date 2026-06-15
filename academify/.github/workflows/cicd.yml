@@ -167,6 +167,7 @@ jobs:
           OLLAMA_MODEL=${{ secrets.OLLAMA_MODEL }}
           OLLAMA_TIMEOUT_MS=${{ secrets.OLLAMA_TIMEOUT_MS }}
           SOCKET_SERVER_URL=http://socket:3100
+          SOCKET_EMIT_SECRET=${{ secrets.SOCKET_EMIT_SECRET }}
           EOF
 
       - uses: actions/setup-node@v4

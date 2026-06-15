@@ -234,6 +234,7 @@ type EventForm = {
   description: string;
   virtualLink: string;
   forumID: string;
+  bannerFile: File | null;
 };
 
 function CreateEventModal({
@@ -379,6 +380,17 @@ function CreateEventModal({
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">
+              Banner Image (optional)
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => onChange({ bannerFile: e.target.files?.[0] ?? null })}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">
               Virtual Link (optional)
             </label>
             <input
@@ -436,6 +448,7 @@ export default function EventsPage() {
     description: "",
     virtualLink: "",
     forumID: "",
+    bannerFile: null,
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
@@ -449,6 +462,20 @@ export default function EventsPage() {
     if (normalized.includes("social")) return "Social";
     return "Study Session";
   };
+
+  useEffect(() => {
+    const shouldCreate = searchParams.get("create") === "true";
+    if (!shouldCreate) return;
+
+    // Avoid setting state in the effect body (lint rule)
+    const id = window.requestAnimationFrame(() => {
+      setModal(true);
+      router.replace(`/events?forum=${forumSlug ?? ""}`);
+    });
+
+    return () => window.cancelAnimationFrame(id);
+  }, [searchParams, forumSlug, router]);
+
 
   useEffect(() => {
     if (!forumSlug) {
@@ -604,6 +631,15 @@ export default function EventsPage() {
         throw new Error(data.message || "Failed to create event");
       }
 
+      if (form.bannerFile && data.id) {
+        const fd = new FormData();
+        fd.append("file", form.bannerFile);
+        await fetch(`/api/storage/upload-entity-banner/event/${data.id}`, {
+          method: "POST",
+          body: fd,
+        });
+      }
+
       setModal(false);
       setForm({
         title: "",
@@ -615,6 +651,7 @@ export default function EventsPage() {
         description: "",
         virtualLink: "",
         forumID: "",
+        bannerFile: null,
       });
       setFormError(null);
       const refreshRes = await fetch("/api/events?filter=upcoming");

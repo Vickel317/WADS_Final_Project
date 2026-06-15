@@ -227,6 +227,31 @@ export type ValidatedFileUpload = {
   spaceId?: string;
 };
 
+export function validateUploadedFile(file: { name: string; type: string; size: number }) {
+  const fileName = validateUploadFileName(file.name);
+  if (!fileName.ok) {
+    return { ok: false as const, error: fileName.error };
+  }
+
+  const fileType = file.type?.trim() || "application/octet-stream";
+  if (!ALLOWED_MIME_TYPES.has(fileType)) {
+    return { ok: false as const, error: `File type "${fileType}" is not allowed` };
+  }
+
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { ok: false as const, error: "File exceeds the 50 MB limit" };
+  }
+
+  return {
+    ok: true as const,
+    value: {
+      fileName: fileName.value,
+      fileType,
+      fileSize: file.size,
+    },
+  };
+}
+
 export function validateFileUpload(body: unknown):
   | { ok: true; data: ValidatedFileUpload }
   | { ok: false; error: string } {
