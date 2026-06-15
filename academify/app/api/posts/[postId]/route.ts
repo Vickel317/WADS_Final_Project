@@ -200,15 +200,14 @@ export async function PUT(
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    const isModerator = decoded.role === "moderator" || decoded.role === "admin";
-    if (existing.authorID !== decoded.id && !isModerator) {
+    if (existing.authorID !== decoded.id) {
       return apiError(
         403,
         "Forbidden: You can only edit your own posts",
         "FORBIDDEN"
       );
     }
-    if (existing.moderationStatus !== "APPROVED" && !isModerator) {
+    if (existing.moderationStatus !== "APPROVED") {
       return apiError(
         403,
         "Forbidden: Flagged/blocked posts cannot be edited",

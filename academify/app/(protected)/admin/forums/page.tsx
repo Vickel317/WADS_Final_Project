@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AdminBackLink } from "@/components/admin-back-link";
 
 type ForumItem = {
   id: string;
@@ -139,6 +140,7 @@ export default function AdminForumsPage() {
 
   return (
     <div className="space-y-6">
+      <AdminBackLink />
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <h1 className="text-xl font-semibold text-gray-900">Admin Forums</h1>
         <p className="mt-2 text-sm text-gray-600">Create, edit, and delete forum hubs.</p>

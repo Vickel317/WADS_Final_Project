@@ -65,40 +65,58 @@ export default function AdminPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="rounded-xl border border-gray-200 bg-white p-6">
-				<h1 className="text-xl font-semibold text-gray-900">Admin Panel</h1>
-				<p className="mt-2 text-sm text-gray-600">
-					Platform insights powered by live admin endpoints.
-				</p>
-				<div className="mt-4 flex flex-wrap gap-2">
-					<Link href="/admin/users" className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+			<div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+				<div className="p-6 pb-4">
+					<h1 className="text-xl font-semibold text-gray-900">Admin Panel</h1>
+					<p className="mt-1 text-sm text-gray-600">
+						Platform insights powered by live admin endpoints.
+					</p>
+				</div>
+
+				<div className="grid grid-cols-2 divide-x divide-y divide-gray-100 border-t border-gray-100 md:grid-cols-4 md:divide-y-0">
+					{[
+						{ label: "Users", value: analytics?.users.total },
+						{ label: "Posts", value: analytics?.posts.total },
+						{ label: "Reports", value: analytics?.reports.total },
+						{ label: "Moderation", value: analytics?.moderation.totalActions },
+					].map((stat) => (
+						<div key={stat.label} className="px-5 py-4">
+							<p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+								{stat.label}
+							</p>
+							<p className="mt-1 text-2xl font-semibold text-gray-900 tabular-nums">
+								{loading ? "…" : stat.value ?? 0}
+							</p>
+						</div>
+					))}
+				</div>
+
+				<div className="flex flex-wrap gap-2 p-4 sm:p-5 bg-gray-50/60">
+					<Link
+						href="/admin/users"
+						className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
 						Manage Users
 					</Link>
-					<Link href="/admin/forums" className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+					<Link
+						href="/admin/forums"
+						className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
 						Manage Forums
 					</Link>
+					<Link
+						href="/admin/reports"
+						className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						Manage Reports
+					</Link>
+					<Link
+						href="/moderation/queue"
+						className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						Moderation Queue
+					</Link>
 				</div>
-			</div>
-
-			<div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-				{["Users", "Posts", "Reports", "Moderation"].map((label) => (
-					<div key={label} className="rounded-xl border border-gray-200 bg-white p-4">
-						<p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-							{label}
-						</p>
-						<p className="mt-2 text-2xl font-semibold text-gray-900">
-							{loading ? "…" : analytics ? String(
-								label === "Users"
-									? analytics.users.total
-									: label === "Posts"
-										? analytics.posts.total
-										: label === "Reports"
-											? analytics.reports.total
-											: analytics.moderation.totalActions
-							) : "0"}
-						</p>
-					</div>
-				))}
 			</div>
 
 			<div className="rounded-xl border border-gray-200 bg-white p-6">

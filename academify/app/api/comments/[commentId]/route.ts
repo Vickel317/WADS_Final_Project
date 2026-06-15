@@ -100,10 +100,7 @@ export async function PUT(
       return apiError(404, "Comment not found", "NOT_FOUND");
     }
 
-    const isModerator =
-      decoded.role === "moderator" || decoded.role === "admin";
-
-    if (comment.authorID !== decoded.id && !isModerator) {
+    if (comment.authorID !== decoded.id) {
       return apiError(
         403,
         "Forbidden: You can only edit your own comments",

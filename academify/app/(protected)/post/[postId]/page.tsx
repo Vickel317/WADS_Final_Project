@@ -9,6 +9,7 @@ import { AiSummary } from "@/components/ai-summary";
 import PostActions from "./post-actions";
 import CommentItem from "./comment-item";
 import { slugify } from "@/lib/slugify";
+import { ReportButton } from "@/components/report-button";
 
 export default async function PostDetailPage({
 	params,
@@ -68,10 +69,11 @@ export default async function PostDetailPage({
 		}),
 		prisma.comment.count({ where: { postID: post.postID } }),
 	]);
-  const canManagePost =
-    post.authorID === session.user.userId || role === "admin" || role === "moderator";
+  const isModOrAdmin = role === "admin" || role === "moderator";
+  const isAuthor = post.authorID === session.user.userId;
+  const canDeletePost = isAuthor || isModOrAdmin;
   const isNonPublic = post.moderationStatus !== "APPROVED";
-  const canEditPost = !isNonPublic || role === "admin" || role === "moderator";
+  const canEditPost = isAuthor && !isNonPublic;
 
 	return (
 		<div className="space-y-6">
@@ -110,6 +112,14 @@ export default async function PostDetailPage({
 					</div>
 					<div className="flex flex-col items-start gap-2 text-xs text-gray-400 sm:items-end">
 						<LikeButton postId={post.postID} />
+						{post.authorID !== session.user.userId && (
+							<ReportButton
+								targetType="post"
+								targetId={post.postID}
+								targetLabel={post.title}
+								label="Report"
+							/>
+						)}
 						<span>
 							Updated {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
 						</span>
@@ -117,8 +127,9 @@ export default async function PostDetailPage({
               postId={post.postID}
               title={post.title}
               content={post.content}
-              canManage={canManagePost}
+              canDelete={canDeletePost}
               canEdit={canEditPost}
+              showEditLockedNotice={isAuthor && isNonPublic}
             />
 					</div>
 				</div>
