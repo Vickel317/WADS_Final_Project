@@ -13,6 +13,11 @@ jest.mock("@/lib/auth-session", () => ({
 
 jest.mock("@/lib/ollama", () => ({
   ollamaGenerate: jest.fn(),
+  getOllamaConfig: jest.fn(() => ({
+    baseUrl: "https://ollama.test",
+    model: "llama3.1:8b",
+    timeoutMs: 60000,
+  })),
 }));
 
 jest.mock("@/lib/prisma", () => ({
@@ -85,6 +90,7 @@ describe("GET /api/ai/summarize/[postId]", () => {
     expect(response.status).toBe(200);
     expect(body.summary).toBe("Cached summary");
     expect(body.cached).toBe(true);
+    expect(body.model).toBe("llama3.1:8b");
     expect(ollamaGenerate).not.toHaveBeenCalled();
     expect(prisma.post.update).not.toHaveBeenCalled();
   });
@@ -114,6 +120,7 @@ describe("GET /api/ai/summarize/[postId]", () => {
     expect(response.status).toBe(200);
     expect(body.summary).toBe("Fresh summary");
     expect(body.cached).toBe(false);
+    expect(body.model).toBe("llama3.1:8b");
     expect(ollamaGenerate).toHaveBeenCalledTimes(1);
     expect(prisma.post.update).toHaveBeenCalledWith(
       expect.objectContaining({

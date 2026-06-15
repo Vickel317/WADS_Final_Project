@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-import { ollamaGenerate } from "@/lib/ollama";
+import { getOllamaConfig, ollamaGenerate } from "@/lib/ollama";
 import { buildSummarizePrompt } from "@/lib/ai/prompts";
 import { SummaryResultSchema } from "@/lib/ai/schemas";
 import { canViewPost } from "@/lib/post-visibility";
@@ -46,6 +46,7 @@ export async function GET(
   }
 
   const commentCount = post._count.comments;
+  const { model } = getOllamaConfig();
 
   if (
     post.summaryJson &&
@@ -54,7 +55,7 @@ export async function GET(
   ) {
     const cached = SummaryResultSchema.safeParse(post.summaryJson);
     if (cached.success) {
-      return NextResponse.json({ ...cached.data, cached: true }, { status: 200 });
+      return NextResponse.json({ ...cached.data, model, cached: true }, { status: 200 });
     }
   }
 
@@ -83,7 +84,7 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ ...result.data, cached: false }, { status: 200 });
+    return NextResponse.json({ ...result.data, model, cached: false }, { status: 200 });
   } catch (err) {
     console.error("[AI summarize] Ollama error:", err);
     return apiError(503, "AI service unavailable", "AI_UNAVAILABLE");
