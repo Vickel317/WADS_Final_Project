@@ -31,10 +31,11 @@ export const REPORT_REASONS = [
   },
 ] as const;
 
-export type ReportTargetType = "post" | "comment" | "user";
+export type { ReportTargetType } from "@/lib/report-target";
 
-export function reportModalTitle(targetType: ReportTargetType) {
+export function reportModalTitle(targetType: import("@/lib/report-target").ReportTargetType) {
   if (targetType === "user") return "Report Profile";
   if (targetType === "comment") return "Report Comment";
+  if (targetType === "forum") return "Report Forum";
   return "Report Thread";
 }

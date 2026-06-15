@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, CreateBucketCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
@@ -109,6 +109,16 @@ export async function putObjectBytes(key: string, body: Uint8Array | Buffer, con
     ContentType: contentType,
   });
   await client.send(cmd);
+}
+
+export async function ensureBucketExists() {
+  const config = requireMinioConfig();
+  const client = getS3Client();
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: config.bucket }));
+  } catch {
+    await client.send(new CreateBucketCommand({ Bucket: config.bucket }));
+  }
 }
 
 export async function getObjectBytes(key: string) {

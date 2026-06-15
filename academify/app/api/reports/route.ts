@@ -4,8 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ReportStatus } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
-
-
+import { resolveReportTarget } from "@/lib/report-target";
 
 function isModOrAdmin(role?: string) {
   return role === "moderator" || role === "admin";
@@ -21,23 +20,6 @@ const REPORT_STATUS_MAP: Record<string, ReportStatus> = {
 function toResponseStatus(status: ReportStatus) {
   if (status === ReportStatus.UNDER_REVIEW) return "reviewed";
   return status.toLowerCase();
-}
-
-function resolveReportTarget(report: {
-  reportedPostID: string | null;
-  reportedCommentID: string | null;
-  reportedUserID: string | null;
-}) {
-  if (report.reportedPostID) {
-    return { targetType: "post" as const, targetId: report.reportedPostID };
-  }
-  if (report.reportedCommentID) {
-    return { targetType: "comment" as const, targetId: report.reportedCommentID };
-  }
-  if (report.reportedUserID) {
-    return { targetType: "user" as const, targetId: report.reportedUserID };
-  }
-  return { targetType: "post" as const, targetId: "" };
 }
 
 /**
@@ -196,8 +178,18 @@ export async function POST(request: NextRequest) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
-    if (!targetType.value || !["post", "comment", "user"].includes(targetType.value)) {
-      return apiError(400, "targetType must be post, comment, or user", "BAD_REQUEST");
+    if (!targetType.value || !["post", "comment", "user", "forum"].includes(targetType.value)) {
+      return apiError(400, "targetType must be post, comment, user, or forum", "BAD_REQUEST");
+    }
+
+    if (targetType.value === "forum") {
+      const forum = await prisma.forumHub.findUnique({
+        where: { forumID: targetId.value! },
+        select: { forumID: true },
+      });
+      if (!forum) {
+        return apiError(404, "Forum not found", "NOT_FOUND");
+      }
     }
 
     const report = await prisma.reportReview.create({
@@ -209,6 +201,7 @@ export async function POST(request: NextRequest) {
         reportedPostID: targetType.value === "post" ? targetId.value! : null,
         reportedCommentID: targetType.value === "comment" ? targetId.value! : null,
         reportedUserID: targetType.value === "user" ? targetId.value! : null,
+        reportedForumID: targetType.value === "forum" ? targetId.value! : null,
       },
     });
 

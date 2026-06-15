@@ -37,6 +37,10 @@ jest.mock("@/lib/prisma", () => ({
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
     },
+    forumModerator: {
+      count: jest.fn().mockResolvedValue(1),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     moderationLog: {
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
@@ -87,12 +91,13 @@ describe("Authorization checks", () => {
     expect(body.analytics.posts.total).toBe(0);
   });
 
-  it("allows moderators on moderation endpoints", async () => {
+  it("allows forum moderators on moderation endpoints", async () => {
     (verifyToken as jest.Mock).mockResolvedValue({
       id: "user_mod",
       email: "mod@example.com",
-      role: "moderator",
+      role: "student",
     });
+    (prisma.forumModerator.count as jest.Mock).mockResolvedValue(1);
 
     const request = new NextRequest("http://localhost/api/moderation/logs");
     const response = await moderationLogsGet(request);

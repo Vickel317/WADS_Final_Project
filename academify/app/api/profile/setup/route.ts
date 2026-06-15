@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { apiError } from "@/lib/api-response";
+import { normalizeEducationLevel } from "@/lib/profile-education";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,24 +13,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    
-    // We'll trust the body parsing for now to save time
-    const { 
-      role, 
-      academicLevel, 
-      major, 
-      bio, 
-      skillTags, 
+
+    const {
+      role,
+      academicLevel,
+      educationLevel,
+      major,
+      bio,
+      skillTags,
       portfolioLinks,
       department,
       specializations,
       consultationHours,
       verifiedPublications,
       askMeAbout,
-      username
+      username,
     } = body;
 
-    // Common fields
+    const resolvedEducation = normalizeEducationLevel(
+      typeof educationLevel === "string" ? educationLevel : academicLevel
+    );
+
     const updates: Prisma.UserUpdateInput = {
       profileSetupComplete: true,
       bio: bio || null,
@@ -38,8 +42,9 @@ export async function POST(request: NextRequest) {
 
     if (role === "STUDENT") {
       updates.role = "STUDENT";
-      updates.academicLevel = academicLevel || null;
-      updates.major = major || null;
+      updates.academicLevel =
+        resolvedEducation === "Prefer not to say" ? null : resolvedEducation;
+      updates.major = typeof major === "string" && major.trim() ? major.trim() : null;
       updates.skillTags = skillTags || [];
       updates.portfolioLinks = portfolioLinks || [];
     } else if (role === "LECTURER") {

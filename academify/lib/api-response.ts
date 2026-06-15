@@ -9,7 +9,9 @@ export type ApiErrorCode =
   | "INTERNAL_ERROR"
   | "AI_ERROR"
   | "AI_UNAVAILABLE"
-  | "RATE_LIMITED";
+  | "RATE_LIMITED"
+  | "FILE_SCAN_FAILED"
+  | "FILE_INFECTED";
 
 export type ApiErrorDetail = {
   field?: string;

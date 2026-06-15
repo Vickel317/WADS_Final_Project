@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
@@ -164,6 +165,20 @@ export async function POST(request: NextRequest) {
 
     const { objectKey, fileName, fileType, fileSize, spaceId } = validation.data;
 
+    if (spaceId) {
+      const membership = await prisma.spaceMember.findUnique({
+        where: {
+          spaceID_userID: {
+            spaceID: spaceId,
+            userID: sessionUser.user.userId,
+          },
+        },
+      });
+      if (!membership) {
+        return apiError(403, "You must be a member of this space to upload files to it", "FORBIDDEN");
+      }
+    }
+
     const scanResult = await scanObjectFromMinio(objectKey, fileName);
     if (!scanResult.ok) {
       return apiError(500, "File scan failed", "FILE_SCAN_FAILED");
@@ -183,12 +198,18 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.file.create({ data });
 
+    if (created.spaceID) {
+      revalidatePath(`/collaboration/${created.spaceID}`);
+    }
+
+    const downloadUrl = await getPresignedGetUrl(created.fileUrl);
+
     const resp: FileRecord = {
       id: created.fileID,
       name: created.fileName,
       size: created.fileSize,
       type: created.fileType,
-      url: created.fileUrl,
+      url: downloadUrl,
       uploadedBy: { id: sessionUser.user.userId, name: sessionUser.user.name },
       spaceId: created.spaceID ?? null,
       createdAt: created.updatedAt.toISOString(),

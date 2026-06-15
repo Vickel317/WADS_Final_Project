@@ -13,6 +13,7 @@ type ForumCategory = {
   imageUrl?: string | null;
   slug: string;
   createdAt: string;
+  memberCount?: number;
 };
 
 export default function ForumsPage() {
@@ -183,7 +184,12 @@ export default function ForumsPage() {
                           {forum.name.slice(0, 1).toUpperCase()}
                         </span>
                       </div>
-                      <p className="mt-3 text-xs font-medium text-teal-600">Open forum →</p>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-teal-600">Open forum →</p>
+                        <p className="text-[11px] text-gray-400 shrink-0">
+                          {forum.memberCount ?? 0} member{(forum.memberCount ?? 0) === 1 ? "" : "s"}
+                        </p>
+                      </div>
                     </div>
                   </Link>
                 ))}

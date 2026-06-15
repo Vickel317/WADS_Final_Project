@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalString } from "@/lib/validation";
+import { canManageForum, isPlatformAdmin } from "@/lib/forum-permissions";
 
 const slugify = (value: string) =>
   value
@@ -139,16 +140,18 @@ export async function PUT(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
-      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
-    }
-
-    const { id  } = await params;
+    const { id } = await params;
     const existing = await prisma.forumHub.findUnique({
       where: { forumID: id },
     });
     if (!existing) {
       return apiError(404, "Category not found", "NOT_FOUND");
+    }
+
+    const isAdmin = isPlatformAdmin(decoded.role);
+    const isForumMod = await canManageForum(decoded.id, id, decoded.role);
+    if (!isAdmin && !isForumMod) {
+      return apiError(403, "Forbidden: Admin or forum moderator access required", "FORBIDDEN");
     }
 
     const body = await parseJson<{
@@ -163,6 +166,33 @@ export async function PUT(
     const name = parseOptionalString(body.name);
     const description = parseOptionalString(body.description);
     const slug = parseOptionalString(body.slug);
+
+    if (!isAdmin && (name.value || slug.value)) {
+      return apiError(403, "Moderators cannot change the forum name", "FORBIDDEN");
+    }
+    if (!isAdmin) {
+      if (!description.value || description.value.trim().length < 3) {
+        return apiError(400, "Description must be at least 3 characters", "BAD_REQUEST");
+      }
+      const updated = await prisma.forumHub.update({
+        where: { forumID: id },
+        data: { description: description.value.trim() },
+      });
+      return NextResponse.json(
+        {
+          message: "Forum updated successfully",
+          category: {
+            id: updated.forumID,
+            name: updated.name,
+            description: updated.description ?? "",
+            slug: slugify(updated.name),
+            createdAt: updated.createdAt.toISOString(),
+          },
+        },
+        { status: 200 }
+      );
+    }
+
     const errors = [] as Array<{ field?: string; message: string }>;
 
     if (name.error) errors.push({ field: "name", message: `name ${name.error}` });

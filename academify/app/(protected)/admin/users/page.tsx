@@ -12,7 +12,7 @@ type AdminUser = {
 	createdAt: string;
 };
 
-const roleOptions = ["student", "moderator", "admin"];
+const roleOptions = ["student", "lecturer", "admin"];
 
 export default function AdminUsersPage() {
 	const [users, setUsers] = useState<AdminUser[]>([]);
@@ -94,7 +94,7 @@ export default function AdminUsersPage() {
 			<div className="rounded-xl border border-gray-200 bg-white p-6">
 				<h1 className="text-xl font-semibold text-gray-900">Admin Users</h1>
 				<p className="mt-2 text-sm text-gray-600">
-					Manage platform users and roles.
+					Manage platform roles. Student and lecturer are titles only — forum moderators are assigned per forum.
 				</p>
 			</div>
 

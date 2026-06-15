@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { formatEducationLabel } from "@/lib/profile-education";
+import { apiError } from "@/lib/api-response";
 
 export async function GET() {
   try {

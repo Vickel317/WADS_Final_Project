@@ -22,15 +22,30 @@ export async function getRecommendUserContext(userId: string): Promise<Recommend
     },
   });
 
-  const postedForums = await prisma.post.findMany({
-    where: { authorID: userId },
-    select: {
-      forumID: true,
-      forum: { select: { name: true } },
-    },
-    distinct: ["forumID"],
-    take: 12,
-  });
+  const [memberships, postedForums] = await Promise.all([
+    prisma.forumMember.findMany({
+      where: { userID: userId },
+      select: { forum: { select: { forumID: true, name: true } } },
+      take: 12,
+    }),
+    prisma.post.findMany({
+      where: { authorID: userId },
+      select: {
+        forumID: true,
+        forum: { select: { name: true } },
+      },
+      distinct: ["forumID"],
+      take: 12,
+    }),
+  ]);
+
+  const forumMap = new Map<string, string>();
+  for (const entry of memberships) {
+    forumMap.set(entry.forum.forumID, entry.forum.name);
+  }
+  for (const entry of postedForums) {
+    forumMap.set(entry.forumID, entry.forum.name);
+  }
 
   return {
     profile: {
@@ -39,7 +54,7 @@ export async function getRecommendUserContext(userId: string): Promise<Recommend
       skillTags: user?.skillTags ?? [],
       academicLevel: user?.academicLevel ?? null,
     },
-    joinedForumIds: postedForums.map((entry) => entry.forumID),
-    joinedForumNames: postedForums.map((entry) => entry.forum.name),
+    joinedForumIds: [...forumMap.keys()],
+    joinedForumNames: [...forumMap.values()],
   };
 }

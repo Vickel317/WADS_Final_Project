@@ -10,6 +10,12 @@ import PostActions from "./post-actions";
 import CommentItem from "./comment-item";
 import { slugify } from "@/lib/slugify";
 import { ReportButton } from "@/components/report-button";
+import { canModerateForumContent, isPlatformAdmin } from "@/lib/forum-permissions";
+import { fetchPostCommentTree } from "@/lib/post-comments";
+import {
+  moderationStatusLabelClass,
+  shouldShowModerationStatus,
+} from "@/lib/post-visibility";
 
 export default async function PostDetailPage({
 	params,
@@ -39,12 +45,13 @@ export default async function PostDetailPage({
 
 	if (!post) notFound();
   const role = String(session.user.role || "").toLowerCase();
-  const canSeeHidden = role === "admin" || role === "moderator" || post.authorID === session.user.userId;
+  const isForumMod = await canModerateForumContent(session.user.userId, post.forumID, role);
+  const canSeeHidden = isPlatformAdmin(role) || isForumMod || post.authorID === session.user.userId;
   if (post.moderationStatus !== "APPROVED" && !canSeeHidden) {
     notFound();
   }
 
-	const [author, forum, file, topLevelComments, allComments] = await Promise.all([
+	const [author, forum, file, commentTree] = await Promise.all([
 		prisma.user.findUnique({
 			where: { userId: post.authorID },
 			select: { name: true },
@@ -56,20 +63,11 @@ export default async function PostDetailPage({
 		prisma.file.findUnique({
 			where: { postID: post.postID },
 		}),
-		prisma.comment.findMany({
-			where: { postID: post.postID, parentId: null },
-			include: {
-				author: { select: { name: true } },
-				replies: {
-					include: { author: { select: { name: true } } },
-					orderBy: { createdAt: "asc" },
-				},
-			},
-			orderBy: { createdAt: "asc" },
-		}),
-		prisma.comment.count({ where: { postID: post.postID } }),
+		fetchPostCommentTree(post.postID),
 	]);
-  const isModOrAdmin = role === "admin" || role === "moderator";
+  const topLevelComments = commentTree.topLevel;
+  const allComments = commentTree.total;
+  const isModOrAdmin = isPlatformAdmin(role) || isForumMod;
   const isAuthor = post.authorID === session.user.userId;
   const canDeletePost = isAuthor || isModOrAdmin;
   const isNonPublic = post.moderationStatus !== "APPROVED";
@@ -106,8 +104,14 @@ export default async function PostDetailPage({
                   <span className="font-semibold text-gray-500">edited</span>
                 </>
               )}
-							<span>•</span>
-							<span className={`uppercase ${isNonPublic ? "text-amber-600 font-semibold" : ""}`}>{post.moderationStatus}</span>
+              {shouldShowModerationStatus(post.moderationStatus) && (
+                <>
+                  <span>•</span>
+                  <span className={`uppercase ${moderationStatusLabelClass(post.moderationStatus)}`}>
+                    {post.moderationStatus}
+                  </span>
+                </>
+              )}
 						</div>
 					</div>
 					<div className="flex flex-col items-start gap-2 text-xs text-gray-400 sm:items-end">
@@ -162,6 +166,7 @@ export default async function PostDetailPage({
 				<h2 className="text-sm font-semibold text-gray-700">
 					Comments ({allComments})
 				</h2>
+				<p className="text-xs text-gray-400 mt-1">Top comments sorted by likes</p>
 				<div className="mt-4">
 					<CommentForm postId={post.postID} />
 				</div>
@@ -192,7 +197,7 @@ export default async function PostDetailPage({
 									})),
 								}}
 								currentUserId={session.user.userId}
-								currentRole={role}
+								canModerate={isModOrAdmin}
 							/>
 						))
 					)}

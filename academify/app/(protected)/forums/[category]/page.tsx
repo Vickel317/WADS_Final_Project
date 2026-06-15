@@ -6,6 +6,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday } from "date-fns";
 import { ForumHubNav, type ForumHubTab } from "@/components/forum-hub-nav";
 import { ReportButton } from "@/components/report-button";
+import JoinForumButton, { formatMemberCount } from "@/components/join-forum-button";
+import { AdminBackLink } from "@/components/admin-back-link";
+import ForumModeratorSettings from "@/components/forum-moderator-settings";
+import { useCurrentUser } from "@/components/current-user-context";
 
 type ForumCategory = {
   id: string;
@@ -235,6 +239,7 @@ function ForumEventsTab({ events, category }: { events: ForumEvent[]; category: 
 
 export default function CategoryForumsPage() {
   const { category } = useParams<{ category: string }>();
+  const currentUser = useCurrentUser();
   const searchParams = useSearchParams();
   const router = useRouter();
   const hubTab = parseHubTab(searchParams.get("tab"));
@@ -249,6 +254,25 @@ export default function CategoryForumsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("Trending");
   const [search, setSearch] = useState("");
+  const [isMember, setIsMember] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [memberCount, setMemberCount] = useState(0);
+  const [showForumEdit, setShowForumEdit] = useState(false);
+
+  const canEditForum =
+    isModerator || String(currentUser?.role ?? "").toLowerCase() === "admin";
+
+  const refreshForum = async () => {
+    try {
+      const res = await fetch("/api/categories", { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) return;
+      const match = (data.categories ?? []).find((c: ForumCategory) => c.slug === category);
+      if (match) setForum(match);
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -268,6 +292,28 @@ export default function CategoryForumsPage() {
       ignore = true;
     };
   }, [category]);
+
+  useEffect(() => {
+    if (!forum) return;
+    let ignore = false;
+    const loadMembership = async () => {
+      try {
+        const res = await fetch(`/api/forums/${forum.id}/membership`, { credentials: "include" });
+        const data = await res.json();
+        if (!ignore && res.ok) {
+          setIsMember(Boolean(data.isMember));
+          setIsModerator(Boolean(data.isModerator));
+          setMemberCount(data.memberCount ?? 0);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void loadMembership();
+    return () => {
+      ignore = true;
+    };
+  }, [forum]);
 
   useEffect(() => {
     if (!forum) return;
@@ -341,62 +387,127 @@ export default function CategoryForumsPage() {
     return (
       <div className="max-w-2xl mx-auto text-center py-16">
         <p className="text-gray-600 font-medium">Forum not found</p>
-        <Link href="/forums" className="mt-4 inline-block text-sm text-teal-600 hover:underline">
-          ← Back to all forums
-        </Link>
+        <div className="mt-4 flex justify-center">
+          <AdminBackLink href="/forums" label="Back to forums" />
+        </div>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-2">
-        <Link href="/forums" className="text-xs text-gray-400 hover:text-teal-600 transition">
-          ← All forums
-        </Link>
+      <div className="mb-4">
+        <AdminBackLink href="/forums" label="Back to forums" />
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-        <div className="flex-1 min-w-0">
-          {forum?.imageUrl ? (
-            <div className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={forum.imageUrl} alt={forum.name} className="h-56 w-full object-cover" />
+      {forum && (
+        <div className="relative mb-4 w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+          {forum.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={forum.imageUrl} alt={forum.name} className="h-56 w-full object-cover" />
+          ) : (
+            <div
+              className="flex h-56 w-full items-center justify-center text-5xl font-bold text-teal-700"
+              style={{ background: "linear-gradient(135deg, #ccfbf1, #99f6e4)" }}
+            >
+              {forum.name.charAt(0).toUpperCase()}
             </div>
-
-          ) : null}
-          <h1 className="text-2xl font-bold text-gray-900">{forum?.name ?? category}</h1>
-          <p className="text-sm text-gray-500 mt-1 max-w-xl">
-            {forum?.description || "Threads, calendar events, and team workspaces for this community."}
-          </p>
+          )}
+          {canEditForum && (
+            <button
+              type="button"
+              onClick={() => setShowForumEdit(true)}
+              className="absolute bottom-3 right-3 rounded-xl border border-white/30 bg-black/40 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/55"
+            >
+              Edit forum
+            </button>
+          )}
         </div>
-        {hubTab === "threads" && (
-          <button
-            onClick={() => router.push(`/forums/${category}/new`)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition shrink-0"
-            style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
-          >
-            New thread
-          </button>
-        )}
-        {hubTab === "events" && (
-          <Link
-            href={`/events?forum=${category}&create=true`}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition shrink-0"
-            style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
-          >
-            New event
-          </Link>
-        )}
-        {hubTab === "collab" && (
-          <Link
-            href={`/collaboration?forum=${category}`}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition shrink-0"
-            style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
-          >
-            Create space
-          </Link>
-        )}
+      )}
+
+      {forum && canEditForum && (
+        <ForumModeratorSettings
+          key={`${forum.id}-${showForumEdit}`}
+          open={showForumEdit}
+          onClose={() => setShowForumEdit(false)}
+          forumId={forum.id}
+          forumName={forum.name}
+          description={forum.description}
+          imageUrl={forum.imageUrl}
+          onDescriptionSaved={(description) => {
+            setForum((prev) => (prev ? { ...prev, description } : prev));
+          }}
+          onImageUploaded={refreshForum}
+        />
+      )}
+
+      <div className="mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-gray-900">{forum?.name ?? category}</h1>
+            <p className="text-sm text-gray-500 mt-1 max-w-xl">
+              {forum?.description || "Threads, calendar events, and team workspaces for this community."}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">{formatMemberCount(memberCount)}</p>
+            {isModerator && forum && (
+              <Link
+                href={`/admin/forums/${forum.id}/members`}
+                className="mt-2 inline-block text-xs font-medium text-violet-600 hover:underline"
+              >
+                Manage members →
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {forum && (
+            <JoinForumButton
+              forumId={forum.id}
+              isMember={isMember}
+              onMembershipChange={(joined, count) => {
+                setIsMember(joined);
+                setMemberCount(count);
+              }}
+            />
+          )}
+          {forum && (
+            <ReportButton
+              targetType="forum"
+              targetId={forum.id}
+              targetLabel={forum.name}
+              label="Report forum"
+            />
+          )}
+          {hubTab === "threads" && (
+            <button
+              type="button"
+              onClick={() => router.push(`/forums/${category}/new`)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
+            >
+              New thread
+            </button>
+          )}
+          {hubTab === "events" && (
+            <Link
+              href={`/events?forum=${category}&create=true`}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
+            >
+              New event
+            </Link>
+          )}
+          {hubTab === "collab" && (
+            <Link
+              href={`/collaboration?forum=${category}`}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
+            >
+              Create space
+            </Link>
+          )}
+        </div>
       </div>
 
       {category && <ForumHubNav forumSlug={category} activeTab={hubTab} />}
@@ -483,8 +594,9 @@ export default function CategoryForumsPage() {
                     targetType="post"
                     targetId={thread.id}
                     targetLabel={thread.title}
+                    label="Report"
                     stopPropagation
-                    className="shrink-0 rounded-lg border border-gray-200 p-2 text-gray-400 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition"
+                    className="shrink-0 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition"
                   />
                 </div>
               ))

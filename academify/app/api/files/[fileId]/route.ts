@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { getPresignedGetUrl, deleteObject } from "@/lib/storage";
 import { canAccessFile } from "@/lib/file-access";
+import { validateUploadFileName } from "@/lib/validation";
 
 /**
  * @swagger
@@ -167,11 +169,18 @@ export async function PATCH(
 
     const { fileId } = await params;
     const body = (await request.json().catch(() => null)) as
-      | { spaceId?: string | null }
+      | { spaceId?: string | null; fileName?: string }
       | null;
 
-    if (!body || !("spaceId" in body)) {
-      return apiError(400, "Missing spaceId", "BAD_REQUEST");
+    if (!body) {
+      return apiError(400, "Invalid request body", "BAD_REQUEST");
+    }
+
+    const hasSpaceUpdate = "spaceId" in body;
+    const hasNameUpdate = typeof body.fileName === "string";
+
+    if (!hasSpaceUpdate && !hasNameUpdate) {
+      return apiError(400, "Provide fileName and/or spaceId to update", "BAD_REQUEST");
     }
 
     const file = await prisma.file.findUnique({
@@ -185,21 +194,54 @@ export async function PATCH(
     if (file.uploadedByID !== decoded.id) {
       return apiError(
         403,
-        "Forbidden: You can only share your own files",
+        "Forbidden: You can only update your own files",
         "FORBIDDEN"
       );
     }
 
+    const data: { fileName?: string; spaceID?: string | null } = {};
+
+    if (hasNameUpdate) {
+      const validated = validateUploadFileName(body.fileName!);
+      if (!validated.ok) {
+        return apiError(400, validated.error, "BAD_REQUEST");
+      }
+      data.fileName = validated.value;
+    }
+
+    if (hasSpaceUpdate) {
+      const nextSpaceId = body.spaceId?.trim() || null;
+      if (nextSpaceId) {
+        const membership = await prisma.spaceMember.findUnique({
+          where: {
+            spaceID_userID: {
+              spaceID: nextSpaceId,
+              userID: decoded.id,
+            },
+          },
+        });
+        if (!membership) {
+          return apiError(403, "You must be a member of the target space", "FORBIDDEN");
+        }
+      }
+      data.spaceID = nextSpaceId;
+    }
+
     const updated = await prisma.file.update({
       where: { fileID: fileId },
-      data: {
-        spaceID: body.spaceId || null,
-      },
+      data,
     });
+
+    if (updated.spaceID) {
+      revalidatePath(`/collaboration/${updated.spaceID}`);
+    }
+    if (file.spaceID && file.spaceID !== updated.spaceID) {
+      revalidatePath(`/collaboration/${file.spaceID}`);
+    }
 
     return NextResponse.json(
       {
-        message: "File shared successfully",
+        message: "File updated successfully",
         file: {
           id: updated.fileID,
           name: updated.fileName,
@@ -212,7 +254,7 @@ export async function PATCH(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Share file error:", error);
+    console.error("Update file error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

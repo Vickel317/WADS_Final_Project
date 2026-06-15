@@ -21,11 +21,6 @@ export async function GET(request: NextRequest) {
   const decoded = await verifyToken(request);
   if (!decoded) return apiError(401, "Not authenticated", "UNAUTHORIZED");
 
-  const rate = checkAiRateLimit(decoded.id, "recommend");
-  if (!rate.ok) {
-    return apiError(429, "Too many recommendation requests. Try again shortly.", "RATE_LIMITED");
-  }
-
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10) || 1);
   const limit = Math.min(8, Math.max(1, Number.parseInt(searchParams.get("limit") || "5", 10) || 5));
@@ -68,6 +63,14 @@ export async function GET(request: NextRequest) {
   const fallback = buildThreadHeuristicRecommendations(threadRows, context, limit);
 
   if (heuristicOnly) {
+    return NextResponse.json(
+      { recommendations: fallback, page, limit, hasMore, fallback: true },
+      { status: 200 }
+    );
+  }
+
+  const rate = checkAiRateLimit(decoded.id, "recommend");
+  if (!rate.ok) {
     return NextResponse.json(
       { recommendations: fallback, page, limit, hasMore, fallback: true },
       { status: 200 }

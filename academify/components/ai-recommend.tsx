@@ -33,6 +33,23 @@ type AiRecommendProps = {
   heuristicOnly?: boolean;
 };
 
+async function fetchRecommendJson(url: string) {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (res.ok) return data;
+
+  const fallbackUrl = url.includes("heuristic=1")
+    ? url
+    : `${url}${url.includes("?") ? "&" : "?"}heuristic=1`;
+  const fallbackRes = await fetch(fallbackUrl);
+  const fallbackData = await fallbackRes.json();
+  if (fallbackRes.ok) {
+    return { ...fallbackData, fallback: true };
+  }
+
+  throw new Error(fallbackData?.error?.message || data?.error?.message || "Could not load recommendations");
+}
+
 function ThreadCard({ item }: { item: ThreadRecommendation }) {
   return (
     <Link
@@ -103,11 +120,9 @@ export function AiRecommend({
   const loadThreads = useCallback(
     async (nextPage: number, append: boolean) => {
       const heuristicQuery = heuristicOnly ? "&heuristic=1" : "";
-      const res = await fetch(`/api/ai/recommend?page=${nextPage}&limit=${limit}${heuristicQuery}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error?.message || "Could not load recommendations");
-      }
+      const data = await fetchRecommendJson(
+        `/api/ai/recommend?page=${nextPage}&limit=${limit}${heuristicQuery}`
+      );
 
       const incoming = (data.recommendations ?? []) as ThreadRecommendation[];
       setThreadItems((prev) => (append ? [...prev, ...incoming] : incoming));
@@ -127,11 +142,7 @@ export function AiRecommend({
       setUsedFallback(false);
       try {
         if (variant === "forums") {
-          const res = await fetch(endpoint);
-          const data = await res.json();
-          if (!res.ok) {
-            throw new Error(data?.error?.message || "Could not load recommendations");
-          }
+          const data = await fetchRecommendJson(endpoint);
           if (!ignore) {
             setForumItems(data.recommendations ?? []);
             setUsedFallback(Boolean(data.fallback));

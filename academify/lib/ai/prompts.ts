@@ -24,7 +24,7 @@ Guidelines:
 
 export function buildSummarizePrompt(title: string, content: string, comments: string[]) {
   const commentsText = comments
-    .slice(0, 15)
+    .slice(0, 20)
     .map((c, i) => `Comment ${i + 1}: ${c.slice(0, 300)}`)
     .join("\n");
 
@@ -33,14 +33,16 @@ Return ONLY valid JSON with no extra text.
 
 Thread title: ${title}
 Original post: ${content.slice(0, 800)}
-${commentsText ? `\nComments:\n${commentsText}` : ""}
+${commentsText ? `\nTop comments by likes (${Math.min(comments.length, 20)} shown, highest first):\n${commentsText}` : "\nNo comments yet."}
 
 Return JSON with exactly these fields:
 {
   "summary": <2-3 sentence neutral summary of the discussion, max 200 chars>,
   "keyPoints": <array of up to 4 short bullet strings, each max 80 chars>,
-  "openQuestions": <array of up to 2 unresolved questions from the thread, may be empty>
-}`;
+  "openQuestions": <array of up to 2 unresolved questions from the thread; use [] if none>
+}
+
+Do not include empty strings in keyPoints or openQuestions.`;
 }
 
 export function buildRecommendPrompt(

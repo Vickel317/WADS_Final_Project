@@ -9,7 +9,7 @@ const config: Config = {
   testEnvironment: "jsdom",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testMatch: ["**/__tests__/**/*.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
-  testPathIgnorePatterns: ["/node_modules/", "/.next/", "/e2e/"],
+  testPathIgnorePatterns: ["/node_modules/", "/.next/", "/e2e/", "/__tests__/integration/"],
   // Allow Jest to transform better-auth and other ESM-only packages
   transformIgnorePatterns: [
     "/node_modules/(?!(better-auth|@better-auth)/)",

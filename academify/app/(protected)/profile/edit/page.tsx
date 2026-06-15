@@ -8,11 +8,17 @@ import { DEFAULT_EDUCATION_LEVEL, normalizeEducationLevel } from "@/lib/profile-
 
 interface FormState {
     name: string;
+    role: string;
     educationLevel: string;
     bio: string;
     location: string;
     website: string;
     skills: string;
+    department: string;
+    consultationHours: string;
+    specializations: string;
+    verifiedPublications: string;
+    askMeAbout: string;
   avatarUrl: string;
   bannerUrl: string;
     currentPassword: string;
@@ -22,17 +28,27 @@ interface FormState {
 
 const defaultForm: FormState = {
   name: "",
+  role: "student",
   educationLevel: DEFAULT_EDUCATION_LEVEL,
   bio: "",
   location: "",
   website: "",
   skills: "",
+  department: "",
+  consultationHours: "",
+  specializations: "",
+  verifiedPublications: "",
+  askMeAbout: "",
   avatarUrl: "",
   bannerUrl: "",
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
 };
+
+const joinCommaList = (items: string[]) => items.join(", ");
+const parseCommaList = (value: string) =>
+  value.split(",").map((item) => item.trim()).filter(Boolean);
 
 export default function EditProfilePage() {
   const currentUser = useCurrentUser();
@@ -62,11 +78,23 @@ export default function EditProfilePage() {
           const resolvedBanner = typeof d.user.bannerUrl === "string" ? d.user.bannerUrl : "";
           const loadedForm: FormState = {
             name: d.user.name ?? "",
+            role: String(d.user.role ?? "student").toLowerCase(),
             educationLevel: normalizeEducationLevel(d.user.year ?? d.user.educationLevel),
             bio: d.user.bio ?? "",
             location: d.user.location ?? "",
             website: d.user.website ?? "",
             skills: Array.isArray(d.user.skills) ? d.user.skills.join(", ") : "",
+            department: d.user.department ?? "",
+            consultationHours: d.user.consultationHours ?? "",
+            specializations: Array.isArray(d.user.specializations)
+              ? joinCommaList(d.user.specializations.map(String))
+              : "",
+            verifiedPublications: Array.isArray(d.user.verifiedPublications)
+              ? joinCommaList(d.user.verifiedPublications.map(String))
+              : "",
+            askMeAbout: Array.isArray(d.user.askMeAbout)
+              ? joinCommaList(d.user.askMeAbout.map(String))
+              : "",
             avatarUrl: resolvedAvatar,
             bannerUrl: resolvedBanner,
             currentPassword: "",
@@ -241,17 +269,47 @@ export default function EditProfilePage() {
 
 
       const payload: Record<string, unknown> = {};
+      const isLecturer = form.role === "lecturer";
 
       if (form.name.trim() !== initialForm.name.trim()) payload.name = form.name.trim();
-      if (form.educationLevel !== initialForm.educationLevel) payload.year = form.educationLevel;
+      if (!isLecturer && form.educationLevel !== initialForm.educationLevel) {
+        payload.year = form.educationLevel;
+      }
       if (form.bio.trim() !== initialForm.bio.trim()) payload.bio = form.bio.trim();
       if (form.location.trim() !== initialForm.location.trim()) payload.location = form.location.trim();
       if (form.website.trim() !== initialForm.website.trim()) payload.website = form.website.trim();
 
-      const nextSkills = form.skills.split(",").map((s) => s.trim()).filter(Boolean);
-      const initialSkills = initialForm.skills.split(",").map((s) => s.trim()).filter(Boolean);
-      if (nextSkills.join("|") !== initialSkills.join("|")) {
-        payload.skills = nextSkills;
+      if (!isLecturer) {
+        const nextSkills = parseCommaList(form.skills);
+        const initialSkills = parseCommaList(initialForm.skills);
+        if (nextSkills.join("|") !== initialSkills.join("|")) {
+          payload.skills = nextSkills;
+        }
+      } else {
+        if (form.department.trim() !== initialForm.department.trim()) {
+          payload.department = form.department.trim();
+        }
+        if (form.consultationHours.trim() !== initialForm.consultationHours.trim()) {
+          payload.consultationHours = form.consultationHours.trim();
+        }
+
+        const nextSpecializations = parseCommaList(form.specializations);
+        const initialSpecializations = parseCommaList(initialForm.specializations);
+        if (nextSpecializations.join("|") !== initialSpecializations.join("|")) {
+          payload.specializations = nextSpecializations;
+        }
+
+        const nextPublications = parseCommaList(form.verifiedPublications);
+        const initialPublications = parseCommaList(initialForm.verifiedPublications);
+        if (nextPublications.join("|") !== initialPublications.join("|")) {
+          payload.verifiedPublications = nextPublications;
+        }
+
+        const nextAskMeAbout = parseCommaList(form.askMeAbout);
+        const initialAskMeAbout = parseCommaList(initialForm.askMeAbout);
+        if (nextAskMeAbout.join("|") !== initialAskMeAbout.join("|")) {
+          payload.askMeAbout = nextAskMeAbout;
+        }
       }
 
       if (avatarKey) {
@@ -311,6 +369,8 @@ export default function EditProfilePage() {
         ? "border-red-300 focus:border-red-400 focus:ring-red-400/30"
         : "border-gray-200 focus:border-teal-400 focus:ring-teal-400/30"
     }`;
+
+  const isLecturer = form.role === "lecturer";
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -442,20 +502,91 @@ export default function EditProfilePage() {
             {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
           </div>
 
-          {/* Current education */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              Current education
-            </label>
-            <EducationLevelSelect
-              value={form.educationLevel}
-              onChange={(value) => setForm((prev) => ({ ...prev, educationLevel: value }))}
-              className={inputClass("educationLevel")}
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Choose the level that fits you — from elementary through university.
-            </p>
-          </div>
+          {/* Current education (students only) */}
+          {!isLecturer && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                Current education
+              </label>
+              <EducationLevelSelect
+                value={form.educationLevel}
+                onChange={(value) => setForm((prev) => ({ ...prev, educationLevel: value }))}
+                className={inputClass("educationLevel")}
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                Choose the level that fits you — from elementary through university.
+              </p>
+            </div>
+          )}
+
+          {/* Lecturer academic info */}
+          {isLecturer && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Department / Faculty
+                </label>
+                <input
+                  type="text"
+                  value={form.department}
+                  onChange={set("department")}
+                  placeholder="e.g., Faculty of Computer Science"
+                  className={inputClass("department")}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Specializations
+                  <span className="ml-1 text-gray-400 font-normal normal-case">(comma separated)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.specializations}
+                  onChange={set("specializations")}
+                  placeholder="e.g., Artificial Intelligence, Machine Learning"
+                  className={inputClass("specializations")}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Consultation hours
+                </label>
+                <input
+                  type="text"
+                  value={form.consultationHours}
+                  onChange={set("consultationHours")}
+                  placeholder="e.g., Mon & Wed, 2PM - 4PM"
+                  className={inputClass("consultationHours")}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Verified publications
+                  <span className="ml-1 text-gray-400 font-normal normal-case">(comma separated links)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.verifiedPublications}
+                  onChange={set("verifiedPublications")}
+                  placeholder="e.g., link.springer.com/articles/123"
+                  className={inputClass("verifiedPublications")}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Ask me about
+                  <span className="ml-1 text-gray-400 font-normal normal-case">(comma separated topics)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.askMeAbout}
+                  onChange={set("askMeAbout")}
+                  placeholder="e.g., Graduate Studies, Career Advice"
+                  className={inputClass("askMeAbout")}
+                />
+              </div>
+            </>
+          )}
 
           {/* Bio */}
           <div>
@@ -488,30 +619,31 @@ export default function EditProfilePage() {
             </div>
           </div>
 
-          {/* Skills */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              Skills & Interests
-              <span className="ml-1 text-gray-400 font-normal normal-case">(comma separated)</span>
-            </label>
-            <input
-              type="text"
-              value={form.skills}
-              onChange={set("skills")}
-              placeholder="e.g. React, Python, Machine Learning"
-              className={inputClass("skills")}
-            />
-            {/* Preview tags */}
-            {form.skills.trim() && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {form.skills.split(",").map((s) => s.trim()).filter(Boolean).map((skill) => (
-                  <span key={skill} className="px-2.5 py-1 rounded-lg text-xs font-medium text-teal-700 bg-teal-50">
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Skills (students only) */}
+          {!isLecturer && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                Skills & Interests
+                <span className="ml-1 text-gray-400 font-normal normal-case">(comma separated)</span>
+              </label>
+              <input
+                type="text"
+                value={form.skills}
+                onChange={set("skills")}
+                placeholder="e.g. React, Python, Machine Learning"
+                className={inputClass("skills")}
+              />
+              {form.skills.trim() && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {parseCommaList(form.skills).map((skill) => (
+                    <span key={skill} className="px-2.5 py-1 rounded-lg text-xs font-medium text-teal-700 bg-teal-50">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Change Password */}
@@ -551,7 +683,7 @@ export default function EditProfilePage() {
         <div className="flex items-center gap-3 pb-6">
           <button
             type="submit"
-            disabled={loading || saved || avatarUploading}
+            disabled={loading || saved || avatarUploading || bannerUploading}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
           >
@@ -562,7 +694,7 @@ export default function EditProfilePage() {
                 </svg>
                 Saved!
               </>
-            ) : loading || avatarUploading ? (
+            ) : loading || avatarUploading || bannerUploading ? (
               <>
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

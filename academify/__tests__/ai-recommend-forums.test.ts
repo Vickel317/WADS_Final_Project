@@ -92,4 +92,22 @@ describe("GET /api/ai/recommend/forums", () => {
     expect(body.fallback).toBe(true);
     expect(body.recommendations.length).toBeGreaterThan(0);
   });
+
+  it("falls back to heuristic scoring when rate limited", async () => {
+    (ollamaGenerate as jest.Mock).mockResolvedValue({
+      recommendations: [{ forumID: "forum_1", score: 0.91, reason: "Matches your major" }],
+    });
+
+    const request1 = new NextRequest("http://localhost/api/ai/recommend/forums");
+    await forumRecommendGet(request1);
+
+    const request2 = new NextRequest("http://localhost/api/ai/recommend/forums");
+    const response = await forumRecommendGet(request2);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.fallback).toBe(true);
+    expect(body.recommendations.length).toBeGreaterThan(0);
+    expect(ollamaGenerate).toHaveBeenCalledTimes(1);
+  });
 });

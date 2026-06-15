@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { getSocket } from "@/lib/socket-client";
@@ -8,6 +8,7 @@ import type { ChatMessage, SpaceChatMessage } from "@/socket-server/index";
 import NewMessageModal from "@/components/new-message-modal";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { ChatProfilePopover } from "@/components/chat-profile-popover";
+import { ChatTypingBubble } from "@/components/chat-typing-bubble";
 
 interface Message {
   id: string;
@@ -62,6 +63,7 @@ export default function ConversationPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [spaceTypers, setSpaceTypers] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [loadingMsgs, setLoadingMsgs] = useState(true);
   const [showNewMessage, setShowNewMessage] = useState(false);
@@ -71,6 +73,31 @@ export default function ConversationPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMessageAt = useRef<string | null>(null);
+
+  const spaceTypingActive = isSpaceChat && Object.keys(spaceTypers).length > 0;
+  const spaceTypingLabel = useMemo(() => {
+    const names = Object.values(spaceTypers);
+    if (names.length === 0) return "";
+    if (names.length === 1) return `${names[0]} is typing…`;
+    if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+    return `${names.length} people are typing…`;
+  }, [spaceTypers]);
+
+  const emitSpaceTyping = useCallback(() => {
+    if (!isSpaceChat || !spaceId || !myId) return;
+    const socket = getSocket();
+    const name = session?.user?.name ?? "Someone";
+    socket.emit("space_typing", { spaceId, name });
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      socket.emit("space_stop_typing", { spaceId });
+    }, 1500);
+  }, [isSpaceChat, myId, session?.user?.name, spaceId]);
+
+  const emitSpaceStopTyping = useCallback(() => {
+    if (!isSpaceChat || !spaceId) return;
+    getSocket().emit("space_stop_typing", { spaceId });
+  }, [isSpaceChat, spaceId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +154,9 @@ export default function ConversationPage() {
         e.preventDefault();
         input.focus();
         setInput((prev) => prev + e.key);
-        if (!isSpaceChat) {
+        if (isSpaceChat) {
+          emitSpaceTyping();
+        } else {
           const socket = getSocket();
           socket.emit("typing", { to: partnerId });
           if (typingTimer.current) clearTimeout(typingTimer.current);
@@ -151,7 +180,7 @@ export default function ConversationPage() {
     const container = messagesContainerRef.current;
     if (!container) return;
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  }, [messages, isTyping]);
+  }, [messages, isTyping, spaceTypingActive]);
 
   // Load conversation list
   useEffect(() => {
@@ -335,6 +364,28 @@ export default function ConversationPage() {
       if (from === partnerId) setIsTyping(false);
     }
 
+    function onSpaceTyping({
+      spaceId: sid,
+      userId,
+      name,
+    }: {
+      spaceId: string;
+      userId: string;
+      name?: string;
+    }) {
+      if (!isSpaceChat || sid !== spaceId || userId === myId) return;
+      setSpaceTypers((prev) => ({ ...prev, [userId]: name || "Someone" }));
+    }
+
+    function onSpaceStopTyping({ spaceId: sid, userId }: { spaceId: string; userId: string }) {
+      if (!isSpaceChat || sid !== spaceId) return;
+      setSpaceTypers((prev) => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+    }
+
     // Register listeners BEFORE connecting so no events are missed
     socket.on("connect", onConnect);
     socket.on("authenticated", onAuthenticated);
@@ -342,6 +393,8 @@ export default function ConversationPage() {
     socket.on("new_space_message", onNewSpaceMessage);
     socket.on("typing", onTyping);
     socket.on("stop_typing", onStopTyping);
+    socket.on("space_typing", onSpaceTyping);
+    socket.on("space_stop_typing", onSpaceStopTyping);
 
     // Connect (or authenticate immediately if already connected)
     if (!socket.connected) {
@@ -367,12 +420,22 @@ export default function ConversationPage() {
       socket.off("new_space_message", onNewSpaceMessage);
       socket.off("typing", onTyping);
       socket.off("stop_typing", onStopTyping);
+      socket.off("space_typing", onSpaceTyping);
+      socket.off("space_stop_typing", onSpaceStopTyping);
     };
   }, [isSpaceChat, loadMessages, myId, partnerId, spaceId]);
 
+  useEffect(() => {
+    setSpaceTypers({});
+    setIsTyping(false);
+  }, [partnerId]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
-    if (isSpaceChat) return;
+    if (isSpaceChat) {
+      emitSpaceTyping();
+      return;
+    }
     const socket = getSocket();
     socket.emit("typing", { to: partnerId });
     if (typingTimer.current) clearTimeout(typingTimer.current);
@@ -409,7 +472,9 @@ export default function ConversationPage() {
     setSending(true);
     setInput("");
     if (typingTimer.current) clearTimeout(typingTimer.current);
-    if (!isSpaceChat) {
+    if (isSpaceChat) {
+      emitSpaceStopTyping();
+    } else {
       getSocket().emit("stop_typing", { to: partnerId });
     }
 
@@ -637,7 +702,9 @@ export default function ConversationPage() {
                 <p className="text-sm font-bold text-gray-900">{displayPartnerName}</p>
               )}
               {isSpaceChat ? (
-                <p className="text-xs font-medium text-gray-400">Collaboration space chat</p>
+                <p className={`text-xs font-medium ${spaceTypingActive ? "text-teal-600" : "text-gray-400"}`}>
+                  {spaceTypingActive ? spaceTypingLabel : "Collaboration space chat"}
+                </p>
               ) : (
                 <p className={`text-xs font-medium ${partnerOnline ? "text-green-500" : "text-gray-400"}`}>
                   {isTyping ? "typing…" : partnerOnline ? "Online" : "Offline"}
@@ -706,20 +773,7 @@ export default function ConversationPage() {
             })
           )}
 
-          {isTyping && (
-            <div className="flex items-end gap-2 justify-start">
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
-              </div>
-            </div>
-          )}
+          {(isTyping || spaceTypingActive) && <ChatTypingBubble />}
 
         </div>
 

@@ -57,6 +57,9 @@ export async function GET() {
   try {
     const categories = await prisma.forumHub.findMany({
       orderBy: { createdAt: "asc" },
+      include: {
+        _count: { select: { members: true } },
+      },
     });
 
     const mapped = await Promise.all(
@@ -77,6 +80,7 @@ export async function GET() {
           imageUrl,
           slug: slugify(category.name),
           createdAt: category.createdAt.toISOString(),
+          memberCount: category._count.members,
         };
       })
     );

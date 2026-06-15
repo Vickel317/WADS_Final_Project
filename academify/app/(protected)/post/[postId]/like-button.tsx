@@ -14,7 +14,6 @@ export default function LikeButton({ postId }: LikeButtonProps) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     fetch(`/api/posts/${postId}/like`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {

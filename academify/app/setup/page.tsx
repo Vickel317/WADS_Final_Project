@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { EducationLevelSelect } from "@/components/education-level-select";
+import { DEFAULT_EDUCATION_LEVEL } from "@/lib/profile-education";
+
+const fieldClass =
+  "w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 focus:bg-white transition-all";
 
 export default function ProfileSetupPage() {
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<"STUDENT" | "LECTURER">("STUDENT");
-  
-  // Shared
+
   const [bio, setBio] = useState("");
   const [username, setUsername] = useState("");
-
-  // Student specific
-  const [major, setMajor] = useState("");
-  const [academicLevel, setAcademicLevel] = useState("");
+  const [educationLevel, setEducationLevel] = useState(DEFAULT_EDUCATION_LEVEL);
   const [skillTags, setSkillTags] = useState("");
   const [portfolioLinks, setPortfolioLinks] = useState("");
 
@@ -32,13 +33,12 @@ export default function ProfileSetupPage() {
       role,
       bio,
       username: username || undefined,
-      ...(role === "STUDENT" 
-        ? { 
-          major, 
-          academicLevel, 
-          skillTags: skillTags.split(",").map((s) => s.trim()).filter(Boolean),
-          portfolioLinks: portfolioLinks.split(",").map((s) => s.trim()).filter(Boolean)
-        } 
+      ...(role === "STUDENT"
+        ? {
+            educationLevel,
+            skillTags: skillTags.split(",").map((s) => s.trim()).filter(Boolean),
+            portfolioLinks: portfolioLinks.split(",").map((s) => s.trim()).filter(Boolean),
+          }
         : {
           department,
           consultationHours,
@@ -162,20 +162,41 @@ export default function ProfileSetupPage() {
               {role === "STUDENT" && (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Academic Level</label>
-                    <input type="text" value={academicLevel} onChange={(e) => setAcademicLevel(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 focus:bg-white transition-all" placeholder="e.g., Undergraduate, Masters, PhD, Semester 4" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Current education</label>
+                    <EducationLevelSelect
+                      value={educationLevel}
+                      onChange={setEducationLevel}
+                      className={fieldClass}
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Choose the level that fits you — from elementary through university.
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Major / Subjects of Interest</label>
-                    <input type="text" value={major} onChange={(e) => setMajor(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 focus:bg-white transition-all" placeholder="e.g., Computer Science" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      Skills &amp; interests
+                      <span className="ml-1 font-normal text-gray-400">(comma separated)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={skillTags}
+                      onChange={(e) => setSkillTags(e.target.value)}
+                      className={fieldClass}
+                      placeholder="e.g., Math, Reading, Python, Basketball"
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Skill Tags (comma separated)</label>
-                    <input type="text" value={skillTags} onChange={(e) => setSkillTags(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 focus:bg-white transition-all" placeholder="e.g., React, Python, Data Analysis" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Portfolio Links (comma separated)</label>
-                    <input type="text" value={portfolioLinks} onChange={(e) => setPortfolioLinks(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:border-teal-400 focus:bg-white transition-all" placeholder="e.g., github.com/johndoe, mywebsite.com" />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      Portfolio links
+                      <span className="ml-1 font-normal text-gray-400">(comma separated, optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={portfolioLinks}
+                      onChange={(e) => setPortfolioLinks(e.target.value)}
+                      className={fieldClass}
+                      placeholder="e.g., github.com/johndoe, mywebsite.com"
+                    />
                   </div>
                 </>
               )}

@@ -22,11 +22,6 @@ export async function GET(request: NextRequest) {
   const decoded = await verifyToken(request);
   if (!decoded) return apiError(401, "Not authenticated", "UNAUTHORIZED");
 
-  const rate = checkAiRateLimit(decoded.id, "recommend-forums");
-  if (!rate.ok) {
-    return apiError(429, "Too many recommendation requests. Try again shortly.", "RATE_LIMITED");
-  }
-
   const context = await getRecommendUserContext(decoded.id);
   const joinedSet = new Set(context.joinedForumIds);
   const heuristicOnly = new URL(request.url).searchParams.get("heuristic") === "1";
@@ -92,6 +87,14 @@ export async function GET(request: NextRequest) {
     );
 
   if (heuristicOnly) {
+    return NextResponse.json(
+      { recommendations: await buildFallback(), fallback: true },
+      { status: 200 }
+    );
+  }
+
+  const rate = checkAiRateLimit(decoded.id, "recommend-forums");
+  if (!rate.ok) {
     return NextResponse.json(
       { recommendations: await buildFallback(), fallback: true },
       { status: 200 }

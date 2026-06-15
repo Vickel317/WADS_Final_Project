@@ -104,6 +104,42 @@ const MONTH_NAMES = [
   "July","August","September","October","November","December",
 ];
 
+function mapApiEvent(event: ApiEvent, userId: string | null): Event {
+  const when = new Date(event.date);
+  const attendeeIds = event.attendees ?? [];
+  return {
+    id: event.id,
+    creatorId: event.userId ?? event.creator?.id,
+    title: event.title,
+    type: (() => {
+      if (!event.category) return "Study Session" as const;
+      const normalized = event.category.toLowerCase();
+      if (normalized.includes("workshop")) return "Workshop" as const;
+      if (normalized.includes("seminar")) return "Seminar" as const;
+      if (normalized.includes("social")) return "Social" as const;
+      return "Study Session" as const;
+    })(),
+    date: when.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    time: when.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+    location: event.location,
+    host: event.creator?.name ?? "Host",
+    hostUsername: event.creator?.username,
+    participants: attendeeIds.length,
+    maxParticipants: event.maxAttendees ?? 0,
+    durationMinutes: event.duration ?? 60,
+    startsAt: when,
+    attendeeIds,
+    joined: userId ? attendeeIds.includes(userId) : false,
+  };
+}
+
 
 function StatCard({ value, label }: { value: number | string; label: string }) {
   return (
@@ -116,12 +152,14 @@ function StatCard({ value, label }: { value: number | string; label: string }) {
 
 function EventCard({
   event,
-  onJoin,
+  onToggleRsvp,
   onOpen,
+  rsvpLoading,
 }: {
   event: Event;
-  onJoin: (id: string) => void;
+  onToggleRsvp: (id: string) => void;
   onOpen: (id: string) => void;
+  rsvpLoading: boolean;
 }) {
   const styles = TYPE_STYLES[event.type];
   const hasCap = event.maxParticipants > 0;
@@ -176,12 +214,12 @@ function EventCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (!full) onJoin(event.id);
+            if (!full || event.joined) onToggleRsvp(event.id);
           }}
-          disabled={event.joined}
-          className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+          disabled={rsvpLoading || (full && !event.joined)}
+          className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
             event.joined
-              ? "bg-gray-100 text-gray-400 cursor-default"
+              ? "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
               : full
               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
               : "text-white hover:opacity-90"
@@ -190,7 +228,13 @@ function EventCard({
             !event.joined && !full ? { backgroundColor: "#0d9488" } : undefined
           }
         >
-          {event.joined ? "Joined" : full ? "Full" : "Join"}
+          {rsvpLoading
+            ? "Saving..."
+            : event.joined
+            ? "Cancel RSVP"
+            : full
+            ? "Full"
+            : "Join"}
         </button>
         {gcalUrl && (
           <a
@@ -455,15 +499,8 @@ export default function EventsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [forumsList, setForumsList] = useState<Array<{ id: string; name: string }>>([]);
-
-  const normalizeType = (value?: string): Event["type"] => {
-    if (!value) return "Study Session";
-    const normalized = value.toLowerCase();
-    if (normalized.includes("workshop")) return "Workshop";
-    if (normalized.includes("seminar")) return "Seminar";
-    if (normalized.includes("social")) return "Social";
-    return "Study Session";
-  };
+  const [rsvpLoadingId, setRsvpLoadingId] = useState<string | null>(null);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
 
   useEffect(() => {
     const shouldCreate = searchParams.get("create") === "true";
@@ -519,9 +556,11 @@ export default function EventsPage() {
           fetch("/api/users/me"),
         ]);
         const data = await eventRes.json();
+        let userId: string | null = null;
         if (userRes.ok) {
           const me = await userRes.json();
-          if (!ignore) setCurrentUserId(me.user?.userId ?? null);
+          userId = me.user?.userId ?? null;
+          if (!ignore) setCurrentUserId(userId);
         }
         if (!eventRes.ok) return;
 
@@ -530,32 +569,7 @@ export default function EventsPage() {
           ? raw.filter((event: ApiEvent) => event.forumId === forumFilter.id)
           : raw;
 
-        const mapped = scoped.map((event: ApiEvent) => {
-          const when = new Date(event.date);
-          return {
-            id: event.id,
-            creatorId: event.userId ?? event.creator?.id,
-            title: event.title,
-            type: normalizeType(event.category),
-            date: when.toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            }),
-            time: when.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "2-digit",
-            }),
-            location: event.location,
-            host: event.creator?.name ?? "Host",
-            hostUsername: event.creator?.username,
-            participants: event.attendees?.length ?? 0,
-            maxParticipants: event.maxAttendees ?? 0,
-            durationMinutes: event.duration ?? 60,
-            startsAt: when,
-            attendeeIds: event.attendees ?? [],
-          } as Event;
-        });
+        const mapped = scoped.map((event: ApiEvent) => mapApiEvent(event, userId));
 
         if (!ignore) setEvents(mapped);
       } catch {
@@ -572,14 +586,47 @@ export default function EventsPage() {
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
 
-  const handleJoin = (id: string) => {
-    setEvents((prev) =>
-      prev.map((e) =>
-        e.id === id
-          ? { ...e, joined: true, participants: e.participants + 1 }
-          : e
-      )
-    );
+  const handleToggleRsvp = async (id: string) => {
+    const event = events.find((e) => e.id === id);
+    if (!event || !currentUserId) return;
+
+    const isAttending = Boolean(event.joined);
+    const full =
+      event.maxParticipants > 0 && event.participants >= event.maxParticipants;
+    if (!isAttending && full) return;
+
+    setRsvpLoadingId(id);
+    setRsvpError(null);
+    try {
+      const res = await fetch(`/api/events/${id}/rsvp`, {
+        method: isAttending ? "DELETE" : "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || data.message || "Failed to update RSVP");
+      }
+
+      const nextAttendeeIds = isAttending
+        ? (event.attendeeIds ?? []).filter((userId) => userId !== currentUserId)
+        : [...(event.attendeeIds ?? []), currentUserId];
+
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.id === id
+            ? {
+                ...e,
+                joined: !isAttending,
+                participants: nextAttendeeIds.length,
+                attendeeIds: nextAttendeeIds,
+              }
+            : e
+        )
+      );
+    } catch (err) {
+      setRsvpError(err instanceof Error ? err.message : "Failed to update RSVP");
+    } finally {
+      setRsvpLoadingId(null);
+    }
   };
 
   const handleCreateEvent = async () => {
@@ -659,32 +706,9 @@ export default function EventsPage() {
       const refreshRes = await fetch("/api/events?filter=upcoming");
       const refreshed = await refreshRes.json();
       if (refreshRes.ok) {
-        const mapped = (refreshed.data ?? []).map((event: ApiEvent) => {
-          const when = new Date(event.date);
-          return {
-            id: event.id,
-            creatorId: event.userId ?? event.creator?.id,
-            title: event.title,
-            type: normalizeType(event.category),
-            date: when.toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            }),
-            time: when.toLocaleTimeString(undefined, {
-              hour: "numeric",
-              minute: "2-digit",
-            }),
-            location: event.location,
-            host: event.creator?.name ?? "Host",
-            hostUsername: event.creator?.username,
-            participants: event.attendees?.length ?? 0,
-            maxParticipants: event.maxAttendees ?? 0,
-            durationMinutes: event.duration ?? 60,
-            startsAt: when,
-            attendeeIds: event.attendees ?? [],
-          } as Event;
-        });
+        const mapped = (refreshed.data ?? []).map((event: ApiEvent) =>
+          mapApiEvent(event, currentUserId)
+        );
         setEvents(mapped);
       }
     } catch (err) {
@@ -904,6 +928,11 @@ export default function EventsPage() {
         {/* Upcoming events */}
         <div className="flex-1 min-w-0 w-full">
           <p className="text-sm font-semibold text-gray-700 mb-3">Upcoming</p>
+          {rsvpError && (
+            <p className="mb-3 text-sm text-red-500 rounded-lg border border-red-100 bg-red-50 px-3 py-2">
+              {rsvpError}
+            </p>
+          )}
           <div className="space-y-3">
             {events.length === 0 ? (
               <p className="text-sm text-gray-500">No upcoming events yet.</p>
@@ -912,8 +941,9 @@ export default function EventsPage() {
                 <EventCard
                   key={event.id}
                   event={event}
-                  onJoin={handleJoin}
+                  onToggleRsvp={handleToggleRsvp}
                   onOpen={(id) => router.push(`/events/${id}`)}
+                  rsvpLoading={rsvpLoadingId === event.id}
                 />
               ))
             )}

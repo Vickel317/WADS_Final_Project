@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminBackLink } from "@/components/admin-back-link";
 
 type ReportItem = {
@@ -31,9 +31,13 @@ function statusBadgeClass(status: string) {
   }
 }
 
-function targetHref(targetType: string, targetId: string) {
+function targetHref(targetType: string, targetId: string, forumSlugs: Record<string, string>) {
   if (targetType === "user") return `/profile/${targetId}`;
   if (targetType === "post") return `/post/${targetId}`;
+  if (targetType === "forum") {
+    const slug = forumSlugs[targetId];
+    return slug ? `/forums/${slug}` : "/forums";
+  }
   return null;
 }
 
@@ -49,28 +53,57 @@ export function ReportsAdminPanel({
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>("all");
-
-  const loadReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const query = statusFilter === "all" ? "" : `?status=${statusFilter}`;
-      const res = await fetch(`/api/reports${query}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error?.message || "Failed to load reports");
-      }
-      setReports(data.reports || []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load reports");
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter]);
+  const [forumSlugs, setForumSlugs] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    void loadReports();
-  }, [loadReports]);
+    let cancelled = false;
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const category of data.categories ?? []) {
+          if (category.id && category.slug) {
+            map[category.id] = category.slug;
+          }
+        }
+        setForumSlugs(map);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      try {
+        const query = statusFilter === "all" ? "" : `?status=${statusFilter}`;
+        const res = await fetch(`/api/reports${query}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.error?.message || "Failed to load reports");
+        }
+        if (!cancelled) {
+          setReports(data.reports || []);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load reports");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [statusFilter]);
 
   const review = async (reportId: string) => {
     try {
@@ -120,7 +153,7 @@ export function ReportsAdminPanel({
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Review community reports for profiles, threads, and comments.
+          Review community reports for profiles, forums, threads, and comments.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {STATUS_FILTERS.map((status) => (
@@ -149,7 +182,7 @@ export function ReportsAdminPanel({
         ) : (
           <div className="space-y-4">
             {reports.map((report) => {
-              const href = targetHref(report.targetType, report.targetId);
+              const href = targetHref(report.targetType, report.targetId, forumSlugs);
               return (
                 <div key={report.id} className="rounded-lg border border-gray-100 p-4">
                   <div className="flex items-start justify-between gap-3">

@@ -62,6 +62,34 @@ describe("EditProfilePage – rendering", () => {
   });
 });
 
+describe("EditProfilePage – lecturer", () => {
+  beforeEach(() => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        user: {
+          name: "Dr. Smith",
+          role: "lecturer",
+          department: "Faculty of Computer Science",
+          specializations: ["Machine Learning"],
+          consultationHours: "Mon 2-4PM",
+          verifiedPublications: ["https://example.com/paper"],
+          askMeAbout: ["Graduate Studies"],
+        },
+      }),
+    });
+  });
+
+  it("shows lecturer fields instead of current education", async () => {
+    render(<EditProfilePage />);
+    expect(await screen.findByDisplayValue("Faculty of Computer Science")).toBeInTheDocument();
+    expect(screen.getByText(/department \/ faculty/i)).toBeInTheDocument();
+    expect(screen.getByText(/consultation hours/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^current education$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/skills & interests/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("EditProfilePage – validation", () => {
   it("shows error when name is cleared and form is submitted", async () => {
     const user = userEvent.setup();
