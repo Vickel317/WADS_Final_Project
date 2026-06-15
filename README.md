@@ -64,7 +64,7 @@ Main features:
 
 ### 5.1 Architecture Diagram
 
-![ArchitectureDesignDiagram](images/ArchitectureDesign.jpeg)
+![ArchitectureDesignDiagram](images/ArchitectureDesignDiagram.png)
 
 ### 5.2 Architecture Explanation
 

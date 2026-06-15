@@ -81,24 +81,7 @@ Academify is a full-stack web platform where users:
 
 ### 5.1 Architecture diagram
 
-```
-┌─────────────┐     HTTPS      ┌──────────────────┐
-│   Browser   │ ◄────────────► │  Next.js (app)   │
-│  (React UI) │                │  API routes      │
-└──────┬──────┘                └────────┬─────────┘
-       │                                │
-       │ WebSocket (Socket.IO)          │ Prisma
-       ▼                                ▼
-┌─────────────┐                ┌──────────────────┐
-│ Socket.IO   │                │   PostgreSQL     │
-│  server     │                │   (Neon / VPS)   │
-└─────────────┘                └────────┬─────────┘
-                                        │
-                               ┌────────┴────────┐
-                               │ MinIO (files)   │
-                               │ Ollama (AI)     │
-                               └─────────────────┘
-```
+![Alternative Text](path-to-your-image)
 
 ### 5.2 Architecture explanation
 
@@ -1192,13 +1175,112 @@ https://e2526-wads-b4ac-02.csbihub.id
 
 > Each member: copy this block, fill in, and ensure it matches commit history.
 
-**Student Name:** [FILL IN]
+**Student Name:** HES2209 (Harris Ekaputra Suryadi)
 
-- Features implemented: [FILL IN]
-- API endpoints handled: [FILL IN]
-- Tests written: [FILL IN]
-- Security work: [FILL IN]
-- AI-related work: [FILL IN]
+- Features implemented: Project bootstrap (Next.js app structure, login/register pages, navbar, early dashboard), file sharing & collab spaces (collab pages/API, files library, MinIO Docker setup, presigned uploads, file share via DM), profile media (avatar upload/proxy + storage delete), auth migration (Better Auth integration + Firebase bridge route), Prisma/schema alignment (Category → ForumHub, enum/orderBy fixes, collab roles), upload reliability fixes (avatar/banner/files), collab-space chat UI bug fix, moderation logging + admin analytics enrichment.
+- API endpoints handled:
+  - Posts: GET/POST /api/posts, GET/PATCH/DELETE /api/posts/{postId}, GET/POST /api/posts/{postId}/comments
+  - Messages: GET/POST /api/messages, GET/POST /api/messages/{userId}
+  - Files: GET/POST /api/files, GET/DELETE /api/files/{fileId}, POST /api/files/{fileId}/share, POST /api/files/scan
+  - Collaboration: GET/POST /api/collaboration, GET/POST/DELETE /api/collaboration/{spaceId}
+  - Storage: POST /api/storage/presign, avatar upload + storage delete
+  - Users: GET /api/users/{userId}/avatar
+  - Moderation hardening (approve/delete/warn/suspend/ban/queue/logs): implemented under /api/moderation/* and /api/reports/* with admin hooks under /api/admin/*
+  - Admin: analytics enhancements under /api/admin/*
+  - Broad security pass across routes under /api/forums, /api/events, /api/categories, /api/posts, /api/comments, /api/messages, /api/users
+- Tests written: Security and authorization test coverage and updates across middleware/security-critical paths; updated collaboration/files/messages/profile-edit tests (plus rate-limit and authz tests).
+- Security work: Primary security owner.
+  - `lib/security.ts` — centralized security utilities (~800 lines)
+  - `middleware.ts` / `proxy.ts` — security headers + route protection
+  - `lib/sanitization.ts` — HTML stripping / XSS mitigation
+  - `lib/validation.ts` — request body validation and upload filename/MIME/size checks
+  - `lib/rate-limit.ts` — API rate limiting (write/auth/read buckets)
+  - ClamAV virus scanning: `lib/clamav.ts`, POST /api/files/scan, plus Docker/compose integration
+  - Moderation guards: restricted-account checks for posts/messages/comments
+  - Socket server: security additions in `socket-server/index.ts`
+  - Security documentation: `CHECKPOINT_09_WEB_SECURITY.md`
+- AI-related work: None identified in Harris’s commits (AI moderation/recommend/summarize implemented by Vickel’s work in shared commits).
+
+**Student Name:** Vickel317 (Vickelsteins August Santoso)
+
+- Features implemented:
+  - Auth & onboarding: Migrated from Firebase to Better Auth (email/password + Google OAuth), unified API auth layer, profile setup flow, lecturer profile edit aligned with setup, mock OAuth for tests, OAuth error fixes
+  - Dashboard & posts: Personalized dashboard with real connection counts, admin/user post CRUD, post likes, post visibility rules (pending/blocked), comment likes, comment tree sorting by engagement
+  - Forums & moderation: Neon/Prisma ORM for forums/categories/comments, forum access control (only admins/lecturers create forums), moderator forum settings & member management, admin reports page + report modal, forum/thread/user reporting in DB and admin panel, streamlined admin nav (removed admin edit on posts/comments)
+  - AI-powered UX: Async post moderation with profanity fallback, staff revert of AI decisions, thread summarization with DB cache, forum & thread recommendations with heuristic fallback, AI recommend UI, Reddit-style sidebar + polished navbar/topbar
+  - Realtime messaging: Standalone Socket.IO server for DMs and collab chat, typing indicators, online status, message search modal, reconnect handling, group chat typing in collab spaces
+  - Files & storage: MinIO upload routes (server + presigned), files UI, collab space file upload, avatar/banner/entity banner uploads, file sharing
+  - Profiles & social: User profile/connections schema, follow model, privacy settings page, profile education fields, public profile view button, DM restriction rules (ALL, CONNECTIONS, LECTURERS, NONE)
+  - Search: Global search across users, forums, and threads
+  - Events & collaboration: Collab space API/UI polish, events UI integration (alongside teammates’ event work)
+  - DevOps & docs: Docker + GitHub Actions CI/CD (app + socket server), deployment compose fixes, project overview/README/technology stack, full Swagger UI at /api-docs with OpenAPI spec for all endpoints, freshclam for ClamAV in Docker
+  - UI polish: Thread/comment edit placement, admin/forums/files/collab/events UI refinements, removed notification feature (later cleanup)
+
+- API endpoints handled (high-level, implemented/extended under `app/api/**`):
+  - Auth: POST /api/auth/sign-up/email, /api/auth/sign-in/email, /api/auth/sign-out, GET /api/auth/get-session, plus `/api/auth/[...all]`
+  - Users & profile: GET/PATCH/PUT/DELETE /api/users/{userId}, /api/users, /api/users/connections, /api/users/{userId}/follow, /api/users/{userId}/posts, /api/users/{userId}/events, /api/users/{userId}/avatar, /api/users/{userId}/banner, POST /api/profile/setup
+  - Search: GET /api/search
+  - Forums: GET/POST/DELETE /api/forums/{forumId}/membership, GET/PUT /api/forums/{forumId}/members
+  - Categories: GET/POST /api/categories, GET/PATCH/DELETE /api/categories/{id}
+  - Posts/comments: GET/POST /api/posts, GET/PATCH/DELETE /api/posts/{postId}, GET/POST /api/posts/{postId}/comments, /api/posts/{postId}/like, GET/PATCH/DELETE /api/comments/{commentId}, /api/comments/{commentId}/like
+  - Messages: GET/POST /api/messages, /api/messages/{userId}, /api/messages/space/{spaceId}
+  - Events: GET/POST /api/events, GET/PUT/DELETE /api/events/{eventId}, RSVP + attendees endpoints
+  - Files/storage: GET/POST/DELETE /api/files, /api/files/{fileId}, /api/files/{fileId}/share, POST /api/files/scan, storage upload/presign/delete/avatar/banner/entity-banner
+  - Collaboration: GET/POST /api/collaboration, GET/POST/DELETE /api/collaboration/{spaceId}
+  - AI: GET /api/ai/health, POST /api/ai/moderate, GET /api/ai/recommend, /api/ai/recommend/forums, GET /api/ai/summarize/{postId}
+  - Moderation: queue/logs and approve/delete/revert/warn/suspend/ban
+  - Reports: GET/POST /api/reports, GET/PATCH /api/reports/{reportId}, review + action
+  - Admin: GET /api/admin/analytics, user management + role assignment
+  - Docs: GET /api/swagger
+
+- Tests written:
+  - Unit/component (Jest): login, register, profile, profile-edit, profile-setup, profile-education, admin, dashboard, forums, files, messages, collaboration, events, sidebar, topbar, post-comments, post-like, comment-sort, avatar-url, forum-access, categories-authorization, files-authorization, message-access, api-authorization, api-events, api-reports, api-search, rate-limit, security-critical
+  - AI tests: ai-moderation, ai-summarize, ai-recommend-forums, ai-rate-limit
+  - Integration (DB): categories, post-comments, post-visibility, profile-setup, collaboration, events
+  - E2E (Playwright): e2e/smoke.spec.ts, e2e/login.spec.ts, e2e/register.spec.ts
+  - CI: Jest + Playwright wired into GitHub Actions; Playwright artifacts ignored from git
+
+- Security work:
+  - Unified Better Auth session cookies (httpOnly, sameSite: lax, secure in prod)
+  - Role-based authorization (student/lecturer/admin + per-forum moderators) with tests in api-authorization.test.ts, categories-authorization.test.ts, files-authorization.test.ts
+  - Input validation (lib/validation.ts) and XSS sanitization (lib/sanitization.ts) on messages, posts, and comments — covered in security-critical.test.ts
+  - Rate limiting on write/auth/read and AI endpoints (lib/rate-limit.ts, lib/ai/rate-limit.ts)
+  - Upload security: dangerous filename rejection, extension/MIME checks, size limits
+  - ClamAV integration: freshclam in Docker (your commit); virus scan route (POST /api/files/scan)
+  - Account restrictions: blocked/banned/shadow-banned users prevented from messaging and commenting
+  - DM privacy: canSendDirectMessage rules by restriction setting
+  - Removed hardcoded mock identity; API keys/secrets env-only
+  - (Teammate Harris also contributed dedicated security commits: “Security Critical Feature Done” and virus scan.)
+
+- AI-related work:
+  - Content moderation: Ollama-based async post moderation (lib/ai/post-moderation.ts), profanity heuristic fallback, moderation queue statuses, staff revert via POST /api/moderation/revert/{postId}
+  - Thread summarization: GET /api/ai/summarize/{postId} with DB cache, refresh=1 bypass, model name from env (not hardcoded)
+  - Recommendations: GET /api/ai/recommend (threads) and /api/ai/recommend/forums with heuristic fallback when Ollama is down or rate-limited
+  - Prompts & schemas: lib/ai/prompts.ts, lib/ai/schemas.ts, ModerationResultSchema validation
+  - Rate limits: per-route AI throttling (checkAiRateLimit)
+  - Health check: GET /api/ai/health for Ollama availability
+  - UI: AI recommend components, moderation status on posts, summary display on threads
+
+**Student Name:** kevMk (Kevin Makmur Kurniawan)
+
+
+- Features implemented: Events (events list/detail pages, RSVP actions, event creation flow, event API extensions, dashboard calendar widget, event banner upload, and forum–event integration); Forums UI (forum list/detail, new thread page, comment + like buttons on thread pages, forum seed script); Files UI (early files page shell); Public profiles (public profile page /profile/[userId], profile banner display, report-user modal/button); Profile UX (profile stabilization, profile edit improvements, chat profile popover); Landing & layout (login entry, responsive layouts, sidebar/topbar polish); Admin & roles (admin users page updates, role-aware forums/connections UI, admin role API tweaks); Notifications (initial in-app notification model and topbar notification UI); Storage/banners (profile banner upload, user banner serving, entity banner upload for events/collab spaces/forums).
+- API endpoints handled:
+  - Authentication (legacy, pre–Better Auth): POST /api/auth/login, /api/auth/register, /api/auth/logout, /api/auth/refresh, GET /api/auth/me
+  - Events: GET/POST /api/events, GET/PUT/DELETE /api/events/{eventId}, POST/DELETE /api/events/{eventId}/rsvp, GET /api/events/{eventId}/attendees
+  - Users: GET/PATCH /api/users/{userId}, GET /api/users/{userId}/posts, GET /api/users/{userId}/events
+  - Forums/categories: GET/POST /api/categories, category detail routes, forum-related post routes
+  - Messages: DM route tweaks + GET /api/notifications
+  - Storage/banners: POST /api/storage/upload-banner, GET /api/users/{userId}/banner, POST /api/storage/upload-entity-banner/{type}/{id}
+  - Admin role management: PATCH /api/admin/users/{userId}/role
+- Tests written: No major dedicated test suites authored by Kevin in git history (only minor test/line-fix commits). Main test coverage for his areas was added by others (e.g. events.test.tsx, api-events.test.ts).
+- Security work:
+  - Report user from profile (UI + report-profile modal)
+  - Admin role management UI/API alignment
+  - Not the primary security implementer; auth/events routes were later hardened by Harris and Vickel.
+- AI-related work: None identified in Kevin’s commits.
+
+
 
 ---
 
