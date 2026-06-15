@@ -175,7 +175,7 @@ export default function ConversationPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isSpaceChat, partnerId]);
+  }, [isSpaceChat, partnerId, emitSpaceTyping]);
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -292,11 +292,19 @@ export default function ConversationPage() {
 
   useEffect(() => {
     if (!partnerId) return;
-    void Promise.resolve().then(() => {
+    let cancelled = false;
+    const frameId = requestAnimationFrame(() => {
+      if (cancelled) return;
+      setSpaceTypers({});
+      setIsTyping(false);
       setLoadingMsgs(true);
       setMessages([]);
-      return loadMessages();
+      void loadMessages();
     });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
   }, [partnerId, loadMessages]);
 
   // Socket setup
@@ -424,11 +432,6 @@ export default function ConversationPage() {
       socket.off("space_stop_typing", onSpaceStopTyping);
     };
   }, [isSpaceChat, loadMessages, myId, partnerId, spaceId]);
-
-  useEffect(() => {
-    setSpaceTypers({});
-    setIsTyping(false);
-  }, [partnerId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);

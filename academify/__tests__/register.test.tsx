@@ -4,13 +4,31 @@ import RegisterPage from "@/app/(auth)/register/page";
 
 const mockPush = jest.fn();
 
+function mockFetchWithAuthConfig(
+  handler?: (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }> | { ok: boolean; json: () => Promise<unknown> }
+) {
+  (global.fetch as jest.Mock).mockImplementation((url: string) => {
+    if (String(url).includes("/api/auth/config")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ googleEnabled: false, googleCallbackUrl: "" }),
+      });
+    }
+    if (handler) {
+      return Promise.resolve(handler(url));
+    }
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+}
+
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn();
+  mockFetchWithAuthConfig();
 });
 
 describe("RegisterPage – rendering", () => {
@@ -109,6 +127,9 @@ describe("RegisterPage – validation", () => {
     const user = userEvent.setup();
     render(<RegisterPage />);
 
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/auth/config"));
+    (fetch as jest.Mock).mockClear();
+
     await user.click(screen.getByRole("button", { name: /create account/i }));
 
     expect(fetch).not.toHaveBeenCalled();
@@ -126,10 +147,12 @@ describe("RegisterPage – API interaction", () => {
 
   it("redirects to /login on successful registration", async () => {
     const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: "ok" }),
-    });
+    mockFetchWithAuthConfig((url) =>
+      Promise.resolve({
+        ok: true,
+        json: async () => (String(url).includes("/api/auth/sign-up/email") ? { message: "ok" } : {}),
+      })
+    );
 
     render(<RegisterPage />);
     await fillValidForm(user);
@@ -140,10 +163,15 @@ describe("RegisterPage – API interaction", () => {
 
   it("shows error message on API failure", async () => {
     const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ message: "Email already in use" }),
-    });
+    mockFetchWithAuthConfig((url) =>
+      Promise.resolve({
+        ok: !String(url).includes("/api/auth/sign-up/email"),
+        json: async () =>
+          String(url).includes("/api/auth/sign-up/email")
+            ? { message: "Email already in use" }
+            : {},
+      })
+    );
 
     render(<RegisterPage />);
     await fillValidForm(user);
@@ -154,7 +182,12 @@ describe("RegisterPage – API interaction", () => {
 
   it("shows loading state while submitting", async () => {
     const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockImplementationOnce(() => new Promise(() => {}));
+    mockFetchWithAuthConfig((url) => {
+      if (String(url).includes("/api/auth/sign-up/email")) {
+        return new Promise(() => {});
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
 
     render(<RegisterPage />);
     await fillValidForm(user);
