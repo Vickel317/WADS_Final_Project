@@ -54,6 +54,7 @@ describe("security-critical guards", () => {
           name: "Test User",
           accountStatus: "ACTIVE",
           role: "STUDENT",
+          dmRestriction: "ALL",
         });
       }
 
@@ -62,6 +63,7 @@ describe("security-critical guards", () => {
         name: "Receiver",
         accountStatus: "ACTIVE",
         role: "STUDENT",
+        dmRestriction: "ALL",
       });
     });
 

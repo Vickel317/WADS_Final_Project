@@ -5,6 +5,7 @@ import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { isRestrictedAccount } from "@/lib/moderation";
 import { sanitizeText } from "@/lib/sanitization";
+import { areUsersConnected, canSendDirectMessage } from "@/lib/message-access";
 
 /**
  * @swagger
@@ -155,13 +156,32 @@ export async function POST(
 
     const { userId: receiverId } = await params;
 
-    const receiver = await prisma.user.findUnique({ where: { userId: receiverId } });
+    const receiver = await prisma.user.findUnique({
+      where: { userId: receiverId },
+      select: { userId: true, role: true, dmRestriction: true },
+    });
     if (!receiver) {
       return apiError(404, "Recipient not found", "NOT_FOUND");
     }
 
     if (isRestrictedAccount(sessionUser.user)) {
       return apiError(403, "Your account is restricted from sending messages", "FORBIDDEN");
+    }
+
+    const isConnected = await areUsersConnected(
+      sessionUser.user.userId,
+      receiverId,
+      (args) => prisma.follow.findFirst(args)
+    );
+    const sender = await prisma.user.findUnique({
+      where: { userId: sessionUser.user.userId },
+      select: { userId: true, role: true, dmRestriction: true },
+    });
+    if (
+      !sender ||
+      !canSendDirectMessage(sender, receiver, isConnected)
+    ) {
+      return apiError(403, "This user does not accept messages from you", "FORBIDDEN");
     }
 
     const safeContent = sanitizeText(content.value!);

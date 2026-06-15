@@ -21,9 +21,9 @@
 
 | Name | Student ID | Role | GitHub Username |
 |------|------------|------|-----------------|
-| [FILL IN] | [FILL IN] | [FILL IN] | [FILL IN] |
-| [FILL IN] | [FILL IN] | [FILL IN] | [FILL IN] |
-| [FILL IN] | [FILL IN] | [FILL IN] | [FILL IN] |
+| Vickelsteins August Santoso | 2802505941	 | Full Stack | Vickel317 |
+| Harris Ekaputra Suryadi | 2802400502	 | Full Stack | HES2209 |
+| Kevin Makmur Kurniawan | 2802547553 | Full Stack | kevMkr |
 
 ---
 
@@ -54,7 +54,7 @@ Academify is a full-stack web platform where users:
 - Schedule and RSVP to **events**
 - Get **AI-assisted** moderation, recommendations, and thread summaries
 
-**AI is core:** post moderation, forum/thread recommendations, and discussion summarization — all with documented automated tests (see [TESTING.md](./TESTING.md)).
+**AI is core:** post moderation, forum/thread recommendations, and discussion summarization — all with documented automated tests (see §10).
 
 ---
 
@@ -87,15 +87,12 @@ Academify is a full-stack web platform where users:
 │  (React UI) │                │  API routes      │
 └──────┬──────┘                └────────┬─────────┘
        │                                │
-       │ WebSocket                      │ Prisma
+       │ WebSocket (Socket.IO)          │ Prisma
        ▼                                ▼
 ┌─────────────┐                ┌──────────────────┐
 │ Socket.IO   │                │   PostgreSQL     │
 │  server     │                │   (Neon / VPS)   │
-└─────────────┘                └──────────────────┘
-       ▲                                ▲
-       │                                │
-       └──────── emit secret ───────────┤
+└─────────────┘                └────────┬─────────┘
                                         │
                                ┌────────┴────────┐
                                │ MinIO (files)   │
@@ -107,57 +104,781 @@ Academify is a full-stack web platform where users:
 
 - **Frontend:** Next.js App Router with server components (data fetching) and client components (interactivity).
 - **API:** REST handlers in `app/api/**` return JSON; business logic in `lib/**`.
+- **Realtime:** Browser connects to a separate Socket.IO server (`socket-server/`, `lib/socket-client.ts`) for DMs and collab-space typing. Set `NEXT_PUBLIC_SOCKET_URL` in env (port **3100** in Docker/prod).
 - **Database:** Prisma only — never accessed directly from the browser.
 - **Security:** Session cookies (HTTP-only), middleware proxy, role checks in API routes, input sanitization.
 - **AI:** Server-side calls to Ollama; rate-limited; fallbacks when AI is down.
 
 ---
 
-## 6. API Design (mandatory)
+## 6. API Reference (full)
 
-### 6.1 Sample endpoints
+Interactive documentation: **`/api-docs`** (Swagger UI). Machine-readable spec: **`/api/swagger`**.
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| POST | `/api/auth/sign-up/email` | Register | No |
-| POST | `/api/auth/sign-in/email` | Login | No |
-| GET | `/api/auth/get-session` | Current session | Cookie |
-| GET | `/api/categories` | List forums | No |
-| POST | `/api/posts` | Create thread | Yes |
-| GET | `/api/posts` | List threads | Yes |
-| POST | `/api/posts/:id/comments` | Add comment | Yes |
-| GET | `/api/ai/summarize/:postId` | AI thread summary | Yes |
-| GET | `/api/ai/recommend` | AI thread suggestions | Yes |
-| GET | `/api/ai/recommend/forums` | AI forum suggestions | Yes |
-| POST | `/api/ai/moderate` | AI content moderation | Yes |
-| GET | `/api/moderation/queue` | Mod queue | Mod/Admin |
-| POST | `/api/reports` | Report content | Yes |
-| GET | `/api/files` | List uploads | Yes |
+### 6.1 Quick links
 
-Full list: Swagger at **`/api-docs`** or see [API_DOCS.md](./API_DOCS.md).
+- **Interactive Documentation**: Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs) to explore the API with Swagger UI
+- **OpenAPI Spec**: [/public/swagger.json](/public/swagger.json)
 
-### 6.2 Example: create post
+### 6.2 Base URL
 
-```http
-POST /api/posts
-Content-Type: application/json
-Cookie: better-auth.session_token=...
+```
+http://localhost:3000/api
+```
 
+### 6.3 Authentication
+
+The API uses [Better Auth](https://www.better-auth.com/) with **HTTP-only session cookies**. After signing in through `/api/auth/*`, the browser automatically sends the session cookie on same-origin requests. Protected endpoints reject unauthenticated callers with `401 Unauthorized`.
+
+### Session Cookie
+
+Better Auth sets an HTTP-only session cookie (configured in `lib/auth.ts`):
+
+- `httpOnly: true` — not accessible to JavaScript
+- `sameSite: "lax"` — mitigates CSRF for cross-site POST requests while allowing top-level navigation
+- `secure: true` in production — HTTPS only
+
+For same-origin browser clients, no manual `Authorization` header is required. API route handlers read the session via `getSessionUser()` / `verifyToken()`.
+
+### 6.4 API endpoints
+
+### Authentication Endpoints
+
+Better Auth handles registration, login, logout, and session management. Primary routes:
+
+```
+POST /api/auth/sign-up/email
+POST /api/auth/sign-in/email
+POST /api/auth/sign-out
+GET  /api/auth/get-session
+```
+
+#### 1. Register a New Account (legacy reference)
+```
+POST /api/auth/register
+```
+
+**Request Body:**
+```json
 {
-  "title": "Study group for WADS",
-  "content": "Anyone free Thursday?",
-  "forumId": "..."
+  "email": "user@example.com",
+  "password": "SecurePassword123!",
+  "name": "John Doe"
 }
 ```
 
+**Success Response (201):**
 ```json
 {
-  "thread": {
-    "id": "...",
-    "status": "pending"
+  "id": "user_123",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "createdAt": "2026-03-11T10:00:00Z"
+}
+```
+
+#### 2. Login
+```
+POST /api/auth/login
+```
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "user_123",
+    "email": "user@example.com",
+    "name": "John Doe"
   }
 }
 ```
+
+**Note:** The response includes an HTTP-only `auth_token` cookie.
+
+#### 3. Get Current User
+```
+GET /api/auth/me
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Success Response (200):**
+```json
+{
+  "id": "user_123",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "role": "student",
+  "createdAt": "2026-03-11T10:00:00Z",
+  "updatedAt": "2026-03-11T15:00:00Z"
+}
+```
+
+#### 4. Logout
+```
+POST /api/auth/logout
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Success Response (200):**
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+**Note:** The `auth_token` cookie is cleared automatically.
+
+#### 5. Refresh Access Token
+```
+POST /api/auth/refresh
+```
+
+**Request Body:**
+```json
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 3600
+}
+```
+
+### User Endpoints
+
+#### 1. Get User Profile
+```
+GET /api/users/:userId
+```
+
+**Parameters:**
+- `userId` (path, required): User ID (e.g., "user_1")
+
+**Success Response (200):**
+```json
+{
+  "id": "user_1",
+  "email": "john@example.com",
+  "name": "John Doe",
+  "role": "student",
+  "bio": "Computer Science student",
+  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
+  "createdAt": "2026-01-15T10:00:00Z",
+  "updatedAt": "2026-03-10T15:00:00Z"
+}
+```
+
+#### 2. Update Own Profile
+```
+PUT /api/users/:userId
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body:**
+```json
+{
+  "name": "John Doe Updated",
+  "bio": "Updated bio text",
+  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=newavatar"
+}
+```
+
+**Note:** Users can only update their own profile. The `userId` in the URL must match the authenticated user's ID.
+
+**Success Response (200):**
+```json
+{
+  "id": "user_1",
+  "email": "john@example.com",
+  "name": "John Doe Updated",
+  "role": "student",
+  "bio": "Updated bio text",
+  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=newavatar",
+  "createdAt": "2026-01-15T10:00:00Z",
+  "updatedAt": "2026-03-11T12:00:00Z"
+}
+```
+
+#### 3. Delete Own Account
+```
+DELETE /api/users/:userId
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Note:** Users can only delete their own account. The `userId` in the URL must match the authenticated user's ID.
+
+**Success Response (200):**
+```json
+{
+  "message": "Account deleted successfully"
+}
+```
+
+#### 4. Get User's Posts
+```
+GET /api/users/:userId/posts
+```
+
+**Parameters:**
+- `userId` (path, required): User ID
+
+**Success Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "post_1",
+      "userId": "user_1",
+      "title": "Advanced JavaScript Patterns",
+      "content": "A comprehensive guide to design patterns...",
+      "category": "Technology",
+      "createdAt": "2026-03-05T10:00:00Z",
+      "updatedAt": "2026-03-05T10:00:00Z",
+      "likes": 42,
+      "comments": 8
+    }
+  ],
+  "total": 1,
+  "userId": "user_1"
+}
+```
+
+#### 5. Get User's Events
+```
+GET /api/users/:userId/events
+```
+
+**Parameters:**
+- `userId` (path, required): User ID
+- `status` (query, optional): Filter by status - "scheduled", "completed", or "cancelled"
+
+**Query Example:**
+```
+GET /api/users/user_1/events?status=scheduled
+```
+
+**Success Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "event_1",
+      "userId": "user_1",
+      "title": "JavaScript Study Session",
+      "description": "Advanced JavaScript patterns and best practices discussion",
+      "date": "2026-03-15T14:00:00Z",
+      "duration": 120,
+      "location": "Library - Room 301",
+      "category": "Study Session",
+      "participants": ["user_1", "user_3", "user_4"],
+      "status": "scheduled"
+    }
+  ],
+  "total": 1,
+  "userId": "user_1"
+}
+```
+
+### Event Endpoints
+
+#### 1. List Events
+```
+GET /api/events
+```
+
+**Query Parameters:**
+- `filter` (optional): "upcoming" or "past" - Filter events by date
+- `page` (optional): Page number (default: 1)
+
+**Query Examples:**
+```
+GET /api/events
+GET /api/events?filter=upcoming
+GET /api/events?filter=upcoming&page=2
+```
+
+**Success Response (200):**
+```json
+{
+  "data": [
+    {
+      "id": "event_1",
+      "userId": "user_1",
+      "title": "JavaScript Study Session",
+      "description": "Advanced JavaScript patterns discussion",
+      "date": "2026-03-15T14:00:00Z",
+      "duration": 120,
+      "location": "Library - Room 301",
+      "category": "Study Session",
+      "maxAttendees": 20,
+      "attendees": ["user_1", "user_3", "user_4"],
+      "status": "scheduled",
+      "createdAt": "2026-03-10T10:00:00Z",
+      "updatedAt": "2026-03-10T10:00:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "total": 5,
+    "totalPages": 1
+  }
+}
+```
+
+#### 2. Get Event Details with Attendees
+```
+GET /api/events/:eventId
+```
+
+**Parameters:**
+- `eventId` (path, required): Event ID
+
+**Success Response (200):**
+```json
+{
+  "id": "event_1",
+  "userId": "user_1",
+  "title": "JavaScript Study Session",
+  "description": "Advanced JavaScript patterns discussion",
+  "date": "2026-03-15T14:00:00Z",
+  "duration": 120,
+  "location": "Library - Room 301",
+  "category": "Study Session",
+  "maxAttendees": 20,
+  "attendees": ["user_1", "user_3", "user_4"],
+  "status": "scheduled",
+  "createdAt": "2026-03-10T10:00:00Z",
+  "updatedAt": "2026-03-10T10:00:00Z"
+}
+```
+
+#### 3. Create New Event
+```
+POST /api/events
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Request Body:**
+```json
+{
+  "title": "Python Workshop",
+  "description": "Interactive Python programming workshop",
+  "date": "2026-03-25T18:00:00Z",
+  "duration": 180,
+  "location": "Computer Lab - Building A",
+  "category": "Workshop",
+  "maxAttendees": 30
+}
+```
+
+**Success Response (201):**
+```json
+{
+  "id": "event_999",
+  "userId": "user_1",
+  "title": "Python Workshop",
+  "description": "Interactive Python programming workshop",
+  "date": "2026-03-25T18:00:00Z",
+  "duration": 180,
+  "location": "Computer Lab - Building A",
+  "category": "Workshop",
+  "maxAttendees": 30,
+  "attendees": ["user_1"],
+  "status": "scheduled",
+  "createdAt": "2026-03-11T10:00:00Z",
+  "updatedAt": "2026-03-11T10:00:00Z"
+}
+```
+
+#### 4. Update Own Event
+```
+PUT /api/events/:eventId
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Parameters:**
+- `eventId` (path, required): Event ID (must be creator's event)
+
+**Request Body:**
+```json
+{
+  "title": "JavaScript Study Session - Updated",
+  "description": "Updated description",
+  "maxAttendees": 25,
+  "status": "completed"
+}
+```
+
+**Note:** Users can only update their own events.
+
+**Success Response (200):**
+```json
+{
+  "id": "event_1",
+  "userId": "user_1",
+  "title": "JavaScript Study Session - Updated",
+  "description": "Updated description",
+  "date": "2026-03-15T14:00:00Z",
+  "duration": 120,
+  "location": "Library - Room 301",
+  "category": "Study Session",
+  "maxAttendees": 25,
+  "attendees": ["user_1", "user_3", "user_4"],
+  "status": "completed",
+  "createdAt": "2026-03-10T10:00:00Z",
+  "updatedAt": "2026-03-11T12:00:00Z"
+}
+```
+
+#### 5. Delete Own Event
+```
+DELETE /api/events/:eventId
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Parameters:**
+- `eventId` (path, required): Event ID (must be creator's event)
+
+**Note:** Users can only delete their own events.
+
+**Success Response (200):**
+```json
+{
+  "message": "Event deleted successfully"
+}
+```
+
+#### 6. RSVP to Event
+```
+POST /api/events/:eventId/rsvp
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Parameters:**
+- `eventId` (path, required): Event ID to attend
+
+**Success Response (200):**
+```json
+{
+  "message": "Successfully RSVP'd to event",
+  "event": {
+    "id": "event_1",
+    "userId": "user_1",
+    "title": "JavaScript Study Session",
+    "description": "Advanced JavaScript patterns discussion",
+    "date": "2026-03-15T14:00:00Z",
+    "duration": 120,
+    "location": "Library - Room 301",
+    "category": "Study Session",
+    "maxAttendees": 20,
+    "attendees": ["user_1", "user_3", "user_4", "user_6"],
+    "status": "scheduled",
+    "createdAt": "2026-03-10T10:00:00Z",
+    "updatedAt": "2026-03-11T12:00:00Z"
+  }
+}
+```
+
+**Error Scenarios:**
+- **400**: Already attending or event at full capacity
+- **404**: Event not found
+- **401**: Not authenticated
+
+#### 7. Cancel RSVP
+```
+DELETE /api/events/:eventId/rsvp
+```
+
+**Headers:**
+```
+Authorization: Bearer <jwt_token>
+```
+
+**Parameters:**
+- `eventId` (path, required): Event ID to cancel attendance
+
+**Success Response (200):**
+```json
+{
+  "message": "Successfully cancelled RSVP",
+  "event": {
+    "id": "event_1",
+    "userId": "user_1",
+    "title": "JavaScript Study Session",
+    "description": "Advanced JavaScript patterns discussion",
+    "date": "2026-03-15T14:00:00Z",
+    "duration": 120,
+    "location": "Library - Room 301",
+    "category": "Study Session",
+    "maxAttendees": 20,
+    "attendees": ["user_1", "user_3", "user_4"],
+    "status": "scheduled",
+    "createdAt": "2026-03-10T10:00:00Z",
+    "updatedAt": "2026-03-11T12:00:00Z"
+  }
+}
+```
+
+**Error Scenarios:**
+- **400**: Not attending this event
+- **404**: Event not found
+- **401**: Not authenticated
+
+#### 8. Get Attendee List
+```
+GET /api/events/:eventId/attendees
+```
+
+**Parameters:**
+- `eventId` (path, required): Event ID
+
+**Success Response (200):**
+```json
+{
+  "eventId": "event_1",
+  "eventTitle": "JavaScript Study Session",
+  "totalAttendees": 3,
+  "maxAttendees": 20,
+  "attendees": [
+    {
+      "id": "user_1",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "role": "student",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=john"
+    },
+    {
+      "id": "user_3",
+      "name": "Mike Johnson",
+      "email": "mike@example.com",
+      "role": "student",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=mike"
+    },
+    {
+      "id": "user_4",
+      "name": "Emma Wilson",
+      "email": "emma@example.com",
+      "role": "student",
+      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=emma"
+    }
+  ]
+}
+```
+
+### 6.5 Error responses
+
+All error responses follow a consistent format:
+
+```json
+{
+  "error": "Error message describing what went wrong"
+}
+```
+
+### Common HTTP Status Codes
+
+- **200 OK**: Request successful
+- **201 Created**: Resource created successfully
+- **400 Bad Request**: Invalid request body or missing required fields
+- **401 Unauthorized**: Missing or invalid authentication token
+- **404 Not Found**: Resource not found
+- **500 Internal Server Error**: Server-side error
+
+### 6.6 Rate limiting
+
+Global API rate limiting is enforced in `proxy.ts` (Next.js middleware) using client IP:
+
+| Traffic type | Default limit | Applies to |
+|--------------|---------------|------------|
+| Read (`GET`, etc.) | 120 requests / minute | All `/api/*` read routes |
+| Write (`POST`, `PUT`, `PATCH`, `DELETE`) | 30 requests / minute | All `/api/*` write routes |
+| Auth (`/api/auth/*`) | 10 requests / minute | Login, registration, session |
+
+When exceeded, the API returns `429 Too Many Requests` with `Retry-After` and error code `RATE_LIMITED`.
+
+AI-specific routes (`/api/ai/recommend`, `/api/ai/summarize`) additionally enforce a per-user cooldown (default 15 seconds) via `lib/ai/rate-limit.ts`.
+
+Limits are configurable through environment variables: `RATE_LIMIT_READ_MAX`, `RATE_LIMIT_WRITE_MAX`, `RATE_LIMIT_AUTH_MAX`, and corresponding `*_WINDOW_MS` values.
+
+### 6.7 CORS policy
+
+The API accepts requests from:
+- `http://localhost:3000` (development)
+- `https://academify.example.com` (production)
+
+### 6.8 Testing the API
+
+### Using cURL
+
+```bash
+# Register
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePassword123!",
+    "name": "John Doe"
+  }'
+
+# Login
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePassword123!"
+  }'
+
+# Get current user (replace TOKEN with your JWT)
+curl -X GET http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer TOKEN"
+
+# Get user profile
+curl -X GET http://localhost:3000/api/users/user_1
+
+# Update user profile (replace TOKEN with your JWT)
+curl -X PUT http://localhost:3000/api/users/user_1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{
+    "name": "John Doe Updated",
+    "bio": "Updated bio",
+    "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=newavatar"
+  }'
+
+# Get user's posts
+curl -X GET http://localhost:3000/api/users/user_1/posts
+
+# Get user's events
+curl -X GET http://localhost:3000/api/users/user_1/events
+
+# Get user's scheduled events only
+curl -X GET http://localhost:3000/api/users/user_1/events?status=scheduled
+
+# Delete user account (replace TOKEN with your JWT)
+curl -X DELETE http://localhost:3000/api/users/user_1 \
+  -H "Authorization: Bearer TOKEN"
+
+# List all upcoming events
+curl -X GET http://localhost:3000/api/events?filter=upcoming
+
+# Get specific event details
+curl -X GET http://localhost:3000/api/events/event_1
+
+# Create a new event (replace TOKEN with your JWT)
+curl -X POST http://localhost:3000/api/events \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{
+    "title": "Python Workshop",
+    "description": "Interactive Python programming workshop",
+    "date": "2026-03-25T18:00:00Z",
+    "duration": 180,
+    "location": "Computer Lab",
+    "category": "Workshop",
+    "maxAttendees": 30
+  }'
+
+# Update an event (replace TOKEN and event_1 with your JWT and event ID)
+curl -X PUT http://localhost:3000/api/events/event_1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TOKEN" \
+  -d '{
+    "maxAttendees": 25,
+    "status": "completed"
+  }'
+
+# RSVP to an event (replace TOKEN with your JWT)
+curl -X POST http://localhost:3000/api/events/event_1/rsvp \
+  -H "Authorization: Bearer TOKEN"
+
+# Cancel RSVP (replace TOKEN with your JWT)
+curl -X DELETE http://localhost:3000/api/events/event_1/rsvp \
+  -H "Authorization: Bearer TOKEN"
+
+# Get attendee list for an event
+curl -X GET http://localhost:3000/api/events/event_1/attendees
+
+# Delete an event (replace TOKEN and event_1 with your JWT and event ID)
+curl -X DELETE http://localhost:3000/api/events/event_1 \
+  -H "Authorization: Bearer TOKEN"
+```
+
+### Using Swagger UI
+
+1. Navigate to [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
+2. Click on an endpoint to expand it
+3. Click "Try it out" button
+4. Fill in the required parameters
+5. Click "Execute" to send the request
+
+### 6.9 Security considerations
+
+1. **Session-based auth (Better Auth)**: Sessions are stored server-side; cookies are HTTP-only and cannot be read by client JavaScript.
+2. **Password hashing**: Passwords are hashed by Better Auth before storage.
+3. **CSRF mitigation**: Session cookies use `SameSite=Lax`. All state-changing requests are same-origin from the Next.js frontend, which prevents cross-site cookie submission on unsafe methods.
+4. **Input sanitization**: Messages, posts, and comments are sanitized server-side via `sanitizeText()` before persistence (HTML entity escaping).
+5. **RBAC**: Role checks on admin, moderation, post, and file routes.
+6. **File upload validation**: MIME allowlist, 50 MB size cap, and dangerous filename blocking via `validateUploadFileName()`.
+7. **Security headers**: HSTS (HTTPS), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and Content-Security-Policy on page routes — applied via `proxy.ts` for both pages and API routes.
+8. **Rate limiting**: Global IP-based limits on all API routes; additional per-user cooldown on AI routes.
+9. **Realtime transport**: Socket.IO server (`socket-server/index.ts`) with CORS restricted to app origins; clients connect via `NEXT_PUBLIC_SOCKET_URL` (no server-to-server emit relay).
+10. **Known limitations**:
+    - **Virus/malware scanning**: Production Docker images run `clamscan` with definitions from `freshclam` at build time. Local dev skips scanning when `clamscan` is not installed.
+    - **Image moderation**: Text content is AI-moderated; image attachments and avatars are not scanned for explicit content.
+
+### 6.10 Additional endpoints
+
+Forums, threads, posts, comments, messages, files, collaboration spaces, moderation, reports, AI routes, and admin APIs are implemented — explore them in Swagger UI at `/api-docs` or via route handlers under `app/api/`.
+
+### 6.11 Support
+
+For API issues or questions, please contact: support@academify.com
 
 ---
 
@@ -201,7 +922,7 @@ User opens thread
     → Cached JSON on Post when unchanged
 ```
 
-Detailed test cases: **[TESTING.md](./TESTING.md)** §10.4.
+Detailed test cases: **§10.4** below.
 
 ---
 
@@ -216,24 +937,223 @@ Detailed test cases: **[TESTING.md](./TESTING.md)** §10.4.
 | SQL injection | Prisma parameterized queries only |
 | CSRF | SameSite cookies + same-origin API calls |
 | Rate limiting | `lib/ai/rate-limit.ts`, `lib/rate-limit.ts` on AI endpoints |
-| File security | Extension/MIME checks, size limits, ClamAV scan hook |
+| File security | Extension/MIME checks, size limits, ClamAV (`clamscan` + `freshclam` in Docker) |
 | API keys | Ollama/MinIO secrets in env only — never in client bundle |
+| Realtime chat | Socket.IO over WebSocket; CORS on socket server; `NEXT_PUBLIC_SOCKET_URL` for client |
 | Moderation audit | `ModerationActionLog` table |
 
 ---
 
 ## 10. Testing Documentation
 
-**Full tables (FE / API / SEC / AI):** [TESTING.md](./TESTING.md)
+### Test layers
+
+| Layer | Tool | What it tests | Location |
+|-------|------|---------------|----------|
+| **Unit** | Jest | Pure functions, helpers, AI mappers | `__tests__/*.test.ts` |
+| **Component / page** | Jest + React Testing Library | UI rendering, forms, interactions | `__tests__/*.test.tsx` |
+| **API (mocked DB)** | Jest + `NextRequest` | Route handlers, auth guards, validation | `__tests__/api-*.test.ts`, `security-critical.test.ts` |
+| **Integration (real DB)** | Jest + PostgreSQL | API ↔ Prisma ↔ PostgreSQL | `__tests__/integration/*.int.test.ts` |
+| **E2E** | Playwright | Full browser smoke tests on running app | `e2e/*.spec.ts` |
+
+**E2E** tests the whole stack (browser → Next.js → API → DB). **Playwright** automates Chromium. E2E is slower and runs against a live server; unit/integration tests run in Node.
+
+Current coverage (~66% statements) focuses on critical paths. See the **coverage matrix** below.
+
+### Running tests
 
 ```bash
-npm test                 # 125+ unit/component/API tests (mocked DB)
+npm test                 # Unit + component + mocked API tests
+npm run test:coverage    # Coverage report → coverage/
 npm run test:integration # Real PostgreSQL integration tests
 npm run test:e2e         # Playwright browser smoke tests
-npm run test:coverage    # Coverage report → coverage/
 ```
 
-CI runs lint, build, unit tests, and integration tests on every push to `main`.
+For integration tests locally:
+
+```bash
+createdb academify_test   # once
+TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/academify_test npx prisma migrate deploy
+npm run test:integration
+```
+
+CI runs lint, build, unit tests, and integration tests on every push to `main` / `master`.
+
+### 10.1 Frontend testing
+
+| ID | Scenario | Expected result | Automated test | Status |
+|----|----------|-----------------|----------------|--------|
+| FE-01 | Login with invalid email | Inline validation error | `__tests__/login.test.tsx` | Pass |
+| FE-02 | Login with empty password | Inline validation error | `__tests__/login.test.tsx` | Pass |
+| FE-03 | Register password mismatch | Error shown | `__tests__/register.test.tsx` | Pass |
+| FE-04 | Register without terms | Error shown | `__tests__/register.test.tsx` | Pass |
+| FE-05 | Dashboard renders for session | Main sections visible | `__tests__/dashboard.test.tsx` | Pass |
+| FE-06 | Forums list renders | Forum cards / heading | `__tests__/forums.test.tsx` | Pass |
+| FE-07 | Profile edit validation | Field errors | `__tests__/profile-edit.test.tsx` | Pass |
+| FE-08 | Topbar search mount | No hydration crash | `__tests__/topbar.test.tsx` | Pass |
+| FE-09 | Login page E2E smoke | Page loads in browser | `e2e/smoke.spec.ts` | Pass |
+| FE-10 | Register page E2E smoke | Page loads in browser | `e2e/smoke.spec.ts` | Pass |
+| FE-11 | Events page renders | Calendar + create button | `__tests__/events.test.tsx` | Pass |
+| FE-12 | Profile setup (student) | Education dropdown + skills | `__tests__/profile-setup.test.tsx` | Pass |
+| FE-13 | Admin panel | Stats or forbidden message | `__tests__/admin.test.tsx` | Pass |
+| FE-14 | Protected routes E2E smoke | No 500 on key pages | `e2e/smoke.spec.ts` | Pass |
+
+### 10.2 Backend & API testing
+
+| ID | Endpoint / area | Input / case | Expected output | Test file | Status |
+|----|-----------------|--------------|-----------------|-----------|--------|
+| API-01 | `POST /api/posts` | Unauthenticated | 401 | `api-authorization.test.ts` | Pass |
+| API-02 | `PUT /api/categories/:id` | Non-admin/non-mod | 403 | `categories-authorization.test.ts` | Pass |
+| API-03 | `GET /api/files/:id` | Non-owner | 403/404 | `files-authorization.test.ts` | Pass |
+| API-04 | `POST /api/posts/:id/like` | Toggle like | 200 + count | `post-like.test.ts` | Pass |
+| API-05 | `GET /api/categories` | List forums | 200 + JSON | `integration/categories.int.test.ts` | Pass |
+| API-06 | `POST /api/posts/:id/comments` | XSS in body | Sanitized in DB | `integration/post-comments.int.test.ts` | Pass |
+| API-07 | `GET /api/ai/summarize/:id` | Unauthenticated | 401 | `ai-summarize.test.ts` | Pass |
+| API-08 | `GET /api/ai/recommend/forums` | Authenticated | 200 + forums | `ai-recommend-forums.test.ts` | Pass |
+| API-09 | `POST /api/events` | Unauthenticated | 401 | `api-events.test.ts` | Pass |
+| API-10 | `GET /api/reports` | Student role | 403 | `api-reports.test.ts` | Pass |
+| API-11 | `GET /api/events` | Upcoming list | 200 + DB rows | `integration/events.int.test.ts` | Pass |
+| API-12 | `POST /api/collaboration` | Create space | 201 + owner row | `integration/collaboration.int.test.ts` | Pass |
+| API-13 | `POST /api/profile/setup` | Student education | `profileSetupComplete` | `integration/profile-setup.int.test.ts` | Pass |
+
+### 10.3 Security testing
+
+| ID | Attack / case | Expected behavior | Test file | Status |
+|----|---------------|-------------------|-----------|--------|
+| SEC-01 | XSS in message body | Tags stripped before save | `security-critical.test.ts` | Pass |
+| SEC-02 | XSS in comment body | Tags stripped (integration) | `integration/post-comments.int.test.ts` | Pass |
+| SEC-03 | Dangerous upload filename | Rejected | `security-critical.test.ts` | Pass |
+| SEC-04 | Restricted user creates post | 403 | `security-critical.test.ts` | Pass |
+| SEC-05 | Non-author views pending post | Denied | `integration/post-visibility.int.test.ts` | Pass |
+| SEC-06 | AI rate limit exceeded | 429 | `ai-rate-limit.test.ts` | Pass |
+| SEC-07 | Input sanitization helper | HTML escaped | `security-critical.test.ts` | Pass |
+
+### 10.4 AI functionality testing (mandatory)
+
+#### AI Feature 1: Content moderation (Ollama + heuristics)
+
+| ID | Input | Expected output | Test file | Status |
+|----|-------|-----------------|-----------|--------|
+| AI-MOD-01 | Clean academic text | APPROVED | `ai-moderation.test.ts` | Pass |
+| AI-MOD-02 | Profanity / slurs | FLAGGED or BLOCKED | `ai-moderation.test.ts` | Pass |
+| AI-MOD-03 | Ollama timeout / failure | Heuristic fallback | `ai-moderation.test.ts` | Pass |
+| AI-MOD-04 | Malformed model JSON | Safe fallback status | `ai-moderation.test.ts` | Pass |
+
+**Failure handling:** `lib/ai/post-moderation.ts` falls back to profanity heuristics when Ollama is unavailable.
+
+#### AI Feature 2: Thread summarization
+
+| ID | Input | Expected output | Test file | Status |
+|----|-------|-----------------|-----------|--------|
+| AI-SUM-01 | Valid post + comments | Summary JSON | `ai-summarize.test.ts` | Pass |
+| AI-SUM-02 | Unauthenticated request | 401 | `ai-summarize.test.ts` | Pass |
+| AI-SUM-03 | Hidden / pending post (non-author) | 404 | `ai-summarize.test.ts` | Pass |
+| AI-SUM-04 | Rate limit exceeded | 429 | `ai-summarize.test.ts` | Pass |
+
+#### AI Feature 3: Forum & thread recommendations
+
+| ID | Input | Expected output | Test file | Status |
+|----|-------|-----------------|-----------|--------|
+| AI-REC-01 | User with profile | Ranked suggestions | `ai-recommend-forums.test.ts` | Pass |
+| AI-REC-02 | Ollama failure | Heuristic fallback list | `ai-recommend-forums.test.ts` | Pass |
+
+#### AI Feature 4: Comment sorting by engagement
+
+| ID | Input | Expected output | Test file | Status |
+|----|-------|-----------------|-----------|--------|
+| AI-SORT-01 | Comments with like counts | Sorted by likes desc | `comment-sort.test.ts` | Pass |
+
+### Coverage matrix
+
+| Area | Unit/component | Integration | E2E |
+|------|----------------|-------------|-----|
+| Auth (login/register/setup) | ✅ | ✅ setup | ✅ smoke |
+| Forums / threads | ✅ | ✅ categories | ✅ smoke |
+| Posts / comments | ✅ | ✅ comments + visibility | ✅ smoke |
+| Messages / chat | ✅ partial | ⬜ | ✅ smoke |
+| Events | ✅ | ✅ list | ✅ smoke |
+| Files / uploads | ✅ partial | ⬜ | ✅ smoke |
+| Collaboration | ✅ | ✅ create space | ✅ smoke |
+| Moderation / reports | ✅ partial | ⬜ | ⬜ |
+| Admin | ✅ | ⬜ | ✅ smoke |
+| AI endpoints | ✅ | ⬜ | ⬜ |
+
+**Legend:** ✅ covered · ⬜ add next · partial = some paths only
+
+### Manual test checklist (demo / submission)
+
+Run these in the browser on **localhost** and on **production** (`https://e2526-wads-b4ac-02.csbihub.id`). Tick when verified.
+
+#### Auth & onboarding
+- [ ] Register with email/password → redirected to `/setup`
+- [ ] Complete setup (education level + skills) → lands on `/dashboard`
+- [ ] Google sign-in (if configured) → session works, no `state mismatch`
+- [ ] Logout → protected routes redirect to login
+
+#### Forums & posts
+- [ ] Browse forums, open a forum hub (Threads / Events / Collab tabs)
+- [ ] Create thread, comment, like post/comment
+- [ ] Moderator: edit forum description + banner (not name)
+- [ ] Pending post hidden from other users; author can still view
+
+#### Events
+- [ ] Create event from forum Events tab or `/events`
+- [ ] RSVP / cancel RSVP; attendee count updates
+- [ ] Past vs upcoming filter behaves correctly
+
+#### Files & collaboration
+- [ ] Upload file in a collab space; file appears in space + Files page
+- [ ] Rename file, move to another space (if member)
+- [ ] Download via presigned URL works
+
+#### Messages & realtime
+- [ ] DM another user; messages persist after refresh
+- [ ] Socket server running (`npm run dev:all` or prod port **3100**)
+
+#### Moderation & admin
+- [ ] Submit report on a post; mod/admin sees it in queue
+- [ ] Admin analytics page loads (admin account only)
+- [ ] AI moderation flags obvious profanity on new post
+
+#### AI features (document in demo)
+- [ ] Thread summarize on a post with comments
+- [ ] Forum recommendations on dashboard/profile
+- [ ] Show fallback when Ollama is offline (heuristic still works)
+
+#### Deploy / infra
+- [ ] `npm run build` passes
+- [ ] MinIO uploads on prod (port **3099** / configured endpoint)
+- [ ] Swagger UI at `/api-docs`
+
+Export Postman collection or paste sample responses into the API tables above for grader evidence.
+
+### How to document manual tests (Postman / demo)
+
+For submission, export Postman collection or add rows to the tables above with:
+
+- Request URL + method
+- Sample JSON body
+- Screenshot or pasted response
+- Pass/Fail from manual run
+
+Link Swagger UI: `/api-docs` on deployed app.
+
+### CI/CD test pipeline
+
+On push to `main` / `master`:
+
+1. **Lint & Test** — `npm run lint`, `npm run build`, `npm test --coverage`
+2. **Integration Tests** — Postgres service + `npm run test:integration`
+3. **Docker build & deploy** — only if jobs 1–2 pass
+
+### How to add a new integration test
+
+1. Create `__tests__/integration/<feature>.int.test.ts`
+2. Use `/** @jest-environment node */` at the top
+3. Create test data with unique names (`Date.now()` marker)
+4. Call real API handlers or Prisma directly
+5. Clean up in `afterAll`
+6. Run `npm run test:integration` against a **dedicated test database** (never production)
 
 ---
 
@@ -258,9 +1178,9 @@ Secrets via `.env.production` (reconstructed from GitHub Secrets in CI). See [.e
 | `BETTER_AUTH_SECRET` | Session signing |
 | `BETTER_AUTH_URL` | Server auth base URL |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional Google OAuth |
+| `NEXT_PUBLIC_SOCKET_URL` | Browser Socket.IO endpoint (e.g. `https://socket-…` or `http://localhost:3100`) |
 | `OLLAMA_API_BASE` | AI server |
 | `MINIO_*` | File storage |
-| `SOCKET_EMIT_SECRET` | Socket relay auth |
 
 ### 11.3 Live application URL
 
@@ -329,21 +1249,32 @@ Signed: [FILL IN] · [FILL IN] · [FILL IN]
 git clone <repo-url>
 cd academify
 cp .env.example .env.local
-# Edit .env.local — set DATABASE_URL, BETTER_AUTH_*, etc.
+# Edit .env.local — set DATABASE_URL, BETTER_AUTH_*, NEXT_PUBLIC_SOCKET_URL, etc.
 
 npm ci
 npx prisma migrate deploy
 npx prisma generate
 
-# Terminal 1 — Next.js + Socket
+# Next.js + Socket.IO (one command)
 npm run dev:all
+
+# Or two terminals:
+#   npm run dev
+#   SOCKET_PORT=3100 npm run dev:socket
 
 # Open http://localhost:3000
 ```
 
+**Realtime chat:** set `NEXT_PUBLIC_SOCKET_URL=http://localhost:3100` in `.env.local` and run the socket server on the same port (`SOCKET_PORT=3100`). Messages are still saved via REST; Socket.IO delivers live updates.
+
 ### Google OAuth (optional)
 
-See [docs/GOOGLE_OAUTH.md](./docs/GOOGLE_OAUTH.md) for step-by-step setup.
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a **Web application** OAuth client.
+2. Add authorized redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google`
+   - `https://e2526-wads-b4ac-02.csbihub.id/api/auth/callback/google`
+3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env.local` (and GitHub Secrets for deploy).
+4. Ensure `BETTER_AUTH_URL` matches the site origin (no trailing slash).
 
 ---
 
@@ -370,11 +1301,3 @@ Add instead (for Google login):
 
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
-
----
-
-## Related docs
-
-- [TESTING.md](./TESTING.md) — test case tables
-- [API_DOCS.md](./API_DOCS.md) — API reference
-- [docs/GOOGLE_OAUTH.md](./docs/GOOGLE_OAUTH.md) — Google sign-in setup

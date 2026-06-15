@@ -35,8 +35,8 @@ export default function SettingsPage() {
   const handleUpdate = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/profile/setup", {
-        method: "PUT",
+      const res = await fetch("/api/users/me", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });

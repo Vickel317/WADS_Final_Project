@@ -16,6 +16,29 @@ type SearchUser = {
   isConnected?: boolean;
 };
 
+type SearchForum = {
+  forumId: string;
+  name: string;
+  description: string;
+  slug: string;
+};
+
+type SearchThread = {
+  postId: string;
+  title: string;
+  forumName: string;
+  forumSlug: string;
+  moderationStatus?: string;
+};
+
+type SearchResults = {
+  users: SearchUser[];
+  forums: SearchForum[];
+  threads: SearchThread[];
+};
+
+const EMPTY_RESULTS: SearchResults = { users: [], forums: [], threads: [] };
+
 const subscribeNoop = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
@@ -29,24 +52,28 @@ export default function Topbar() {
   const { toggleMobileOpen } = useSidebarLayout();
   const searchMounted = useSyncExternalStore(subscribeNoop, getClientSnapshot, getServerSnapshot);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchUser[]>([]);
+  const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [userName, setUserName] = useState(currentUser?.name ?? "Signed in user");
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(currentUser?.avatarUrl ?? null);
 
-  const searchUsers = useCallback(async (searchTerm: string) => {
+  const runSearch = useCallback(async (searchTerm: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/users?q=${encodeURIComponent(searchTerm)}`);
+      const res = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}&limit=5`);
       if (res.ok) {
-        const data = await res.json();
-        setResults(data.users || []);
+        const data = (await res.json()) as SearchResults;
+        setResults({
+          users: data.users ?? [],
+          forums: data.forums ?? [],
+          threads: data.threads ?? [],
+        });
         setShowDropdown(true);
       }
     } catch (error) {
-      console.error("Failed to search users", error);
+      console.error("Failed to search", error);
     } finally {
       setLoading(false);
     }
@@ -55,15 +82,15 @@ export default function Topbar() {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (query.trim().length > 0) {
-        void searchUsers(query);
+        void runSearch(query);
       } else {
-        setResults([]);
+        setResults(EMPTY_RESULTS);
         setShowDropdown(false);
       }
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [query, searchUsers]);
+  }, [query, runSearch]);
 
   useEffect(() => {
     let active = true;
@@ -86,6 +113,9 @@ export default function Topbar() {
       active = false;
     };
   }, [currentUser?.name, currentUser?.avatarUrl]);
+
+  const hasResults =
+    results.users.length > 0 || results.forums.length > 0 || results.threads.length > 0;
 
   return (
     <header
@@ -127,50 +157,104 @@ export default function Topbar() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => {
-                if (results.length > 0 || loading) setShowDropdown(true);
+                if (hasResults || loading) setShowDropdown(true);
               }}
               onBlur={() => {
                 setTimeout(() => setShowDropdown(false), 200);
               }}
-              placeholder="Search people..."
+              placeholder="Search people, forums, threads..."
               autoComplete="off"
               className={searchInputClassName}
             />
           ) : (
             <div className={`${searchInputClassName} text-transparent select-none`} aria-hidden>
-              Search people...
+              Search people, forums, threads...
             </div>
           )}
 
           {showDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-xl shadow-teal-900/5 max-h-80 overflow-y-auto z-50">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-xl shadow-teal-900/5 max-h-96 overflow-y-auto z-50">
               {loading && <div className="p-4 text-center text-sm text-gray-500">Searching...</div>}
-              {!loading && results.length === 0 && (
-                <div className="p-4 text-center text-sm text-gray-500">No users found.</div>
+              {!loading && !hasResults && (
+                <div className="p-4 text-center text-sm text-gray-500">No results found.</div>
               )}
-              {!loading && results.length > 0 && (
-                <ul className="py-2">
-                  {results.map((user) => (
-                    <li key={user.userId}>
-                      <Link
-                        href={`?profileId=${user.userId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition"
-                      >
-                        <div className="w-8 h-8 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center font-bold text-xs">
-                          {user.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-medium text-gray-800 truncate">{user.name}</span>
-                          <span className="text-xs text-gray-500 truncate">
-                            @{user.username} {user.isConnected ? "• Connected" : ""}
-                          </span>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+              {!loading && hasResults && (
+                <div className="py-2">
+                  {results.users.length > 0 && (
+                    <section>
+                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">People</p>
+                      <ul>
+                        {results.users.map((user) => (
+                          <li key={user.userId}>
+                            <Link
+                              href={`?profileId=${user.userId}`}
+                              className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition"
+                            >
+                              <div className="w-8 h-8 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center font-bold text-xs">
+                                {user.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-medium text-gray-800 truncate">{user.name}</span>
+                                <span className="text-xs text-gray-500 truncate">
+                                  @{user.username} {user.isConnected ? "• Connected" : ""}
+                                </span>
+                              </div>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {results.forums.length > 0 && (
+                    <section className={results.users.length > 0 ? "border-t border-gray-100 mt-1 pt-1" : ""}>
+                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Forums</p>
+                      <ul>
+                        {results.forums.map((forum) => (
+                          <li key={forum.forumId}>
+                            <Link
+                              href={`/forums/${forum.slug}`}
+                              className="block px-4 py-2 hover:bg-gray-50 transition"
+                            >
+                              <span className="text-sm font-medium text-gray-800 truncate block">{forum.name}</span>
+                              {forum.description ? (
+                                <span className="text-xs text-gray-500 line-clamp-1">{forum.description}</span>
+                              ) : null}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+
+                  {results.threads.length > 0 && (
+                    <section
+                      className={
+                        results.users.length > 0 || results.forums.length > 0
+                          ? "border-t border-gray-100 mt-1 pt-1"
+                          : ""
+                      }
+                    >
+                      <p className="px-4 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Threads</p>
+                      <ul>
+                        {results.threads.map((thread) => (
+                          <li key={thread.postId}>
+                            <Link
+                              href={`/post/${thread.postId}`}
+                              className="block px-4 py-2 hover:bg-gray-50 transition"
+                            >
+                              <span className="text-sm font-medium text-gray-800 truncate block">{thread.title}</span>
+                              <span className="text-xs text-gray-500 truncate block">
+                                in {thread.forumName}
+                                {thread.moderationStatus ? ` • ${thread.moderationStatus}` : ""}
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                </div>
               )}
             </div>
           )}
