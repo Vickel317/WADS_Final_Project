@@ -5,13 +5,31 @@ import LoginPage from "@/app/(auth)/login/page";
 
 const mockPush = jest.fn();
 
+function mockFetchWithAuthConfig(
+  handler?: (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }> | { ok: boolean; json: () => Promise<unknown> }
+) {
+  (global.fetch as jest.Mock).mockImplementation((url: string) => {
+    if (String(url).includes("/api/auth/config")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ googleEnabled: false, googleCallbackUrl: "" }),
+      });
+    }
+    if (handler) {
+      return Promise.resolve(handler(url));
+    }
+    return Promise.resolve({ ok: true, json: async () => ({}) });
+  });
+}
+
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn();
+  mockFetchWithAuthConfig();
 });
 
 describe("LoginPage – rendering", () => {
@@ -68,6 +86,9 @@ describe("LoginPage – validation", () => {
     const user = userEvent.setup();
     render(<LoginPage />);
 
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/auth/config"));
+    (fetch as jest.Mock).mockClear();
+
     await user.click(screen.getByRole("button", { name: /^login$/i }));
 
     expect(fetch).not.toHaveBeenCalled();
@@ -77,10 +98,12 @@ describe("LoginPage – validation", () => {
 describe("LoginPage – API interaction", () => {
   it("redirects to /dashboard on successful login", async () => {
     const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: "ok" }),
-    });
+    mockFetchWithAuthConfig((url) =>
+      Promise.resolve({
+        ok: true,
+        json: async () => (String(url).includes("/api/auth/sign-in/email") ? { message: "ok" } : {}),
+      })
+    );
 
     render(<LoginPage />);
 
@@ -93,10 +116,15 @@ describe("LoginPage – API interaction", () => {
 
   it("shows a general error message on failed login", async () => {
     const user = userEvent.setup();
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ message: "Invalid credentials" }),
-    });
+    mockFetchWithAuthConfig((url) =>
+      Promise.resolve({
+        ok: !String(url).includes("/api/auth/sign-in/email"),
+        json: async () =>
+          String(url).includes("/api/auth/sign-in/email")
+            ? { message: "Invalid credentials" }
+            : {},
+      })
+    );
 
     render(<LoginPage />);
 
@@ -109,8 +137,12 @@ describe("LoginPage – API interaction", () => {
 
   it("shows loading state while submitting", async () => {
     const user = userEvent.setup();
-    // Hang the fetch so we can see the loading state
-    (global.fetch as jest.Mock).mockImplementationOnce(() => new Promise(() => {}));
+    mockFetchWithAuthConfig((url) => {
+      if (String(url).includes("/api/auth/sign-in/email")) {
+        return new Promise(() => {});
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
 
     render(<LoginPage />);
 
