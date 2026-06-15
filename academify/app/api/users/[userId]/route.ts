@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DMRestriction } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { apiError } from "@/lib/api-response";
@@ -6,6 +7,8 @@ import { formatEducationLabel, normalizeEducationLevel } from "@/lib/profile-edu
 import { parseJson, parseOptionalString } from "@/lib/validation";
 import { deleteObject } from "@/lib/storage";
 import { resolveAvatarUrl } from "@/lib/avatar-url";
+
+const DM_RESTRICTIONS = new Set<string>(Object.values(DMRestriction));
 
 function mapProfile(
   user: {
@@ -107,17 +110,25 @@ export async function GET(
       prisma.file.count({ where: { uploadedByID: resolvedUserId } }),
     ]);
 
-    return NextResponse.json({ 
-      user: { 
+    return NextResponse.json({
+      user: {
         ...mapProfile(
           { ...user, role: user.role, avatarUrl: user.avatarUrl },
           { connections: connectionsCount, posts: postsCount, filesShared: filesCount }
-        ), 
+        ),
         isOwn,
         isFollowing,
         isFollower,
-        isConnected: isFollowing && isFollower
-      } 
+        isConnected: isFollowing && isFollower,
+        ...(isOwn
+          ? {
+              showEmail: user.showEmail,
+              showAcademicLevel: user.showAcademicLevel,
+              showLastSeen: user.showLastSeen,
+              dmRestriction: user.dmRestriction,
+            }
+          : {}),
+      },
     }, { status: 200 });
   } catch (error) {
     console.error("Get user error:", error);
@@ -170,6 +181,10 @@ async function updateUserProfile(
     const specializationsRaw = (body as { specializations?: unknown }).specializations;
     const verifiedPublicationsRaw = (body as { verifiedPublications?: unknown }).verifiedPublications;
     const askMeAboutRaw = (body as { askMeAbout?: unknown }).askMeAbout;
+    const showEmailRaw = (body as { showEmail?: unknown }).showEmail;
+    const showAcademicLevelRaw = (body as { showAcademicLevel?: unknown }).showAcademicLevel;
+    const showLastSeenRaw = (body as { showLastSeen?: unknown }).showLastSeen;
+    const dmRestrictionRaw = (body as { dmRestriction?: unknown }).dmRestriction;
     const errors = [] as Array<{ field?: string; message: string }>;
 
     if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
@@ -202,6 +217,22 @@ async function updateUserProfile(
       }
     }
 
+    if (showEmailRaw !== undefined && typeof showEmailRaw !== "boolean") {
+      errors.push({ field: "showEmail", message: "showEmail must be a boolean" });
+    }
+    if (showAcademicLevelRaw !== undefined && typeof showAcademicLevelRaw !== "boolean") {
+      errors.push({ field: "showAcademicLevel", message: "showAcademicLevel must be a boolean" });
+    }
+    if (showLastSeenRaw !== undefined && typeof showLastSeenRaw !== "boolean") {
+      errors.push({ field: "showLastSeen", message: "showLastSeen must be a boolean" });
+    }
+    if (
+      dmRestrictionRaw !== undefined &&
+      (typeof dmRestrictionRaw !== "string" || !DM_RESTRICTIONS.has(dmRestrictionRaw))
+    ) {
+      errors.push({ field: "dmRestriction", message: "dmRestriction must be ALL, CONNECTIONS, LECTURERS, or NONE" });
+    }
+
     if (errors.length) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
@@ -220,6 +251,10 @@ async function updateUserProfile(
       specializations?: string[];
       verifiedPublications?: string[];
       askMeAbout?: string[];
+      showEmail?: boolean;
+      showAcademicLevel?: boolean;
+      showLastSeen?: boolean;
+      dmRestriction?: DMRestriction;
     } = {};
     if (name.value !== undefined) updates.name = name.value;
     if (major.value !== undefined) updates.major = major.value;
@@ -248,6 +283,12 @@ async function updateUserProfile(
     }
     if (Array.isArray(askMeAboutRaw)) {
       updates.askMeAbout = askMeAboutRaw.map((item) => item.trim()).filter(Boolean);
+    }
+    if (typeof showEmailRaw === "boolean") updates.showEmail = showEmailRaw;
+    if (typeof showAcademicLevelRaw === "boolean") updates.showAcademicLevel = showAcademicLevelRaw;
+    if (typeof showLastSeenRaw === "boolean") updates.showLastSeen = showLastSeenRaw;
+    if (typeof dmRestrictionRaw === "string" && DM_RESTRICTIONS.has(dmRestrictionRaw)) {
+      updates.dmRestriction = dmRestrictionRaw as DMRestriction;
     }
 
     if (Object.keys(updates).length === 0) {

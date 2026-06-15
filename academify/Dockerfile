@@ -68,16 +68,19 @@ CMD ["node", "socket-server/index.cjs"]
 # Final image for the Next.js app (must be last stage OR build with --target runner)
 FROM base AS runner
 
-# Install ClamAV CLI (clamscan). No TCP port needed because we use the clamscan binary.
+# Install ClamAV CLI + virus definitions (clamscan reads /var/lib/clamav).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends clamav \
+  && freshclam \
+  && chmod -R o+rX /var/lib/clamav \
   && rm -rf /var/lib/apt/lists/*
 
 LABEL org.opencontainers.image.title="academify"
 LABEL org.opencontainers.image.url="e2526-wads-b4ac-02.csbihub.id"
 
 RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 --ingroup nodejs nextjs
+  && adduser --system --uid 1001 --ingroup nodejs nextjs \
+  && usermod -aG clamav nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
