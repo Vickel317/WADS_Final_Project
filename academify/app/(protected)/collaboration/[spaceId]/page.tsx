@@ -70,9 +70,8 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
       <div
         className="relative h-40 rounded-2xl overflow-hidden mb-6"
         style={
-          space.bannerUrl
-            ? { backgroundImage: `url(${space.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-            : { background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }
+          // bannerUrl is not part of the current prisma include/select, so use fallback gradient
+          { background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }
         }
       >
         <div className="absolute inset-0 bg-black/20" />

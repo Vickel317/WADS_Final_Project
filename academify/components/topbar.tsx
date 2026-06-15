@@ -27,7 +27,11 @@ export default function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
   const currentUser = useCurrentUser();
   const { toggleMobileOpen } = useSidebarLayout();
   const [query, setQuery] = useState("");

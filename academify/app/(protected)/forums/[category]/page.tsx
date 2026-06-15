@@ -358,8 +358,10 @@ export default function CategoryForumsPage() {
         <div className="flex-1 min-w-0">
           {forum?.imageUrl ? (
             <div className="mb-4 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={forum.imageUrl} alt={forum.name} className="h-56 w-full object-cover" />
             </div>
+
           ) : null}
           <h1 className="text-2xl font-bold text-gray-900">{forum?.name ?? category}</h1>
           <p className="text-sm text-gray-500 mt-1 max-w-xl">

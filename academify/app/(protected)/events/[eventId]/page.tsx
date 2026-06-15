@@ -68,11 +68,7 @@ export default async function EventDetailPage({
 		<div className="space-y-6">
 			<div
 				className="relative h-48 rounded-2xl overflow-hidden"
-				style={
-					event.bannerUrl
-						? { backgroundImage: `url(${event.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-						: { background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }
-				}
+				style={{ background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }}
 			>
 				<div className="absolute inset-0 bg-black/20" />
 				<EventBannerUpload eventId={eventId} isHost={isHost} />

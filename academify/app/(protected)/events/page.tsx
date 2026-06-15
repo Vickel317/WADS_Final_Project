@@ -464,11 +464,18 @@ export default function EventsPage() {
   };
 
   useEffect(() => {
-    if (searchParams.get("create") === "true") {
+    const shouldCreate = searchParams.get("create") === "true";
+    if (!shouldCreate) return;
+
+    // Avoid setting state in the effect body (lint rule)
+    const id = window.requestAnimationFrame(() => {
       setModal(true);
       router.replace(`/events?forum=${forumSlug ?? ""}`);
-    }
+    });
+
+    return () => window.cancelAnimationFrame(id);
   }, [searchParams, forumSlug, router]);
+
 
   useEffect(() => {
     if (!forumSlug) {

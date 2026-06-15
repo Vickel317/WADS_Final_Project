@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   format,
@@ -27,11 +27,11 @@ interface CalendarEvent {
 
 export default function DashboardCalendar({ events }: { events: CalendarEvent[] }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => new Date());
 
-  useEffect(() => {
-    setSelectedDate(new Date());
-  }, []);
+
+
+
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();

@@ -61,6 +61,7 @@ RUN DATABASE_URL=postgresql://migrate:migrate@127.0.0.1:5432/migrate?sslmode=dis
 CMD ["npx", "prisma", "migrate", "deploy"]
 
 # Socket.IO relay (separate process; exposed on host port 3100 in compose)
+
 FROM base AS socket
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -78,6 +79,11 @@ CMD ["node", "socket-server/index.cjs"]
 
 # Final image for the Next.js app (must be last stage OR build with --target runner)
 FROM base AS runner
+
+# Install ClamAV CLI (clamscan). No TCP port needed because we use the clamscan binary.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends clamav \
+  && rm -rf /var/lib/apt/lists/*
 
 LABEL org.opencontainers.image.title="academify"
 LABEL org.opencontainers.image.url="e2526-wads-b4ac-02.csbihub.id"

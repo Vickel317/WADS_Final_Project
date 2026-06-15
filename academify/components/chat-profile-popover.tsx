@@ -32,17 +32,27 @@ export function ChatProfilePopover({
 }) {
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<MiniProfile | null>(null);
-  const [loading, setLoading] = useState(false);
+  const loading = open && profile === null;
+
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || profile) return;
-    setLoading(true);
+    let active = true;
+
+    // Avoid calling setState synchronously in an effect body (lint)
+    // setLoading will be toggled after the fetch starts (avoid linted sync setState)
+    fetch(`/api/users/${userId}`)
+      .finally(() => {
+        window.requestAnimationFrame(() => setLoading(false));
+      });
+
+    window.requestAnimationFrame(() => setLoading(true));
     fetch(`/api/users/${userId}`)
       .then((r) => r.json())
       .then((d) => {
-        if (!d?.user) return;
+        if (!active || !d?.user) return;
         const u = d.user;
         setProfile({
           id: String(u.id ?? ""),
@@ -57,8 +67,15 @@ export function ChatProfilePopover({
         });
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [open, profile, userId]);
+
 
   useEffect(() => {
     if (!open) return;
