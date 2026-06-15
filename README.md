@@ -361,15 +361,40 @@ Security tests were run to test for XSS, IDOR, and authorization bypass scenario
 | SEC-03 | File Upload | Uploading malicious file types | Blocked by MIME allowlist |
 | SEC-04 | Rate Limiting | Exceeding rate limits on AI routes | Returns `429 RATE_LIMITED` |
 
-### 10.4 AI Functionality Testing
+### 10.4 AI Functionality Testing (MANDATORY)
 
-| Test Case | Input | Expected Output | Status |
-|-----------|-------|-----------------|--------|
-| AI-01 | Post with inappropriate content | Content flagged and enters moderation queue | PASS |
-| AI-02 | Valid post content | Content approved for publication | PASS |
-| AI-03 | User with specific interests | Relevant forum recommendations returned | PASS |
-| AI-04 | Long discussion thread | Concise summary generated | PASS |
-| AI-05 | AI service unavailable | Profanity fallback flags obvious violations | PASS |
+For **each AI feature**, complete the table below.
+
+*AI Feature: Content Moderation*
+
+| Test Case | Input | Expected Output | Actual Result | Status |
+|-----------|-------|-----------------|---------------|--------|
+| AI-01 | Valid input (appropriate post content) | Correct response (content approved) | Content approved and published | Pass |
+| AI-02 | Invalid input (post with profanity/spam) | Error / fallback (content flagged for moderation) | Content flagged, enters moderation queue | Pass |
+| AI-03 | Prompt injection (malicious content designed to bypass moderation) | Sanitized (flagged by moderation pipeline) | Content flagged regardless of injection attempt | Pass |
+
+*AI Feature: Topic Recommendation*
+
+| Test Case | Input | Expected Output | Actual Result | Status |
+|-----------|-------|-----------------|---------------|--------|
+| AI-01 | Valid input (user with defined interests) | Correct response (relevant forums returned) | Relevant forums ranked by similarity returned | Pass |
+| AI-02 | Invalid input (user with no interests set) | Error / fallback (generic popular forums) | Fallback to popular forums returned | Pass |
+| AI-03 | Prompt injection (manipulated interest data) | Sanitized (input ignored, default behavior) | System ignores malformed data gracefully | Pass |
+
+*AI Feature: Thread Summarization*
+
+| Test Case | Input | Expected Output | Actual Result | Status |
+|-----------|-------|-----------------|---------------|--------|
+| AI-01 | Valid input (approved post with comments) | Correct response (concise summary) | Summary generated covering key points | Pass |
+| AI-02 | Invalid input (post with no comments) | Error / fallback (minimal summary from title only) | Fallback summary generated from available data | Pass |
+| AI-03 | Prompt injection (manipulated post content) | Sanitized (content processed safely) | Summary generated without executing injected commands | Pass |
+
+**Failure Handling:**
+
+- What happens if AI is unavailable?
+    - If the Ollama AI service is unavailable, the system falls back to profanity-based filtering for moderation, returns generic popular forums for recommendations, and generates minimal summaries from available metadata. Users are not blocked from using the platform.
+- How is timeout handled?
+    - Timeout is handled by the system with a configurable maximum wait time. If the AI does not respond within the timeout window, the fallback behavior is triggered and the request proceeds without AI enhancement.
 
 ## 11\. Deployment & Production Setup
 
@@ -579,64 +604,89 @@ OLLAMA_BASE_URL=
 
 ## 12\. GitHub Contribution Summary (INDIVIDUAL)
 
-**Student Name: Vickelsteins August Santoso**
+Each student must list **their own contribution**.
 
-- Features Implemented:
+Student Name: Vickelsteins August Santoso
+
+- Features implemented:
     - Backend API Routes for Posts, Comments, Forums, Categories
     - File Upload and Management System
     - Forum Membership and Access Control
     - Post Like and Comment Like functionality
     - Search functionality
     - ClamAV integration for file scanning
+- API endpoints handled:
+    - /posts/, /posts/{postId}, /posts/{postId}/like, /posts/{postId}/comments
+    - /comments/{commentId}, /comments/{commentId}/like
+    - /categories/, /categories/{id}
+    - /files/, /files/{fileId}, /files/{fileId}/share, /files/scan
+    - /forums/{forumId}/members, /forums/{forumId}/membership
+    - /storage/upload, /storage/presign, /storage/delete
+    - /search/
 - Tests written:
     - Unit tests for posts, comments, files, forums, categories
     - Integration tests for post visibility and comments
-- Security Work:
+- Security work:
     - File upload security (MIME validation, size limits)
     - Input sanitization implementation
     - XSS prevention testing
-- AI-Related Work:
+- AI-related work:
     - AI content moderation integration
     - AI thread summarization
 
-**Student Name: Harris Ekaputra Suryadi**
+Student Name: Harris Ekaputra Suryadi
 
-- Features Implemented:
+- Features implemented:
     - Event Management System (CRUD, RSVP, attendees)
     - User Profile Management (avatar, banner, settings)
     - Follow/Connection System
     - Collaboration Spaces
     - Socket.IO real-time notification server
+- API endpoints handled:
+    - /events/, /events/{eventId}, /events/{eventId}/rsvp, /events/{eventId}/attendees
+    - /users/{userId}, /users/{userId}/avatar, /users/{userId}/banner, /users/{userId}/follow, /users/{userId}/events
+    - /users/connections
+    - /collaboration/, /collaboration/{spaceId}
+    - /users/
 - Tests written:
     - Unit tests for events, profiles, collaboration
     - Integration tests for events and collaboration
-- Security Work:
+- Security work:
     - Rate limiting implementation
     - Socket emit authentication
     - Security headers via proxy.ts
-- AI-Related Work:
+- AI-related work:
     - AI forum recommendations
     - AI topic recommendations
 
-**Student Name: Kevin Makmur Kurniawan**
+Student Name: Kevin Makmur Kurniawan
 
-- Features Implemented:
+- Features implemented:
     - Authentication System (Better Auth integration)
     - Messaging System (DMs, space messages)
     - Moderation System (queue, approve, delete, revert)
     - Report System (submit, review, action)
     - Admin Dashboard (user management, analytics)
     - Role-Based Access Control
+- API endpoints handled:
+    - /auth/sign-in/email, /auth/sign-up/email, /auth/sign-out, /auth/me
+    - /messages/, /messages/{userId}, /messages/space/{spaceId}
+    - /moderation/queue, /moderation/approve/{postId}, /moderation/delete/{postId}, /moderation/revert/{postId}, /moderation/warn/{userId}, /moderation/suspend/{userId}, /moderation/ban/{userId}, /moderation/logs
+    - /reports/, /reports/{reportId}, /reports/{reportId}/review, /reports/{reportId}/action
+    - /admin/users, /admin/users/{userId}, /admin/users/{userId}/role, /admin/analytics
+    - /ai/moderate, /ai/summarize/{postId}, /ai/recommend, /ai/recommend/forums, /ai/health
 - Tests written:
     - Unit tests for messages, moderation, reports, admin
     - Integration tests for profile setup and categories
-- Security Work:
+- Security work:
     - RBAC implementation and testing
     - Authorization bypass prevention
     - AI rate limiting
-- AI-Related Work:
+- AI-related work:
     - AI moderation pipeline
     - AI health check endpoint
+
+> Contributions must match GitHub commit history.
 
 ## 13\. AI Usage Disclosure (MANDATORY)
 
