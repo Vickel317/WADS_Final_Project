@@ -251,13 +251,7 @@ export default function ProfilePage() {
               <p className="text-sm text-gray-400 mt-0.5">@{profile.username}</p>
             )}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              {profile.major && profile.year && (
-                <p className="text-sm text-teal-600 font-medium">{profile.major} &middot; {profile.year}</p>
-              )}
-              {profile.major && !profile.year && (
-                <p className="text-sm text-teal-600 font-medium">{profile.major}</p>
-              )}
-              {!profile.major && profile.year && (
+              {profile.year && (
                 <p className="text-sm text-teal-600 font-medium">{profile.year}</p>
               )}
             </div>

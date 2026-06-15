@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/current-user-context";
+import { EducationLevelSelect } from "@/components/education-level-select";
+import { DEFAULT_EDUCATION_LEVEL, normalizeEducationLevel } from "@/lib/profile-education";
 
 interface FormState {
     name: string;
-    major: string;
-    year: string;
+    educationLevel: string;
     bio: string;
     location: string;
     website: string;
@@ -21,8 +22,7 @@ interface FormState {
 
 const defaultForm: FormState = {
   name: "",
-  major: "",
-  year: "1st Year",
+  educationLevel: DEFAULT_EDUCATION_LEVEL,
   bio: "",
   location: "",
   website: "",
@@ -33,8 +33,6 @@ const defaultForm: FormState = {
   newPassword: "",
   confirmPassword: "",
 };
-
-const yearOptions = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Graduate"];
 
 export default function EditProfilePage() {
   const currentUser = useCurrentUser();
@@ -64,8 +62,7 @@ export default function EditProfilePage() {
           const resolvedBanner = typeof d.user.bannerUrl === "string" ? d.user.bannerUrl : "";
           const loadedForm: FormState = {
             name: d.user.name ?? "",
-            major: d.user.major ?? "",
-            year: d.user.year ?? defaultForm.year,
+            educationLevel: normalizeEducationLevel(d.user.year ?? d.user.educationLevel),
             bio: d.user.bio ?? "",
             location: d.user.location ?? "",
             website: d.user.website ?? "",
@@ -207,7 +204,6 @@ export default function EditProfilePage() {
   const validate = () => {
     const e: Partial<FormState> = {};
     if (!form.name.trim()) e.name = "Name is required";
-    if (!form.major.trim()) e.major = "Major is required";
     if (form.newPassword && form.newPassword.length < 8)
       e.newPassword = "Password must be at least 8 characters";
     if (form.newPassword && form.newPassword !== form.confirmPassword)
@@ -247,8 +243,7 @@ export default function EditProfilePage() {
       const payload: Record<string, unknown> = {};
 
       if (form.name.trim() !== initialForm.name.trim()) payload.name = form.name.trim();
-      if (form.major.trim() !== initialForm.major.trim()) payload.major = form.major.trim();
-      if (form.year !== initialForm.year) payload.year = form.year;
+      if (form.educationLevel !== initialForm.educationLevel) payload.year = form.educationLevel;
       if (form.bio.trim() !== initialForm.bio.trim()) payload.bio = form.bio.trim();
       if (form.location.trim() !== initialForm.location.trim()) payload.location = form.location.trim();
       if (form.website.trim() !== initialForm.website.trim()) payload.website = form.website.trim();
@@ -447,25 +442,19 @@ export default function EditProfilePage() {
             {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
           </div>
 
-          {/* Major + Year */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                Major
-              </label>
-              <input type="text" value={form.major} onChange={set("major")} placeholder="e.g. Computer Science" className={inputClass("major")} />
-              {errors.major && <p className="mt-1 text-xs text-red-500">{errors.major}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                Year
-              </label>
-              <select value={form.year} onChange={set("year")} className={inputClass("year")}>
-                {yearOptions.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
+          {/* Current education */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              Current education
+            </label>
+            <EducationLevelSelect
+              value={form.educationLevel}
+              onChange={(value) => setForm((prev) => ({ ...prev, educationLevel: value }))}
+              className={inputClass("educationLevel")}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Choose the level that fits you — from elementary through university.
+            </p>
           </div>
 
           {/* Bio */}

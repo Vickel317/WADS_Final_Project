@@ -41,14 +41,6 @@ export function ChatProfilePopover({
     if (!open || profile) return;
     let active = true;
 
-    // Avoid calling setState synchronously in an effect body (lint)
-    // setLoading will be toggled after the fetch starts (avoid linted sync setState)
-    fetch(`/api/users/${userId}`)
-      .finally(() => {
-        window.requestAnimationFrame(() => setLoading(false));
-      });
-
-    window.requestAnimationFrame(() => setLoading(true));
     fetch(`/api/users/${userId}`)
       .then((r) => r.json())
       .then((d) => {
@@ -66,10 +58,7 @@ export function ChatProfilePopover({
           skills: Array.isArray(u.skills) ? u.skills.map((s: unknown) => String(s)) : [],
         });
       })
-      .catch(() => {})
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+      .catch(() => {});
 
     return () => {
       active = false;
@@ -151,9 +140,9 @@ export function ChatProfilePopover({
                 </span>
               </div>
 
-              {profile.major && (
+              {(profile.year || profile.major) && (
                 <p className="text-xs text-teal-600 font-medium mb-1.5">
-                  {profile.major}{profile.year ? ` · ${profile.year}` : ""}
+                  {profile.year || profile.major}
                 </p>
               )}
 

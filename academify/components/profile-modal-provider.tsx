@@ -217,7 +217,9 @@ function ProfileModalContent() {
                   </span>
                 </div>
                 {profile.username && <p className="text-sm text-gray-400 mt-0.5">@{profile.username}</p>}
-                {profile.major && <p className="text-sm text-teal-600 font-medium mt-1">{profile.major}{profile.year ? ` · ${profile.year}` : ""}</p>}
+                {profile.year && (
+                  <p className="text-sm text-teal-600 font-medium mt-1">{profile.year}</p>
+                )}
                 {profile.bio && (
                   <p className="text-sm text-gray-500 mt-2 leading-relaxed">{profile.bio}</p>
                 )}

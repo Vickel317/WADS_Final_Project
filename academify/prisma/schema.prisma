@@ -135,23 +135,9 @@ model User {
   following          Follow[]              @relation("Following")
   moderatedForums    ForumModerator[]      @relation("ForumModerators")
   collabSpaces       SpaceMember[]         @relation("SpaceMembers")
-  notifications      Notification[]        @relation("UserNotifications")
+  postLikes          PostLike[]            @relation("UserPostLikes")
 
   @@map("User")
-}
-
-model Notification {
-  notificationID String   @id @default(cuid())
-  userID         String
-  user           User     @relation("UserNotifications", fields: [userID], references: [userId], onDelete: Cascade)
-  type           String
-  content        String
-  link           String?
-  read           Boolean  @default(false)
-  createdAt      DateTime @default(now())
-
-  @@index([userID])
-  @@map("Notification")
 }
 
 model Follow {
@@ -246,6 +232,7 @@ model Post {
   author            User                  @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)
   forum             ForumHub              @relation(fields: [forumID], references: [forumID], onDelete: Restrict)
   comments          Comment[]             @relation("PostComments")
+  likes             PostLike[]            @relation("PostLikes")
   file              File?                 @relation("PostFile")
   reports           ReportReview[]        @relation("ReportedPost")
   moderationActions ModerationActionLog[] @relation("TargetPost")
@@ -254,6 +241,20 @@ model Post {
   @@index([forumID])
   @@index([createdAt])
   @@map("Post")
+}
+
+model PostLike {
+  postID    String
+  userID    String
+  createdAt DateTime @default(now())
+
+  post Post @relation("PostLikes", fields: [postID], references: [postID], onDelete: Cascade)
+  user User @relation("UserPostLikes", fields: [userID], references: [userId], onDelete: Cascade)
+
+  @@id([postID, userID])
+  @@index([postID])
+  @@index([userID])
+  @@map("PostLike")
 }
 
 model Comment {

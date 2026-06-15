@@ -8,6 +8,7 @@ interface ConnectionUser {
   userId: string;
   name: string;
   username: string;
+  educationLevel?: string;
   major: string | null;
   isFollowing: boolean;
   isFollower: boolean;
@@ -136,7 +137,9 @@ export default function ConnectionsPage() {
                       {user.name}
                     </p>
                     <p className="text-xs text-gray-400 truncate">@{user.username}</p>
-                    {user.major && <p className="text-xs text-teal-600 mt-0.5 truncate">{user.major}</p>}
+                    {user.educationLevel && (
+                      <p className="text-xs text-teal-600 mt-0.5 truncate">{user.educationLevel}</p>
+                    )}
                   </div>
                   {user.isConnected && (
                     <span className="shrink-0 w-2 h-2 rounded-full bg-teal-500" title="Connected" />
@@ -178,7 +181,9 @@ export default function ConnectionsPage() {
                         {user.name}
                       </p>
                       <p className="text-xs text-gray-400 truncate">@{user.username}</p>
-                      {user.major && <p className="text-xs text-teal-600 mt-0.5 truncate">{user.major}</p>}
+                      {user.educationLevel && (
+                      <p className="text-xs text-teal-600 mt-0.5 truncate">{user.educationLevel}</p>
+                    )}
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import Topbar from "@/components/topbar";
 import { SidebarLayoutProvider } from "@/components/sidebar-layout-context";
 
@@ -7,13 +7,6 @@ jest.mock("@/components/current-user-context", () => ({
 }));
 
 jest.mock("@/lib/socket-client", () => ({
-  getSocket: () => ({
-    on: jest.fn(),
-    off: jest.fn(),
-    connect: jest.fn(),
-    connected: false,
-    emit: jest.fn(),
-  }),
   disconnectSocket: jest.fn(),
 }));
 
@@ -37,15 +30,8 @@ beforeEach(() => {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = String(input);
 
-    if (url.includes("/api/notifications")) {
-      // Topbar loads notifications on mount; default to none.
-      return mockFetchResponse([]);
-    }
     if (url.includes("/api/users/me")) {
       return mockFetchResponse({ user: { userId: "u1", name: "Test User" } });
-    }
-    if (url.includes("/api/events/reminders")) {
-      return mockFetchResponse({});
     }
     return mockFetchResponse({});
   }) as typeof fetch;
@@ -57,46 +43,9 @@ describe("Topbar – rendering", () => {
     expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument();
   });
 
-  it("renders the notification button", () => {
+  it("renders the profile menu button", () => {
     renderTopbar();
-    const buttons = screen.getAllByRole("button");
-    expect(buttons.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it("does not show the unread badge when there are no notifications", async () => {
-    renderTopbar();
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith("/api/notifications");
-    });
-
-    expect(document.querySelector(".bg-red-500")).not.toBeInTheDocument();
-  });
-
-  it("shows the unread badge when notifications exist", async () => {
-    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/api/notifications")) {
-        return mockFetchResponse([
-          {
-            notificationID: "notif_1",
-            content: "New message",
-            link: null,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      }
-      if (url.includes("/api/users/me")) {
-        return mockFetchResponse({ user: { userId: "u1", name: "Test User" } });
-      }
-      return mockFetchResponse({});
-    });
-
-    renderTopbar();
-
-    await waitFor(() => {
-      expect(document.querySelector(".bg-red-500")).toBeInTheDocument();
-    });
+    expect(screen.getByRole("button", { name: /open navigation/i })).toBeInTheDocument();
   });
 
   it("renders within a header element", () => {

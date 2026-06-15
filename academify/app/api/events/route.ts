@@ -9,7 +9,6 @@ import {
   parseRequiredDate,
   parseRequiredString,
 } from "@/lib/validation";
-import { emitNotificationToUser } from "@/lib/notify";
 
 const DEFAULT_DURATION_MINUTES = 60;
 const DEFAULT_CATEGORY = "Study Session";
@@ -202,38 +201,6 @@ export async function POST(request: NextRequest) {
         userID: sessionUser.user.userId,
       },
     });
-
-    // Notify forum moderators about the new event
-    const moderators = await prisma.forumModerator.findMany({
-      where: { forumID: forum.forumID },
-      select: { userID: true },
-    });
-
-    const moderatorIds = moderators
-      .map((m) => m.userID)
-      .filter((id) => id !== sessionUser.user.userId);
-
-    if (moderatorIds.length > 0) {
-      const notifData = moderatorIds.map((userID) => ({
-        userID,
-        type: "new_event",
-        content: `New event "${parsed.title}" created in ${forum.name}`,
-        link: `/events/${createdEvent.eventID}`,
-      }));
-
-      const createdNotifs = await prisma.notification.createManyAndReturn({
-        data: notifData,
-      });
-
-      for (const n of createdNotifs) {
-        emitNotificationToUser(n.userID, {
-          notificationID: n.notificationID,
-          content: n.content,
-          link: n.link,
-          createdAt: n.createdAt.toISOString(),
-        });
-      }
-    }
 
     return NextResponse.json(
       {

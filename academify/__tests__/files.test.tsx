@@ -10,6 +10,5 @@ describe("FilesPage", () => {
     const hits = await screen.findAllByText(/collaboration space/i);
     expect(hits.length).toBeGreaterThan(0);
     await screen.findByRole("link", { name: /open collaboration hub/i });
-    await screen.findByText(/live collaboration feed/i);
   });
 });

@@ -6,7 +6,7 @@ import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { isRestrictedAccount } from "@/lib/moderation";
 import { sanitizeText } from "@/lib/sanitization";
-import { emitNotificationToUser } from "@/lib/notify";
+import { resolveAvatarUrl } from "@/lib/avatar-url";
 
 /** Message rows scoped to a collab space (spaceID exists on schema; assert when client types lag). */
 type SpaceMessageWhere = Prisma.MessageWhereInput & { spaceID: string };
@@ -83,6 +83,17 @@ export async function GET(
     const sinceParam = request.nextUrl.searchParams.get("since");
     const sinceDate = sinceParam ? new Date(sinceParam) : null;
 
+    if (!sinceDate) {
+      await prisma.message.updateMany({
+        where: {
+          spaceID: spaceId,
+          receiverID: currentUserId,
+          read: false,
+        },
+        data: { read: true },
+      });
+    }
+
     const where: SpaceMessageWhere = {
       spaceID: spaceId,
       receiverID: currentUserId,
@@ -110,7 +121,10 @@ export async function GET(
           id: message.messageID,
           senderId: message.senderID,
           senderName: message.sender?.name ?? "Unknown User",
-          senderAvatarUrl: message.sender?.avatarUrl ?? null,
+          senderAvatarUrl: resolveAvatarUrl(
+            message.sender?.userId ?? message.senderID,
+            message.sender?.avatarUrl ?? null
+          ),
           receiverId: `space-${spaceId}`,
           content: message.content,
           createdAt: message.sentAt.toISOString(),
@@ -160,8 +174,6 @@ export async function POST(
     const memberIds = await getSpaceMemberIds(spaceId);
     const recipientIds = memberIds.filter((id) => id !== currentUserId);
 
-    const space = await prisma.collabSpace.findUnique({ where: { spaceID: spaceId } });
-
     let selfMessage;
     try {
       const selfPayload: SpaceMessageCreate = {
@@ -184,26 +196,6 @@ export async function POST(
         }));
 
         await prisma.message.createMany({ data: batch });
-      }
-
-      if (recipientIds.length > 0) {
-        const notifications = await prisma.notification.createManyAndReturn({
-          data: recipientIds.map((userID) => ({
-            userID,
-            type: "new_space_message",
-            content: `You have a new message in ${space?.name}`,
-            link: `/messages/space/${spaceId}`,
-          })),
-        });
-
-        for (const n of notifications) {
-          emitNotificationToUser(n.userID, {
-            notificationID: n.notificationID,
-            content: n.content,
-            link: n.link,
-            createdAt: n.createdAt.toISOString(),
-          });
-        }
       }
     } catch (err) {
       // Prisma client may not yet have the updated `spaceID` field (no migration/generate run).
@@ -229,24 +221,6 @@ export async function POST(
             })),
           });
         }
-        if (recipientIds.length > 0) {
-          const fallbackNotifications = await prisma.notification.createManyAndReturn({
-            data: recipientIds.map((userID) => ({
-              userID,
-              type: "new_space_message",
-              content: `You have a new message in ${space?.name}`,
-              link: `/messages/space/${spaceId}`,
-            })),
-          });
-          for (const n of fallbackNotifications) {
-            emitNotificationToUser(n.userID, {
-              notificationID: n.notificationID,
-              content: n.content,
-              link: n.link,
-              createdAt: n.createdAt.toISOString(),
-            });
-          }
-        }
       } else {
         throw err;
       }
@@ -259,7 +233,10 @@ export async function POST(
           id: selfMessage.messageID,
           senderId: selfMessage.senderID,
           senderName: sessionUser.user.name,
-          senderAvatarUrl: sessionUser.user.avatarUrl ?? null,
+          senderAvatarUrl: resolveAvatarUrl(
+            sessionUser.user.userId,
+            sessionUser.user.avatarUrl ?? null
+          ),
           receiverId: `space-${spaceId}`,
           content: selfMessage.content,
           createdAt: selfMessage.sentAt.toISOString(),

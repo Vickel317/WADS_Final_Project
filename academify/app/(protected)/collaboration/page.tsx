@@ -97,10 +97,10 @@ export default function CollaborationPage() {
               Collab space · inside a forum
             </span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl break-words">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl wrap-break-word">
                 {forumFilter ? `${forumFilter.name} — group workspaces` : "Team workspaces inside forums"}
               </h1>
-              <p className="mt-3 max-w-2xl text-sm text-white/80 sm:text-base break-words">
+              <p className="mt-3 max-w-2xl text-sm text-white/80 sm:text-base wrap-break-word">
                 Shared files and small teams for assignments — not a replacement for threads. Pick a forum first, then create a space.
               </p>
             </div>
@@ -199,14 +199,6 @@ export default function CollaborationPage() {
         </div>
 
         <aside className="space-y-5">
-          <div className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-900">Live activity</h2>
-            <p className="text-sm text-gray-500">Recent collaboration updates will appear here once activity tracking is connected.</p>
-            <div className="mt-4 rounded-2xl border border-gray-100 px-4 py-3 text-sm text-gray-500">
-              No seeded activity remains.
-            </div>
-          </div>
-
           <div className="rounded-3xl border border-teal-100 bg-linear-to-br from-teal-50 to-cyan-50 p-5 shadow-sm">
             <h2 className="text-lg font-bold text-gray-900">Collaboration rules</h2>
             <div className="mt-4 space-y-3 text-sm text-gray-600">

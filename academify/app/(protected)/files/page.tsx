@@ -407,9 +407,9 @@ export default function FilesPage() {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1.4fr_0.9fr] mb-5">
+      <div className="mb-5">
         <div
-          className="relative overflow-hidden rounded-2xl border border-teal-100 p-5 text-white shadow-sm"
+          className="relative min-w-0 overflow-hidden rounded-2xl border border-teal-100 p-5 text-white shadow-sm"
           style={{ backgroundImage: "linear-gradient(135deg, #0f766e, #14b8a6, #06b6d4)" }}
         >
           <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/10 blur-2xl" />
@@ -430,14 +430,19 @@ export default function FilesPage() {
               </Link>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-3">
               {spaces.length ? (
                 spaces.slice(0, 3).map((space) => (
-                  <div key={space.id} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-                    <p className="text-sm font-semibold">{space.name}</p>
-                    <p className="mt-1 text-xs text-white/75">{space.description ?? "No description provided."}</p>
-                    <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/70">
-                      <span className="inline-block max-w-48 align-middle overflow-hidden whitespace-nowrap text-ellipsis truncate">Forum {space.forumName}</span>
+                  <div
+                    key={space.id}
+                    className="min-w-0 overflow-hidden rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"
+                  >
+                    <p className="truncate text-sm font-semibold">{space.name}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-white/75">
+                      {space.description ?? "No description provided."}
+                    </p>
+                    <p className="mt-3 truncate text-[10px] font-medium uppercase tracking-wide text-white/70">
+                      Forum {space.forumName}
                     </p>
                   </div>
                 ))
@@ -447,15 +452,6 @@ export default function FilesPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-800">Live collaboration feed</h3>
-          <p className="text-xs text-gray-400 mt-1">Recent activity from shared spaces</p>
-
-          <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
-            Live activity is not seeded anymore. It will appear once collaboration events are connected.
           </div>
         </div>
       </div>
@@ -514,18 +510,19 @@ export default function FilesPage() {
       {/* Upload Modal */}
       {showUploadModal && (
         <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-3 sm:items-center sm:p-4"
           onClick={() => setShowUploadModal(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6"
+            className="my-auto flex max-h-[min(90dvh,calc(100dvh-1.5rem))] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Upload File</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              Share a file with your community
-            </p>
+            <div className="shrink-0 border-b border-gray-100 px-5 py-4">
+              <h3 className="text-lg font-bold text-gray-900">Upload File</h3>
+              <p className="text-sm text-gray-500">Share a file with your community</p>
+            </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {/* Drop zone */}
             <div
               onDragOver={(e) => {
@@ -538,7 +535,7 @@ export default function FilesPage() {
                 setDragging(false);
                 setSelectedFile(e.dataTransfer.files?.[0] ?? null);
               }}
-              className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center mb-4 transition-colors ${
+              className={`w-full border-2 border-dashed rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center mb-4 transition-colors ${
                 dragging
                   ? "border-teal-500 bg-teal-50"
                   : "border-gray-200 bg-gray-50"
@@ -553,7 +550,7 @@ export default function FilesPage() {
                 type="file"
                 ref={fileInputRef}
                 onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-                className="mt-2"
+                className="mt-2 w-full max-w-full text-xs sm:text-sm file:mr-3 file:max-w-40 file:truncate file:rounded-lg file:border-0 file:bg-teal-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-teal-700 hover:file:bg-teal-100"
               />
               {selectedFile && (
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-500">
@@ -601,6 +598,9 @@ export default function FilesPage() {
               </div>
             </div>
 
+            </div>
+
+            <div className="shrink-0 border-t border-gray-100 px-5 py-4">
             <div className="flex gap-3">
               <button
                 onClick={() => setShowUploadModal(false)}
@@ -684,6 +684,7 @@ export default function FilesPage() {
               >
                 {uploading ? 'Uploading...' : 'Upload'}
               </button>
+            </div>
             </div>
           </div>
         </div>

@@ -3,14 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/get-session";
 import { ProtectedShell } from "@/components/protected-shell";
 import { CurrentUserProvider } from "@/components/current-user-context";
-
-function resolveAvatarUrl(user: { userId: string; avatarUrl: string | null }) {
-  if (!user.avatarUrl) return null;
-  if (user.avatarUrl.startsWith("http") || user.avatarUrl.startsWith("data:")) {
-    return user.avatarUrl;
-  }
-  return `/api/users/${user.userId}/avatar`;
-}
+import { resolveAvatarUrl } from "@/lib/avatar-url";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const sessionData = await getSession();
@@ -26,7 +19,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   const currentUser = {
     userId: user.userId,
     name: user.name,
-    avatarUrl: resolveAvatarUrl(user),
+    avatarUrl: resolveAvatarUrl(user.userId, user.avatarUrl),
     role: user.role.toLowerCase(),
   };
 
