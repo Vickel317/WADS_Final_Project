@@ -13,7 +13,7 @@
 |-------|-------|
 | **Project Title** | Academify |
 | **Project Domain** | Option 8 — Student Community & Collaboration Platform |
-| **Class** | [FILL IN — e.g. L4AC] |
+| **Class** | L4AC |
 | **Live URL** | https://e2526-wads-b4ac-02.csbihub.id |
 | **API Docs** | `/api-docs` on live URL (Swagger UI) |
 

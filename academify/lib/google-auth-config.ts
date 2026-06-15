@@ -36,10 +36,12 @@ export function mapOAuthErrorMessage(error: string, description?: string | null)
   }
 
   if (combined.includes("provider_not_found") || combined.includes("oauth_provider_not_found")) {
+    const isDev = process.env.NODE_ENV !== "production";
     return {
       title: "Google sign-in not configured",
-      message:
-        "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local, then restart the dev server.",
+      message: isDev
+        ? "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local, then restart the dev server."
+        : "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in deployment secrets, redeploy the app, then try again.",
     };
   }
 

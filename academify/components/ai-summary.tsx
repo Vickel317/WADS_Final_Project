@@ -38,7 +38,7 @@ export function AiSummary({ postId }: { postId: string }) {
     return (
       <button
         onClick={() => void load(false)}
-        className="mt-4 flex items-center gap-1.5 rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition"
+        className="flex items-center gap-1.5 rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 transition"
       >
         <span>✦</span> AI Summary
       </button>
@@ -47,7 +47,7 @@ export function AiSummary({ postId }: { postId: string }) {
 
   if (state === "loading") {
     return (
-      <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50 p-4">
+      <div className="rounded-xl border border-violet-100 bg-violet-50 p-4">
         <p className="text-xs text-violet-600 animate-pulse">Generating summary…</p>
       </div>
     );
@@ -55,7 +55,7 @@ export function AiSummary({ postId }: { postId: string }) {
 
   if (state === "error") {
     return (
-      <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 space-y-2">
+      <div className="rounded-xl border border-red-100 bg-red-50 p-3 space-y-2">
         <p className="text-xs text-red-600">{error}</p>
         <button
           type="button"
@@ -72,7 +72,7 @@ export function AiSummary({ postId }: { postId: string }) {
   const openQuestions = (data?.openQuestions ?? []).filter(Boolean);
 
   return (
-    <div className="mt-4 rounded-xl border border-violet-100 bg-violet-50 p-4 space-y-3">
+    <div className="rounded-xl border border-violet-100 bg-violet-50 p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-violet-600 text-xs font-bold">✦ AI SUMMARY</span>

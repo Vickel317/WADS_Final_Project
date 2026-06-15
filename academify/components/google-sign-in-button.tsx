@@ -8,6 +8,13 @@ type AuthConfig = {
   googleCallbackUrl: string;
 };
 
+function googleNotConfiguredMessage() {
+  if (process.env.NODE_ENV === "development") {
+    return "Google sign-in is off — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local, then restart the dev server.";
+  }
+  return "Google sign-in is off on this server — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in deployment secrets, redeploy, and add the OAuth redirect URI in Google Cloud Console.";
+}
+
 export default function GoogleSignInButton({
   label = "Continue with Google",
   callbackURL = "/dashboard",
@@ -28,9 +35,7 @@ export default function GoogleSignInButton({
 
   const handleGoogleSignIn = async () => {
     if (!config?.googleEnabled) {
-      setError(
-        "Google sign-in is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.local, then restart npm run dev."
-      );
+      setError(googleNotConfiguredMessage());
       return;
     }
 
@@ -61,12 +66,7 @@ export default function GoogleSignInButton({
   };
 
   if (config && !config.googleEnabled) {
-    return (
-      <p className="text-center text-xs text-gray-400">
-        Google sign-in is off — set <code className="text-gray-500">GOOGLE_CLIENT_*</code> in{" "}
-        <code className="text-gray-500">.env.local</code> and restart the server.
-      </p>
-    );
+    return <p className="text-center text-xs text-gray-400">{googleNotConfiguredMessage()}</p>;
   }
 
   return (

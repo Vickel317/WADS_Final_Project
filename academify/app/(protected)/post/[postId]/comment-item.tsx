@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import CommentForm from "./comment-form";
 import CommentActions from "./comment-actions";
 import CommentLikeButton from "./comment-like-button";
+import { ReportButton } from "@/components/report-button";
 
 type CommentData = {
   id: string;
@@ -39,12 +41,17 @@ export default function CommentItem({
     <div className={depth > 0 ? "ml-6 mt-3 border-l-2 border-gray-100 pl-4" : ""}>
       <div className="rounded-xl border border-gray-100 px-4 py-3">
         <div className="flex items-center gap-2 text-xs text-gray-400">
-          <span className="font-medium text-gray-700">{comment.authorName}</span>
+          <Link
+            href={`?profileId=${comment.authorId}`}
+            className="font-medium text-gray-700 hover:text-teal-600 hover:underline"
+          >
+            {comment.authorName}
+          </Link>
           <span>·</span>
           <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</span>
         </div>
         <p className="mt-2 text-sm text-gray-700">{comment.content}</p>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <CommentLikeButton commentId={comment.id} />
           {depth < maxDepth && (
             <button
@@ -53,6 +60,14 @@ export default function CommentItem({
             >
               Reply
             </button>
+          )}
+          {!isAuthor && (
+            <ReportButton
+              targetType="comment"
+              targetId={comment.id}
+              targetLabel={`Comment by ${comment.authorName}`}
+              className="rounded border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition"
+            />
           )}
           <CommentActions
             commentId={comment.id}
