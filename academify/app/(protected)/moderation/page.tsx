@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function ModerationPage() {
@@ -48,6 +49,20 @@ export default function ModerationPage() {
 				<p className="mt-2 text-sm text-gray-600">
 					Review queued content and reports.
 				</p>
+				<div className="mt-4 flex flex-wrap gap-2">
+					<Link
+						href="/moderation/queue"
+						className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						Open Queue
+					</Link>
+					<Link
+						href="/moderation/reports"
+						className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+					>
+						Open Reports
+					</Link>
+				</div>
 			</div>
 
 			<div className="grid grid-cols-1 gap-4 md:grid-cols-2">

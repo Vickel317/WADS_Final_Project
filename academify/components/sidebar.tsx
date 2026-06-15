@@ -147,7 +147,7 @@ export default function Sidebar() {
   const roleNav = useMemo(() => {
     const role = currentUser?.role ?? "";
     const items: { href: string; label: string; icon: React.ReactNode }[] = [];
-    if (role === "admin" || role === "moderator") {
+    if (role === "moderator") {
       items.push({
         href: "/moderation/queue",
         label: "Moderation",

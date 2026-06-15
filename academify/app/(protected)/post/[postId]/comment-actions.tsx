@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 export default function CommentActions({
   commentId,
   initialContent,
-  canManage,
+  canEdit,
+  canDelete,
 }: {
   commentId: string;
   initialContent: string;
-  canManage: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -20,42 +22,46 @@ export default function CommentActions({
   const [edited, setEdited] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!canManage) return null;
+  if (!canEdit && !canDelete) return null;
 
   return (
     <div className="mt-2">
       {!editing ? (
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Edit
-          </button>
-          <button
-            onClick={async () => {
-              if (!confirm("Delete this comment?")) return;
-              setDeleting(true);
-              setError(null);
-              try {
-                const res = await fetch(`/api/comments/${commentId}`, {
-                  method: "DELETE",
-                  credentials: "include",
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data?.error?.message || "Failed to delete comment");
-                router.refresh();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to delete comment");
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            disabled={deleting}
-            className="rounded border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
-          >
-            {deleting ? "Deleting..." : "Delete"}
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setEditing(true)}
+              className="rounded border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Edit
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={async () => {
+                if (!confirm("Delete this comment?")) return;
+                setDeleting(true);
+                setError(null);
+                try {
+                  const res = await fetch(`/api/comments/${commentId}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(data?.error?.message || "Failed to delete comment");
+                  router.refresh();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Failed to delete comment");
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting}
+              className="rounded border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

@@ -7,14 +7,16 @@ export default function PostActions({
   postId,
   title,
   content,
-  canManage,
+  canDelete,
   canEdit,
+  showEditLockedNotice = false,
 }: {
   postId: string;
   title: string;
   content: string;
-  canManage: boolean;
+  canDelete: boolean;
   canEdit: boolean;
+  showEditLockedNotice?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -24,7 +26,7 @@ export default function PostActions({
   const [formContent, setFormContent] = useState(content);
   const [error, setError] = useState<string | null>(null);
 
-  if (!canManage) return null;
+  if (!canDelete && !canEdit) return null;
 
   return (
     <div className="w-full sm:w-auto">
@@ -37,36 +39,38 @@ export default function PostActions({
             >
               Edit post
             </button>
-          ) : (
+          ) : showEditLockedNotice ? (
             <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
               Editing locked after moderation
             </span>
+          ) : null}
+          {canDelete && (
+            <button
+              onClick={async () => {
+                if (!confirm("Delete this post? This cannot be undone.")) return;
+                setDeleting(true);
+                setError(null);
+                try {
+                  const res = await fetch(`/api/posts/${postId}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(data?.error?.message || "Failed to delete post");
+                  router.push("/forums");
+                  router.refresh();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Failed to delete post");
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting}
+              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
+            >
+              {deleting ? "Deleting..." : "Delete post"}
+            </button>
           )}
-          <button
-            onClick={async () => {
-              if (!confirm("Delete this post? This cannot be undone.")) return;
-              setDeleting(true);
-              setError(null);
-              try {
-                const res = await fetch(`/api/posts/${postId}`, {
-                  method: "DELETE",
-                  credentials: "include",
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data?.error?.message || "Failed to delete post");
-                router.push("/forums");
-                router.refresh();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Failed to delete post");
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            disabled={deleting}
-            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
-          >
-            {deleting ? "Deleting..." : "Delete post"}
-          </button>
         </div>
       ) : (
         <div className="w-full max-w-xl rounded-xl border border-gray-200 p-3 bg-gray-50 space-y-2">

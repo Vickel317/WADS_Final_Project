@@ -30,10 +30,10 @@ export default function CommentItem({
   const [replying, setReplying] = useState(false);
   const maxDepth = 3;
 
-  const canManage =
-    comment.authorId === currentUserId ||
-    currentRole === "admin" ||
-    currentRole === "moderator";
+  const isModOrAdmin = currentRole === "admin" || currentRole === "moderator";
+  const isAuthor = comment.authorId === currentUserId;
+  const canEdit = isAuthor;
+  const canDelete = isAuthor || isModOrAdmin;
 
   return (
     <div className={depth > 0 ? "ml-6 mt-3 border-l-2 border-gray-100 pl-4" : ""}>
@@ -56,7 +56,8 @@ export default function CommentItem({
           <CommentActions
             commentId={comment.id}
             initialContent={comment.content}
-            canManage={canManage}
+            canEdit={canEdit}
+            canDelete={canDelete}
           />
         </div>
       </div>
