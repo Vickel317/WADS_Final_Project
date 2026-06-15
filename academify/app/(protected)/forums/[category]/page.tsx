@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameMonth, isSameDay, isToday } from "date-fns";
 import { ForumHubNav, type ForumHubTab } from "@/components/forum-hub-nav";
+import { ReportButton } from "@/components/report-button";
 
 type ForumCategory = {
   id: string;
@@ -279,7 +280,8 @@ export default function CategoryForumsPage() {
         if (hubTab === "threads") {
           const params = new URLSearchParams();
           params.set("forum", category);
-          if (activeTab === "Trending" || activeTab === "Most Popular") params.set("trending", "true");
+          if (activeTab === "Most Popular") params.set("popular", "true");
+          else if (activeTab === "Trending") params.set("trending", "true");
           params.set("limit", "50");
           const res = await fetch(`/api/posts?${params.toString()}`);
           const data = await res.json();
@@ -477,6 +479,13 @@ export default function CategoryForumsPage() {
                       by {thread.author} · {new Date(thread.createdAt).toLocaleString()} · {thread.replyCount} replies
                     </p>
                   </div>
+                  <ReportButton
+                    targetType="post"
+                    targetId={thread.id}
+                    targetLabel={thread.title}
+                    stopPropagation
+                    className="shrink-0 rounded-lg border border-gray-200 p-2 text-gray-400 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition"
+                  />
                 </div>
               ))
             )}

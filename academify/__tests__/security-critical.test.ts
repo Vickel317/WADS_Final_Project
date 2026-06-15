@@ -74,17 +74,6 @@ describe("security-critical guards", () => {
       sentAt: new Date(),
     });
 
-    (prisma.notification.create as jest.Mock).mockResolvedValue({
-      notificationID: "notif_1",
-      content: "You have a new message from Test User",
-      link: "/messages/test-user-id",
-      createdAt: new Date(),
-    });
-
-    (prisma.$transaction as jest.Mock).mockImplementation((operations: Promise<unknown>[]) =>
-      Promise.all(operations)
-    );
-
     const request = new NextRequest("http://localhost/api/messages/receiver-1", {
       method: "POST",
       headers: { "content-type": "application/json" },

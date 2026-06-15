@@ -32,7 +32,7 @@ export async function POST(
     const content = `Shared file: ${file.fileName}\n${file.fileUrl}`;
     await prisma.message.create({ data: { senderID: decoded.id, receiverID: recipient.userId, content } });
 
-    return NextResponse.json({ message: "File shared via message/email (notification created)" }, { status: 200 });
+    return NextResponse.json({ message: "File shared via message" }, { status: 200 });
   } catch (error) {
     console.error("Share file by email error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");

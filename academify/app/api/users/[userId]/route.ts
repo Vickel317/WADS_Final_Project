@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import { apiError } from "@/lib/api-response";
+import { formatEducationLabel, normalizeEducationLevel } from "@/lib/profile-education";
 import { parseJson, parseOptionalString } from "@/lib/validation";
 import { deleteObject } from "@/lib/storage";
+import { resolveAvatarUrl } from "@/lib/avatar-url";
 
 function mapProfile(
   user: {
@@ -32,12 +34,7 @@ function mapProfile(
   },
   counts: { connections: number; posts: number; filesShared: number }
 ) {
-  const avatarUrl =
-    user.avatarUrl && (user.avatarUrl.startsWith("http") || user.avatarUrl.startsWith("data:"))
-      ? user.avatarUrl
-      : user.avatarUrl
-        ? `/api/users/${user.userId}/avatar`
-        : null;
+  const avatarUrl = resolveAvatarUrl(user.userId, user.avatarUrl);
 
   const bannerUrl =
     user.bannerUrl && (user.bannerUrl.startsWith("http") || user.bannerUrl.startsWith("data:"))
@@ -53,7 +50,8 @@ function mapProfile(
     name: user.name,
     role: user.role.toLowerCase(),
     major: user.major ?? "",
-    year: user.showAcademicLevel ? (user.academicLevel ?? "") : "",
+    year: user.showAcademicLevel ? formatEducationLabel(user.academicLevel) : "",
+    educationLevel: user.showAcademicLevel ? normalizeEducationLevel(user.academicLevel) : "",
     bio: user.bio ?? "",
     location: user.location ?? "",
     website: user.website ?? "",
@@ -160,7 +158,10 @@ async function updateUserProfile(
     const avatarUrl = parseOptionalString(body.avatarUrl);
     const location = parseOptionalString((body as { location?: unknown }).location);
     const website = parseOptionalString((body as { website?: unknown }).website);
-    const year = parseOptionalString((body as { year?: unknown }).year);
+    const year = parseOptionalString(
+      (body as { year?: unknown; educationLevel?: unknown }).year ??
+        (body as { educationLevel?: unknown }).educationLevel
+    );
     const skillsRaw = (body as { skills?: unknown }).skills;
     const errors = [] as Array<{ field?: string; message: string }>;
 
@@ -170,7 +171,7 @@ async function updateUserProfile(
     if (avatarUrl.error) errors.push({ field: "avatarUrl", message: `avatarUrl ${avatarUrl.error}` });
     if (location.error) errors.push({ field: "location", message: `location ${location.error}` });
     if (website.error) errors.push({ field: "website", message: `website ${website.error}` });
-    if (year.error) errors.push({ field: "year", message: `year ${year.error}` });
+    if (year.error) errors.push({ field: "educationLevel", message: `educationLevel ${year.error}` });
     if (skillsRaw !== undefined && !Array.isArray(skillsRaw)) {
       errors.push({ field: "skills", message: "skills must be an array of strings" });
     }
@@ -198,7 +199,12 @@ async function updateUserProfile(
     if (avatarUrl.value !== undefined) updates.avatarUrl = avatarUrl.value || null;
     if (location.value !== undefined) updates.location = location.value || null;
     if (website.value !== undefined) updates.website = website.value || null;
-    if (year.value !== undefined) updates.academicLevel = year.value || null;
+    if (year.value !== undefined) {
+      updates.academicLevel =
+        year.value && year.value !== "Prefer not to say"
+          ? normalizeEducationLevel(year.value)
+          : null;
+    }
     if (Array.isArray(skillsRaw)) {
       updates.skillTags = skillsRaw.map((skill) => skill.trim()).filter(Boolean);
     }

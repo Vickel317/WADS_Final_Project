@@ -8,42 +8,10 @@ const corsOrigins = [
   "http://localhost:3000",
 ].filter((origin): origin is string => Boolean(origin));
 
-const SOCKET_EMIT_SECRET = process.env.SOCKET_EMIT_SECRET;
-
 const httpServer = createServer((req, res) => {
   if (req.url === "/health") {
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("ok");
-    return;
-  }
-
-  // POST /emit-notification — allow Next.js API routes to push real-time notifications
-  if (req.url === "/emit-notification" && req.method === "POST") {
-    const providedSecret = req.headers["x-socket-emit-secret"];
-    if (!SOCKET_EMIT_SECRET || providedSecret !== SOCKET_EMIT_SECRET) {
-      res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Unauthorized" }));
-      return;
-    }
-
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => {
-      try {
-        const { userId, notification } = JSON.parse(body) as {
-          userId: string;
-          notification: NotificationEvent;
-        };
-        if (userId && notification) {
-          emitToUser(userId, "new_notification", notification);
-        }
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true }));
-      } catch {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Invalid JSON" }));
-      }
-    });
     return;
   }
 
@@ -104,13 +72,6 @@ export interface SpaceChatMessage {
   senderId: string;
   spaceId: string;
   content: string;
-  createdAt: string;
-}
-
-export interface NotificationEvent {
-  notificationID: string;
-  content: string;
-  link: string | null;
   createdAt: string;
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
+import { resolveAvatarUrl } from "@/lib/avatar-url";
 
 /**
  * @swagger
@@ -123,8 +124,8 @@ export async function GET(request: NextRequest) {
         ? message.receiver?.name || "Unknown User"
         : message.sender?.name || "Unknown User";
       const partnerAvatarUrl = isSender
-        ? (message.receiver?.avatarUrl ?? null)
-        : (message.sender?.avatarUrl ?? null);
+        ? resolveAvatarUrl(partnerId, message.receiver?.avatarUrl ?? null)
+        : resolveAvatarUrl(partnerId, message.sender?.avatarUrl ?? null);
 
       const existing = conversationMap.get(partnerId);
       if (!existing) {

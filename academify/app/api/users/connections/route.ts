@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
-import { apiError } from "@/lib/api-response";
+import { formatEducationLabel } from "@/lib/profile-education";
 
 export async function GET() {
   try {
@@ -22,6 +22,8 @@ export async function GET() {
             name: true,
             username: true,
             major: true,
+            academicLevel: true,
+            showAcademicLevel: true,
             followers: { where: { followerId: userId } },
             following: { where: { followingId: userId } }
           }
@@ -39,6 +41,8 @@ export async function GET() {
             name: true,
             username: true,
             major: true,
+            academicLevel: true,
+            showAcademicLevel: true,
             followers: { where: { followerId: userId } },
             following: { where: { followingId: userId } }
           }
@@ -52,6 +56,8 @@ export async function GET() {
       name: string;
       username: string;
       major: string | null;
+      academicLevel: string | null;
+      showAcademicLevel: boolean;
       followers: { followerId: string }[];
       following: { followingId: string }[];
     }) => ({
@@ -59,6 +65,7 @@ export async function GET() {
       name: u.name,
       username: u.username,
       major: u.major,
+      educationLevel: u.showAcademicLevel ? formatEducationLabel(u.academicLevel) : "",
       isFollowing: u.followers.length > 0,
       isFollower: u.following.length > 0,
       isConnected: u.followers.length > 0 && u.following.length > 0

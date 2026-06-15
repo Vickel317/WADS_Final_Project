@@ -29,17 +29,16 @@ describe("EditProfilePage – rendering", () => {
     const nameInput = await screen.findByPlaceholderText(/your full name/i);
     expect(nameInput).toBeInTheDocument();
     expect(nameInput).toHaveValue("");
-    expect(screen.getByPlaceholderText(/e\.g\. computer science/i)).toHaveValue("");
     expect(screen.getByPlaceholderText(/city, country/i)).toHaveValue("");
     expect(screen.getByPlaceholderText(/yoursite\.com/i)).toHaveValue("");
   });
 
-  it("renders the year dropdown with options", async () => {
+  it("renders the current education dropdown with K-12 options", async () => {
     render(<EditProfilePage />);
-    const select = await screen.findByDisplayValue("1st Year");
+    const select = await screen.findByDisplayValue("Prefer not to say");
     expect(select).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "1st Year" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Graduate" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Elementary (Grades 1–6)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "University Year 1" })).toBeInTheDocument();
   });
 
   it("does not render skill tags preview when skills are empty", async () => {
@@ -189,8 +188,7 @@ describe("EditProfilePage – pre-fills from API", () => {
       json: async () => ({
         user: {
           name: "API Name",
-          major: "Physics",
-          year: "2nd Year",
+          year: "University Year 2",
           bio: "Science bio",
           location: "Surabaya",
           website: "api.com",
@@ -201,7 +199,7 @@ describe("EditProfilePage – pre-fills from API", () => {
 
     render(<EditProfilePage />);
     expect(await screen.findByDisplayValue("API Name")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Physics")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("University Year 2")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Surabaya")).toBeInTheDocument();
   });
 });

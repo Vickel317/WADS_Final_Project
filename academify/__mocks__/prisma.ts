@@ -12,6 +12,7 @@ const makeMock = () => ({
 export const prisma = {
   user: makeMock(),
   post: makeMock(),
+  postLike: makeMock(),
   comment: makeMock(),
   file: makeMock(),
   space: makeMock(),
@@ -20,7 +21,6 @@ export const prisma = {
   category: makeMock(),
   report: makeMock(),
   message: makeMock(),
-  notification: makeMock(),
   event: makeMock(),
   tag: makeMock(),
 

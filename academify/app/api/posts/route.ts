@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
     const forum = searchParams.get("forum");
     const limit = parseInt(searchParams.get("limit") || "10");
     const trending = searchParams.get("trending") === "true";
+    const popular = searchParams.get("popular") === "true";
 
     const forumQuery = forumId || categoryId || forum || category;
     const resolvedForum = forumQuery ? await resolveForum(forumQuery) : null;
@@ -157,9 +158,13 @@ export async function GET(request: NextRequest) {
       include: {
         author: { select: { name: true } },
         forum: { select: { forumID: true, name: true } },
-        _count: { select: { comments: true } },
+        _count: { select: { comments: true, likes: true } },
       },
-      orderBy: trending ? { comments: { _count: "desc" } } : { createdAt: "desc" },
+      orderBy: popular
+        ? [{ likes: { _count: "desc" } }, { createdAt: "desc" }]
+        : trending
+          ? [{ comments: { _count: "desc" } }, { likes: { _count: "desc" } }]
+          : { createdAt: "desc" },
       take: Number.isFinite(limit) ? limit : 10,
     });
 
@@ -176,7 +181,7 @@ export async function GET(request: NextRequest) {
           replyCount: post._count.comments,
           replies: post._count.comments,
           views: 0,
-          likes: 0,
+          likes: post._count.likes,
           createdAt: post.createdAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
           status: post.moderationStatus.toLowerCase(),

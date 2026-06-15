@@ -49,7 +49,7 @@ beforeEach(() => {
             id: "other-user-123",
             name: "Other User",
             major: "Computer Science",
-            year: "3rd Year",
+            year: "University Year 3",
             bio: "Other user bio",
             location: "Jakarta",
             website: "otheruser.dev",
@@ -73,7 +73,7 @@ beforeEach(() => {
             id: "api-user",
             name: "API User",
             major: "Physics",
-            year: "2nd Year",
+            year: "University Year 2",
             bio: "Science lover",
             location: "Bandung",
             website: "apiuser.com",
@@ -97,7 +97,7 @@ beforeEach(() => {
             id: "me",
             name: "John Doe",
             major: "Computer Science",
-            year: "3rd Year",
+            year: "University Year 3",
             bio: "Building useful things.",
             location: "Jakarta",
             website: "johndoe.dev",
@@ -141,10 +141,9 @@ describe("ProfilePage – own profile (userId=me)", () => {
     expect(await screen.findByText("John Doe")).toBeInTheDocument();
   });
 
-  it("renders major and year", async () => {
+  it("renders current education level", async () => {
     render(<ProfilePage />);
-    expect(await screen.findByText(/computer science/i)).toBeInTheDocument();
-    expect(screen.getByText(/3rd year/i)).toBeInTheDocument();
+    expect(await screen.findByText(/university year 3/i)).toBeInTheDocument();
   });
 
   it("renders the Edit Profile button for own profile", async () => {

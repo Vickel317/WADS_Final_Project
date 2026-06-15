@@ -256,14 +256,14 @@ function CreateEventModal({
 }) {
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-3 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6"
+        className="my-auto flex max-h-[min(90dvh,calc(100dvh-1.5rem))] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
           <h3 className="text-lg font-bold text-gray-900">Create Event</h3>
           <button
             onClick={onClose}
@@ -273,7 +273,7 @@ function CreateEventModal({
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">
               Event Title
@@ -402,24 +402,26 @@ function CreateEventModal({
           </div>
         </div>
 
-        {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+        <div className="shrink-0 border-t border-gray-100 px-4 py-3 sm:px-6 sm:py-4">
+          {error && <p className="mb-3 text-sm text-red-500">{error}</p>}
 
-        <div className="flex gap-3 mt-5">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={loading}
-            className="flex-1 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60"
-            style={{ backgroundColor: "#0d9488" }}
-          >
-            {loading ? "Creating..." : "Create Event"}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSubmit}
+              disabled={loading}
+              className="flex-1 rounded-lg py-2 text-sm font-medium text-white disabled:opacity-60"
+              style={{ backgroundColor: "#0d9488" }}
+            >
+              {loading ? "Creating..." : "Create Event"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -33,7 +33,7 @@ interface Conversation {
 interface PartnerProfile {
   id: string;
   name: string;
-  major: string;
+  educationLevel: string;
   avatarUrl: string | null;
 }
 
@@ -42,7 +42,7 @@ export default function ConversationPage() {
   const isSpaceChat = partnerId.startsWith("space-");
   const spaceId = isSpaceChat ? partnerId.slice("space-".length) : "";
   const router = useRouter();
-  const { data: session, isPending: sessionLoading } = authClient.useSession();
+  const { data: session } = authClient.useSession();
   const [resolvedMyId, setResolvedMyId] = useState("");
   const myId = session?.user?.id ?? resolvedMyId;
 
@@ -53,10 +53,11 @@ export default function ConversationPage() {
   const [spaceNameLoading, setSpaceNameLoading] = useState(isSpaceChat);
   const resolvedSpaceName = spaceName
     ?? conversations.find((c) => c.userId === `space-${spaceId}`)?.name
-    ?? (spaceNameLoading ? null : `Space ${spaceId.slice(0, 8)}...`);
-  const partnerName = isSpaceChat
-    ? resolvedSpaceName ?? "Loading..."
-    : conversations.find((c) => c.userId === partnerId)?.name ?? String(partnerId ?? "");
+    ?? (spaceNameLoading ? null : `Collab space`);
+  const conversationPartnerName = conversations.find((c) => c.userId === partnerId)?.name;
+  const displayPartnerName = isSpaceChat
+    ? (resolvedSpaceName ?? "Loading...")
+    : (partnerProfile?.name ?? conversationPartnerName ?? "Loading...");
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -66,7 +67,8 @@ export default function ConversationPage() {
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMessageAt = useRef<string | null>(null);
 
@@ -96,9 +98,59 @@ export default function ConversationPage() {
     };
   }, [session?.user?.id]);
 
-  // Scroll to bottom whenever messages change
+  // Focus message input when opening a conversation
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const timer = window.setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [partnerId]);
+
+  // Enter or typing a character focuses the message box (when not already in a field)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const isEnter = e.key === "Enter" && !e.shiftKey;
+      const isPrintable = e.key.length === 1 && !e.isComposing;
+      if (!isEnter && !isPrintable) return;
+
+      const input = inputRef.current;
+      if (!input || input.disabled) return;
+
+      if (isPrintable) {
+        e.preventDefault();
+        input.focus();
+        setInput((prev) => prev + e.key);
+        if (!isSpaceChat) {
+          const socket = getSocket();
+          socket.emit("typing", { to: partnerId });
+          if (typingTimer.current) clearTimeout(typingTimer.current);
+          typingTimer.current = setTimeout(() => {
+            socket.emit("stop_typing", { to: partnerId });
+          }, 1500);
+        }
+        return;
+      }
+
+      input.focus();
+      if (isEnter) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSpaceChat, partnerId]);
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
   // Load conversation list
@@ -156,14 +208,14 @@ export default function ConversationPage() {
         const res = await fetch(`/api/users/${partnerId}`);
         if (!res.ok) return;
         const data = (await res.json().catch(() => null)) as
-          | { user?: { id?: string; name?: string; major?: string; avatarUrl?: string | null } }
+          | { user?: { id?: string; name?: string; year?: string; avatarUrl?: string | null } }
           | null;
         const user = data?.user;
         if (!cancelled && user?.id) {
           setPartnerProfile({
             id: user.id,
-            name: user.name ?? partnerName,
-            major: user.major ?? "",
+            name: user.name ?? "Unknown User",
+            educationLevel: user.year ?? "",
             avatarUrl: user.avatarUrl ?? null,
           });
         }
@@ -177,7 +229,7 @@ export default function ConversationPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSpaceChat, partnerId, partnerName]);
+  }, [isSpaceChat, partnerId]);
 
   // Load messages for this conversation
   const loadMessages = useCallback(
@@ -402,7 +454,7 @@ export default function ConversationPage() {
             {
               userId: partnerId,
               kind: "direct",
-              name: existing?.name ?? partnerName,
+              name: existing?.name ?? partnerProfile?.name ?? "Unknown User",
               lastMessage: saved.content,
               lastAt: saved.createdAt,
               unread: 0,
@@ -419,11 +471,16 @@ export default function ConversationPage() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    if (e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    void sendMessage();
+  };
+
+  const handleSendSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void sendMessage();
   };
 
   const filteredConvs = conversations.filter((c) =>
@@ -479,9 +536,9 @@ export default function ConversationPage() {
   return (
     <>
     {showNewMessage && <NewMessageModal onClose={() => setShowNewMessage(false)} />}
-    <div className="flex min-h-[calc(100vh-6rem)] w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
       {/* Sidebar — conversation list */}
-      <div className="hidden lg:flex w-72 shrink-0 border-r border-gray-100 flex-col">
+      <div className="hidden lg:flex w-72 shrink-0 border-r border-gray-100 flex-col h-full min-h-0">
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
           <h2 className="text-base font-bold text-gray-900">Messages</h2>
           <button
@@ -510,7 +567,7 @@ export default function ConversationPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           <div className="px-4 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Personal Chats</div>
           <div className="divide-y divide-gray-50">
             {directConvs.length > 0 ? directConvs.map(renderConversation) : (
@@ -527,7 +584,11 @@ export default function ConversationPage() {
       </div>
 
       {/* Chat Panel */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className="flex-1 flex flex-col min-w-0 min-h-0 h-full outline-none"
+        tabIndex={-1}
+        onClick={() => inputRef.current?.focus()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3">
@@ -568,10 +629,12 @@ export default function ConversationPage() {
             <div>
               {!isSpaceChat && partnerId ? (
                 <ChatProfilePopover userId={partnerId} side="bottom">
-                  <p className="text-sm font-bold text-gray-900 hover:text-teal-700 transition cursor-pointer">{isSpaceChat ? partnerName : partnerProfile?.name ?? partnerName}</p>
+                  <p className="text-sm font-bold text-gray-900 hover:text-teal-700 transition cursor-pointer">
+                    {displayPartnerName}
+                  </p>
                 </ChatProfilePopover>
               ) : (
-                <p className="text-sm font-bold text-gray-900">{partnerName}</p>
+                <p className="text-sm font-bold text-gray-900">{displayPartnerName}</p>
               )}
               {isSpaceChat ? (
                 <p className="text-xs font-medium text-gray-400">Collaboration space chat</p>
@@ -580,15 +643,18 @@ export default function ConversationPage() {
                   {isTyping ? "typing…" : partnerOnline ? "Online" : "Offline"}
                 </p>
               )}
-              {!isSpaceChat && partnerProfile?.major && (
-                <p className="text-[11px] text-gray-400">{partnerProfile.major}</p>
+              {!isSpaceChat && partnerProfile?.educationLevel && (
+                <p className="text-[11px] text-gray-400">{partnerProfile.educationLevel}</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 space-y-3"
+        >
           {loadingMsgs ? (
             <div className="flex justify-center text-gray-400 text-sm py-8">Loading messages…</div>
           ) : messages.length === 0 ? (
@@ -655,7 +721,6 @@ export default function ConversationPage() {
             </div>
           )}
 
-          <div ref={bottomRef} />
         </div>
 
         {/* Send error */}
@@ -672,20 +737,25 @@ export default function ConversationPage() {
 
         {/* Input Bar */}
         <div className="shrink-0 px-4 py-3 border-t border-gray-100">
-          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400/30 transition">
+          <form
+            onSubmit={handleSendSubmit}
+            className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 focus-within:border-teal-400 focus-within:ring-1 focus-within:ring-teal-400/30 transition"
+          >
             <input
+              ref={inputRef}
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={sessionLoading ? "Connecting…" : "Type a message…"}
-              className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none disabled:cursor-not-allowed"
-              disabled={sending || sessionLoading}
+              placeholder="Type a message…"
+              className="flex-1 min-w-0 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none disabled:cursor-not-allowed"
+              disabled={sending}
+              autoComplete="off"
+              enterKeyHint="send"
             />
             <button
-              onClick={sendMessage}
-              disabled={!input.trim() || sending || sessionLoading}
-              title={sessionLoading ? "Connecting to session…" : undefined}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
+              type="submit"
+              disabled={!input.trim() || sending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium text-white transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               style={{ background: "linear-gradient(135deg, #0d9488, #0f766e)" }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -693,7 +763,7 @@ export default function ConversationPage() {
               </svg>
               Send
             </button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

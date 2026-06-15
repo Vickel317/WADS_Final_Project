@@ -81,7 +81,7 @@ export default function MessagesPage() {
           {
             userId: partnerId,
             kind: "direct",
-            name: existing?.name ?? partnerId,
+            name: existing?.name ?? "Unknown User",
             avatarUrl: existing?.avatarUrl ?? null,
             lastMessage: msg.content,
             lastAt: msg.createdAt,
@@ -191,9 +191,9 @@ export default function MessagesPage() {
   return (
     <>
     {showNewMessage && <NewMessageModal onClose={() => setShowNewMessage(false)} />}
-    <div className="relative flex flex-col lg:flex-row min-h-[calc(100vh-6rem)] w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div className="relative flex flex-col lg:flex-row h-full min-h-0 w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
       {/* Conversation List */}
-      <div className="w-full lg:w-72 lg:shrink-0 border-r border-gray-100 flex flex-col">
+      <div className="w-full lg:w-72 lg:shrink-0 border-r border-gray-100 flex flex-col h-full min-h-0 max-h-full">
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
           <h2 className="text-sm sm:text-base font-bold text-gray-900">Messages</h2>
           <button
@@ -222,7 +222,7 @@ export default function MessagesPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Loading…</div>
           ) : filtered.length === 0 ? (
