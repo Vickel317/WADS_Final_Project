@@ -235,9 +235,9 @@ All API's begin with `/api/`.
 ### 6.2 API Documentation
 
 - **Swagger / Postman link (if available)**
-    - Interactive Documentation: Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs) to explore the API with Swagger UI
+    - Interactive Documentation: Visit [https://e2526-wads-b4ac-02.csbihub.id/api-docs](https://e2526-wads-b4ac-02.csbihub.id/api-docs) to explore the API with Swagger UI
     - OpenAPI Spec: [/public/swagger.json](/public/swagger.json)
-    - Base URL: `http://localhost:3000/api`
+    - Base URL: `https://e2526-wads-b4ac-02.csbihub.id/api`
 - **Example request & response (JSON)**
 
 Example: **POST /api/auth/sign-in/email**
@@ -500,45 +500,45 @@ CI runs lint, build, unit tests, and integration tests on every push to `main` /
 Run these in the browser on **localhost** and on **production** (`https://e2526-wads-b4ac-02.csbihub.id`). Tick when verified.
 
 #### Auth & onboarding
-- [ ] Register with email/password → redirected to `/setup`
-- [ ] Complete setup (education level + skills) → lands on `/dashboard`
-- [ ] Google sign-in (if configured) → session works, no `state mismatch`
-- [ ] Logout → protected routes redirect to login
+- [✅] Register with email/password → redirected to `/setup`
+- [✅] Complete setup (education level + skills) → lands on `/dashboard`
+- [✅] Google sign-in (if configured) → session works, no `state mismatch`
+- [✅] Logout → protected routes redirect to login
 
 #### Forums & posts
-- [ ] Browse forums, open a forum hub (Threads / Events / Collab tabs)
-- [ ] Create thread, comment, like post/comment
-- [ ] Moderator: edit forum description + banner (not name)
-- [ ] Pending post hidden from other users; author can still view
+- [✅] Browse forums, open a forum hub (Threads / Events / Collab tabs)
+- [✅] Create thread, comment, like post/comment
+- [✅] Moderator: edit forum description + banner (not name)
+- [✅] Pending post hidden from other users; author can still view
 
 #### Events
-- [ ] Create event from forum Events tab or `/events`
-- [ ] RSVP / cancel RSVP; attendee count updates
-- [ ] Past vs upcoming filter behaves correctly
+- [✅] Create event from forum Events tab or `/events`
+- [✅] RSVP / cancel RSVP; attendee count updates
+- [✅] Past vs upcoming filter behaves correctly
 
 #### Files & collaboration
-- [ ] Upload file in a collab space; file appears in space + Files page
-- [ ] Rename file, move to another space (if member)
-- [ ] Download via presigned URL works
+- [✅] Upload file in a collab space; file appears in space + Files page
+- [✅] Rename file, move to another space (if member)
+- [✅] Download via presigned URL works
 
 #### Messages & realtime
-- [ ] DM another user; messages persist after refresh
-- [ ] Socket server running (`npm run dev:all` or prod port **3100**)
+- [✅] DM another user; messages persist after refresh
+- [✅] Socket server running (`npm run dev:all` or prod port **3100**)
 
 #### Moderation & admin
-- [ ] Submit report on a post; mod/admin sees it in queue
-- [ ] Admin analytics page loads (admin account only)
-- [ ] AI moderation flags obvious profanity on new post
+- [✅] Submit report on a post; mod/admin sees it in queue
+- [✅] Admin analytics page loads (admin account only)
+- [✅] AI moderation flags obvious profanity on new post
 
 #### AI features (document in demo)
-- [ ] Thread summarize on a post with comments
-- [ ] Forum recommendations on dashboard/profile
-- [ ] Show fallback when Ollama is offline (heuristic still works)
+- [✅] Thread summarize on a post with comments
+- [✅] Forum recommendations on dashboard/profile
+- [✅] Show fallback when Ollama is offline (heuristic still works)
 
 #### Deploy / infra
-- [ ] `npm run build` passes
-- [ ] MinIO uploads on prod (port **3099** / configured endpoint)
-- [ ] Swagger UI at `/api-docs`
+- [✅] `npm run build` passes
+- [✅] MinIO uploads on prod (port **3099** / configured endpoint)
+- [✅] Swagger UI at `/api-docs`
 
 Export Postman collection or paste sample responses into the API tables above for grader evidence.
 
@@ -720,9 +720,9 @@ Example (edit for your team):
 
 > ChatGPT / GitHub Copilot / Cursor were used to assist with boilerplate API routes, UI components, test scaffolding, and Docker/CI configuration. All code was reviewed, tested, and modified by the team. We can explain authentication, moderation, and AI fallback logic in presentation.
 
-**Tools used:** [FILL IN]  
-**Purpose:** [FILL IN]  
-**Parts assisted:** [FILL IN]
+**Tools used:** Github Copilot and Cursor AI  
+**Purpose:**    
+**Parts assisted:** 
 
 ---
 
@@ -743,7 +743,7 @@ We declare that:
 - AI usage is disclosed honestly
 - All group members understand the system
 
-Signed: [FILL IN] · [FILL IN] · [FILL IN]
+Signed: Harris Ekaputra Suryadi · Kevin Makmur Kurniawan · Vickelsteins August Santoso
 
 ---
 
