@@ -94,11 +94,145 @@ Academify is a full-stack web platform where users:
 
 ---
 
-## 6. API Reference (full)
+## 6. API Design (MANDATORY)
 
-Interactive documentation: **`/api-docs`** (Swagger UI). Machine-readable spec: **`/api/swagger`**.
+All API's begin with `/api/`.
 
-### 6.1 API Documentation
+### 6.1 API Endpoints
+
+#### Authentication Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | /auth/sign-up/email | Register a new account | No |
+| POST | /auth/sign-in/email | Log in with email and password | No |
+| POST | /auth/sign-out | Log out current user | Yes |
+| GET | /auth/me | Retrieve current user session | Yes |
+
+#### User Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /users/ | Retrieve all users | Yes |
+| GET | /users/{userId} | Retrieve a specific user's profile | Yes |
+| GET | /users/{userId}/posts | Retrieve posts by a specific user | Yes |
+| GET | /users/{userId}/events | Retrieve events by a specific user | Yes |
+| PUT | /users/{userId}/avatar | Update user avatar | Yes |
+| PUT | /users/{userId}/banner | Update user banner | Yes |
+| POST | /users/{userId}/follow | Follow/unfollow a user | Yes |
+| GET | /users/connections | Retrieve user connections | Yes |
+| POST | /profile/setup | Complete profile setup | Yes |
+
+#### Post & Comment Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /posts/ | Retrieve all posts | Yes |
+| POST | /posts/ | Create a new post | Yes |
+| GET | /posts/{postId} | Retrieve a specific post | Yes |
+| PATCH | /posts/{postId} | Update a post | Yes |
+| DELETE | /posts/{postId} | Delete a post | Yes |
+| POST | /posts/{postId}/like | Like/unlike a post | Yes |
+| GET | /posts/{postId}/comments | Retrieve comments for a post | Yes |
+| POST | /posts/{postId}/comments | Add a comment to a post | Yes |
+| GET | /comments/{commentId} | Retrieve a specific comment | Yes |
+| PATCH | /comments/{commentId} | Update a comment | Yes |
+| DELETE | /comments/{commentId} | Delete a comment | Yes |
+| POST | /comments/{commentId}/like | Like/unlike a comment | Yes |
+
+#### Forum & Category Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /categories/ | Retrieve all categories | Yes |
+| GET | /categories/{id} | Retrieve a specific category | Yes |
+| GET | /forums/{forumId}/members | Retrieve forum members | Yes |
+| POST | /forums/{forumId}/membership | Join/leave a forum | Yes |
+
+#### Event Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /events/ | Retrieve all events | Yes |
+| POST | /events/ | Create a new event | Yes |
+| GET | /events/{eventId} | Retrieve a specific event | Yes |
+| PATCH | /events/{eventId} | Update an event | Yes |
+| DELETE | /events/{eventId} | Delete an event | Yes |
+| POST | /events/{eventId}/rsvp | RSVP to an event | Yes |
+| GET | /events/{eventId}/attendees | Retrieve event attendees | Yes |
+
+#### Messaging Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /messages/ | Retrieve user's messages | Yes |
+| POST | /messages/ | Send a new message | Yes |
+| GET | /messages/{userId} | Retrieve conversation with user | Yes |
+| GET | /messages/space/{spaceId} | Retrieve space messages | Yes |
+
+#### File Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /files/ | Retrieve user's files | Yes |
+| POST | /files/ | Upload a file | Yes |
+| GET | /files/{fileId} | Retrieve a specific file | Yes |
+| DELETE | /files/{fileId} | Delete a file | Yes |
+| POST | /files/{fileId}/share | Share a file | Yes |
+| POST | /files/scan | Scan file for malware | Yes |
+| POST | /storage/upload | Upload to object storage | Yes |
+| POST | /storage/presign | Get presigned upload URL | Yes |
+| POST | /storage/delete | Delete from object storage | Yes |
+
+#### Moderation & Admin Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /admin/users | Retrieve all users (admin) | Yes (Admin) |
+| GET | /admin/users/{userId} | Retrieve user details (admin) | Yes (Admin) |
+| PATCH | /admin/users/{userId}/role | Update user role | Yes (Admin) |
+| GET | /admin/analytics | Retrieve platform analytics | Yes (Admin) |
+| GET | /reports/ | Retrieve all reports | Yes (Moderator) |
+| GET | /reports/{reportId} | Retrieve a specific report | Yes (Moderator) |
+| POST | /reports/{reportId}/review | Review a report | Yes (Moderator) |
+| POST | /reports/{reportId}/action | Take action on report | Yes (Moderator) |
+| GET | /moderation/queue | Retrieve moderation queue | Yes (Moderator) |
+| POST | /moderation/approve/{postId} | Approve a post | Yes (Moderator) |
+| POST | /moderation/delete/{postId} | Delete flagged content | Yes (Moderator) |
+| POST | /moderation/revert/{postId} | Revert moderation action | Yes (Moderator) |
+| POST | /moderation/warn/{userId} | Warn a user | Yes (Moderator) |
+| POST | /moderation/suspend/{userId} | Suspend a user | Yes (Moderator) |
+| POST | /moderation/ban/{userId} | Ban a user | Yes (Moderator) |
+| GET | /moderation/logs | Retrieve moderation logs | Yes (Moderator) |
+
+#### AI Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | /ai/moderate | AI content moderation | Yes |
+| POST | /ai/summarize/{postId} | Summarize a post | Yes |
+| GET | /ai/recommend | AI topic recommendations | Yes |
+| GET | /ai/recommend/forums | AI forum recommendations | Yes |
+| GET | /ai/health | Check AI service health | Yes |
+
+#### Collaboration Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /collaboration/ | Retrieve collaboration spaces | Yes |
+| POST | /collaboration/ | Create a collaboration space | Yes |
+| GET | /collaboration/{spaceId} | Retrieve a specific space | Yes |
+| PATCH | /collaboration/{spaceId} | Update a space | Yes |
+| DELETE | /collaboration/{spaceId} | Delete a space | Yes |
+
+#### Miscellaneous Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | /search/ | Search posts, users, forums | Yes |
+| GET | /swagger/ | API documentation | No |
+
+### 6.2 API Documentation
 
 - **Swagger / Postman link (if available)**
     - Interactive Documentation: Visit [http://localhost:3000/api-docs](http://localhost:3000/api-docs) to explore the API with Swagger UI
@@ -128,760 +262,6 @@ Response JSON:
   }
 }
 ```
-
-### 6.2 Authentication
-
-The API uses [Better Auth](https://www.better-auth.com/) with **HTTP-only session cookies**. After signing in through `/api/auth/*`, the browser automatically sends the session cookie on same-origin requests. Protected endpoints reject unauthenticated callers with `401 Unauthorized`.
-
-### Session Cookie
-
-Better Auth sets an HTTP-only session cookie (configured in `lib/auth.ts`):
-
-- `httpOnly: true` — not accessible to JavaScript
-- `sameSite: "lax"` — mitigates CSRF for cross-site POST requests while allowing top-level navigation
-- `secure: true` in production — HTTPS only
-
-For same-origin browser clients, no manual `Authorization` header is required. API route handlers read the session via `getSessionUser()` / `verifyToken()`.
-
-### 6.3 API endpoints
-
-### Authentication Endpoints
-
-Better Auth handles registration, login, logout, and session management. Primary routes:
-
-```
-POST /api/auth/sign-up/email
-POST /api/auth/sign-in/email
-POST /api/auth/sign-out
-GET  /api/auth/get-session
-```
-
-#### 1. Register a New Account (legacy reference)
-```
-POST /api/auth/register
-```
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123!",
-  "name": "John Doe"
-}
-```
-
-**Success Response (201):**
-```json
-{
-  "id": "user_123",
-  "email": "user@example.com",
-  "name": "John Doe",
-  "createdAt": "2026-03-11T10:00:00Z"
-}
-```
-
-#### 2. Login
-```
-POST /api/auth/login
-```
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123!"
-}
-```
-
-**Success Response (200):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "user_123",
-    "email": "user@example.com",
-    "name": "John Doe"
-  }
-}
-```
-
-**Note:** The response includes an HTTP-only `auth_token` cookie.
-
-#### 3. Get Current User
-```
-GET /api/auth/me
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Success Response (200):**
-```json
-{
-  "id": "user_123",
-  "email": "user@example.com",
-  "name": "John Doe",
-  "role": "student",
-  "createdAt": "2026-03-11T10:00:00Z",
-  "updatedAt": "2026-03-11T15:00:00Z"
-}
-```
-
-#### 4. Logout
-```
-POST /api/auth/logout
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Success Response (200):**
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
-**Note:** The `auth_token` cookie is cleared automatically.
-
-#### 5. Refresh Access Token
-```
-POST /api/auth/refresh
-```
-
-**Request Body:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Success Response (200):**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": 3600
-}
-```
-
-### User Endpoints
-
-#### 1. Get User Profile
-```
-GET /api/users/:userId
-```
-
-**Parameters:**
-- `userId` (path, required): User ID (e.g., "user_1")
-
-**Success Response (200):**
-```json
-{
-  "id": "user_1",
-  "email": "john@example.com",
-  "name": "John Doe",
-  "role": "student",
-  "bio": "Computer Science student",
-  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
-  "createdAt": "2026-01-15T10:00:00Z",
-  "updatedAt": "2026-03-10T15:00:00Z"
-}
-```
-
-#### 2. Update Own Profile
-```
-PUT /api/users/:userId
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Request Body:**
-```json
-{
-  "name": "John Doe Updated",
-  "bio": "Updated bio text",
-  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=newavatar"
-}
-```
-
-**Note:** Users can only update their own profile. The `userId` in the URL must match the authenticated user's ID.
-
-**Success Response (200):**
-```json
-{
-  "id": "user_1",
-  "email": "john@example.com",
-  "name": "John Doe Updated",
-  "role": "student",
-  "bio": "Updated bio text",
-  "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=newavatar",
-  "createdAt": "2026-01-15T10:00:00Z",
-  "updatedAt": "2026-03-11T12:00:00Z"
-}
-```
-
-#### 3. Delete Own Account
-```
-DELETE /api/users/:userId
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Note:** Users can only delete their own account. The `userId` in the URL must match the authenticated user's ID.
-
-**Success Response (200):**
-```json
-{
-  "message": "Account deleted successfully"
-}
-```
-
-#### 4. Get User's Posts
-```
-GET /api/users/:userId/posts
-```
-
-**Parameters:**
-- `userId` (path, required): User ID
-
-**Success Response (200):**
-```json
-{
-  "data": [
-    {
-      "id": "post_1",
-      "userId": "user_1",
-      "title": "Advanced JavaScript Patterns",
-      "content": "A comprehensive guide to design patterns...",
-      "category": "Technology",
-      "createdAt": "2026-03-05T10:00:00Z",
-      "updatedAt": "2026-03-05T10:00:00Z",
-      "likes": 42,
-      "comments": 8
-    }
-  ],
-  "total": 1,
-  "userId": "user_1"
-}
-```
-
-#### 5. Get User's Events
-```
-GET /api/users/:userId/events
-```
-
-**Parameters:**
-- `userId` (path, required): User ID
-- `status` (query, optional): Filter by status - "scheduled", "completed", or "cancelled"
-
-**Query Example:**
-```
-GET /api/users/user_1/events?status=scheduled
-```
-
-**Success Response (200):**
-```json
-{
-  "data": [
-    {
-      "id": "event_1",
-      "userId": "user_1",
-      "title": "JavaScript Study Session",
-      "description": "Advanced JavaScript patterns and best practices discussion",
-      "date": "2026-03-15T14:00:00Z",
-      "duration": 120,
-      "location": "Library - Room 301",
-      "category": "Study Session",
-      "participants": ["user_1", "user_3", "user_4"],
-      "status": "scheduled"
-    }
-  ],
-  "total": 1,
-  "userId": "user_1"
-}
-```
-
-### Event Endpoints
-
-#### 1. List Events
-```
-GET /api/events
-```
-
-**Query Parameters:**
-- `filter` (optional): "upcoming" or "past" - Filter events by date
-- `page` (optional): Page number (default: 1)
-
-**Query Examples:**
-```
-GET /api/events
-GET /api/events?filter=upcoming
-GET /api/events?filter=upcoming&page=2
-```
-
-**Success Response (200):**
-```json
-{
-  "data": [
-    {
-      "id": "event_1",
-      "userId": "user_1",
-      "title": "JavaScript Study Session",
-      "description": "Advanced JavaScript patterns discussion",
-      "date": "2026-03-15T14:00:00Z",
-      "duration": 120,
-      "location": "Library - Room 301",
-      "category": "Study Session",
-      "maxAttendees": 20,
-      "attendees": ["user_1", "user_3", "user_4"],
-      "status": "scheduled",
-      "createdAt": "2026-03-10T10:00:00Z",
-      "updatedAt": "2026-03-10T10:00:00Z"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "pageSize": 10,
-    "total": 5,
-    "totalPages": 1
-  }
-}
-```
-
-#### 2. Get Event Details with Attendees
-```
-GET /api/events/:eventId
-```
-
-**Parameters:**
-- `eventId` (path, required): Event ID
-
-**Success Response (200):**
-```json
-{
-  "id": "event_1",
-  "userId": "user_1",
-  "title": "JavaScript Study Session",
-  "description": "Advanced JavaScript patterns discussion",
-  "date": "2026-03-15T14:00:00Z",
-  "duration": 120,
-  "location": "Library - Room 301",
-  "category": "Study Session",
-  "maxAttendees": 20,
-  "attendees": ["user_1", "user_3", "user_4"],
-  "status": "scheduled",
-  "createdAt": "2026-03-10T10:00:00Z",
-  "updatedAt": "2026-03-10T10:00:00Z"
-}
-```
-
-#### 3. Create New Event
-```
-POST /api/events
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Request Body:**
-```json
-{
-  "title": "Python Workshop",
-  "description": "Interactive Python programming workshop",
-  "date": "2026-03-25T18:00:00Z",
-  "duration": 180,
-  "location": "Computer Lab - Building A",
-  "category": "Workshop",
-  "maxAttendees": 30
-}
-```
-
-**Success Response (201):**
-```json
-{
-  "id": "event_999",
-  "userId": "user_1",
-  "title": "Python Workshop",
-  "description": "Interactive Python programming workshop",
-  "date": "2026-03-25T18:00:00Z",
-  "duration": 180,
-  "location": "Computer Lab - Building A",
-  "category": "Workshop",
-  "maxAttendees": 30,
-  "attendees": ["user_1"],
-  "status": "scheduled",
-  "createdAt": "2026-03-11T10:00:00Z",
-  "updatedAt": "2026-03-11T10:00:00Z"
-}
-```
-
-#### 4. Update Own Event
-```
-PUT /api/events/:eventId
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Parameters:**
-- `eventId` (path, required): Event ID (must be creator's event)
-
-**Request Body:**
-```json
-{
-  "title": "JavaScript Study Session - Updated",
-  "description": "Updated description",
-  "maxAttendees": 25,
-  "status": "completed"
-}
-```
-
-**Note:** Users can only update their own events.
-
-**Success Response (200):**
-```json
-{
-  "id": "event_1",
-  "userId": "user_1",
-  "title": "JavaScript Study Session - Updated",
-  "description": "Updated description",
-  "date": "2026-03-15T14:00:00Z",
-  "duration": 120,
-  "location": "Library - Room 301",
-  "category": "Study Session",
-  "maxAttendees": 25,
-  "attendees": ["user_1", "user_3", "user_4"],
-  "status": "completed",
-  "createdAt": "2026-03-10T10:00:00Z",
-  "updatedAt": "2026-03-11T12:00:00Z"
-}
-```
-
-#### 5. Delete Own Event
-```
-DELETE /api/events/:eventId
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Parameters:**
-- `eventId` (path, required): Event ID (must be creator's event)
-
-**Note:** Users can only delete their own events.
-
-**Success Response (200):**
-```json
-{
-  "message": "Event deleted successfully"
-}
-```
-
-#### 6. RSVP to Event
-```
-POST /api/events/:eventId/rsvp
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Parameters:**
-- `eventId` (path, required): Event ID to attend
-
-**Success Response (200):**
-```json
-{
-  "message": "Successfully RSVP'd to event",
-  "event": {
-    "id": "event_1",
-    "userId": "user_1",
-    "title": "JavaScript Study Session",
-    "description": "Advanced JavaScript patterns discussion",
-    "date": "2026-03-15T14:00:00Z",
-    "duration": 120,
-    "location": "Library - Room 301",
-    "category": "Study Session",
-    "maxAttendees": 20,
-    "attendees": ["user_1", "user_3", "user_4", "user_6"],
-    "status": "scheduled",
-    "createdAt": "2026-03-10T10:00:00Z",
-    "updatedAt": "2026-03-11T12:00:00Z"
-  }
-}
-```
-
-**Error Scenarios:**
-- **400**: Already attending or event at full capacity
-- **404**: Event not found
-- **401**: Not authenticated
-
-#### 7. Cancel RSVP
-```
-DELETE /api/events/:eventId/rsvp
-```
-
-**Headers:**
-```
-Authorization: Bearer <jwt_token>
-```
-
-**Parameters:**
-- `eventId` (path, required): Event ID to cancel attendance
-
-**Success Response (200):**
-```json
-{
-  "message": "Successfully cancelled RSVP",
-  "event": {
-    "id": "event_1",
-    "userId": "user_1",
-    "title": "JavaScript Study Session",
-    "description": "Advanced JavaScript patterns discussion",
-    "date": "2026-03-15T14:00:00Z",
-    "duration": 120,
-    "location": "Library - Room 301",
-    "category": "Study Session",
-    "maxAttendees": 20,
-    "attendees": ["user_1", "user_3", "user_4"],
-    "status": "scheduled",
-    "createdAt": "2026-03-10T10:00:00Z",
-    "updatedAt": "2026-03-11T12:00:00Z"
-  }
-}
-```
-
-**Error Scenarios:**
-- **400**: Not attending this event
-- **404**: Event not found
-- **401**: Not authenticated
-
-#### 8. Get Attendee List
-```
-GET /api/events/:eventId/attendees
-```
-
-**Parameters:**
-- `eventId` (path, required): Event ID
-
-**Success Response (200):**
-```json
-{
-  "eventId": "event_1",
-  "eventTitle": "JavaScript Study Session",
-  "totalAttendees": 3,
-  "maxAttendees": 20,
-  "attendees": [
-    {
-      "id": "user_1",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "student",
-      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=john"
-    },
-    {
-      "id": "user_3",
-      "name": "Mike Johnson",
-      "email": "mike@example.com",
-      "role": "student",
-      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=mike"
-    },
-    {
-      "id": "user_4",
-      "name": "Emma Wilson",
-      "email": "emma@example.com",
-      "role": "student",
-      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=emma"
-    }
-  ]
-}
-```
-
-### 6.4 Error responses
-
-All error responses follow a consistent format:
-
-```json
-{
-  "error": "Error message describing what went wrong"
-}
-```
-
-### Common HTTP Status Codes
-
-- **200 OK**: Request successful
-- **201 Created**: Resource created successfully
-- **400 Bad Request**: Invalid request body or missing required fields
-- **401 Unauthorized**: Missing or invalid authentication token
-- **404 Not Found**: Resource not found
-- **500 Internal Server Error**: Server-side error
-
-### 6.5 Rate limiting
-
-Global API rate limiting is enforced in `proxy.ts` (Next.js middleware) using client IP:
-
-| Traffic type | Default limit | Applies to |
-|--------------|---------------|------------|
-| Read (`GET`, etc.) | 120 requests / minute | All `/api/*` read routes |
-| Write (`POST`, `PUT`, `PATCH`, `DELETE`) | 30 requests / minute | All `/api/*` write routes |
-| Auth (`/api/auth/*`) | 10 requests / minute | Login, registration, session |
-
-When exceeded, the API returns `429 Too Many Requests` with `Retry-After` and error code `RATE_LIMITED`.
-
-AI-specific routes (`/api/ai/recommend`, `/api/ai/summarize`) additionally enforce a per-user cooldown (default 15 seconds) via `lib/ai/rate-limit.ts`.
-
-Limits are configurable through environment variables: `RATE_LIMIT_READ_MAX`, `RATE_LIMIT_WRITE_MAX`, `RATE_LIMIT_AUTH_MAX`, and corresponding `*_WINDOW_MS` values.
-
-### 6.6 CORS policy
-
-The API accepts requests from:
-- `http://localhost:3000` (development)
-- `https://academify.example.com` (production)
-
-### 6.7 Testing the API
-
-### Using cURL
-
-```bash
-# Register
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePassword123!",
-    "name": "John Doe"
-  }'
-
-# Login
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePassword123!"
-  }'
-
-# Get current user (replace TOKEN with your JWT)
-curl -X GET http://localhost:3000/api/auth/me \
-  -H "Authorization: Bearer TOKEN"
-
-# Get user profile
-curl -X GET http://localhost:3000/api/users/user_1
-
-# Update user profile (replace TOKEN with your JWT)
-curl -X PUT http://localhost:3000/api/users/user_1 \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "name": "John Doe Updated",
-    "bio": "Updated bio",
-    "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=newavatar"
-  }'
-
-# Get user's posts
-curl -X GET http://localhost:3000/api/users/user_1/posts
-
-# Get user's events
-curl -X GET http://localhost:3000/api/users/user_1/events
-
-# Get user's scheduled events only
-curl -X GET http://localhost:3000/api/users/user_1/events?status=scheduled
-
-# Delete user account (replace TOKEN with your JWT)
-curl -X DELETE http://localhost:3000/api/users/user_1 \
-  -H "Authorization: Bearer TOKEN"
-
-# List all upcoming events
-curl -X GET http://localhost:3000/api/events?filter=upcoming
-
-# Get specific event details
-curl -X GET http://localhost:3000/api/events/event_1
-
-# Create a new event (replace TOKEN with your JWT)
-curl -X POST http://localhost:3000/api/events \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "title": "Python Workshop",
-    "description": "Interactive Python programming workshop",
-    "date": "2026-03-25T18:00:00Z",
-    "duration": 180,
-    "location": "Computer Lab",
-    "category": "Workshop",
-    "maxAttendees": 30
-  }'
-
-# Update an event (replace TOKEN and event_1 with your JWT and event ID)
-curl -X PUT http://localhost:3000/api/events/event_1 \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "maxAttendees": 25,
-    "status": "completed"
-  }'
-
-# RSVP to an event (replace TOKEN with your JWT)
-curl -X POST http://localhost:3000/api/events/event_1/rsvp \
-  -H "Authorization: Bearer TOKEN"
-
-# Cancel RSVP (replace TOKEN with your JWT)
-curl -X DELETE http://localhost:3000/api/events/event_1/rsvp \
-  -H "Authorization: Bearer TOKEN"
-
-# Get attendee list for an event
-curl -X GET http://localhost:3000/api/events/event_1/attendees
-
-# Delete an event (replace TOKEN and event_1 with your JWT and event ID)
-curl -X DELETE http://localhost:3000/api/events/event_1 \
-  -H "Authorization: Bearer TOKEN"
-```
-
-### Using Swagger UI
-
-1. Navigate to [http://localhost:3000/api-docs](http://localhost:3000/api-docs)
-2. Click on an endpoint to expand it
-3. Click "Try it out" button
-4. Fill in the required parameters
-5. Click "Execute" to send the request
-
-### 6.8 Security considerations
-
-1. **Session-based auth (Better Auth)**: Sessions are stored server-side; cookies are HTTP-only and cannot be read by client JavaScript.
-2. **Password hashing**: Passwords are hashed by Better Auth before storage.
-3. **CSRF mitigation**: Session cookies use `SameSite=Lax`. All state-changing requests are same-origin from the Next.js frontend, which prevents cross-site cookie submission on unsafe methods.
-4. **Input sanitization**: Messages, posts, and comments are sanitized server-side via `sanitizeText()` before persistence (HTML entity escaping).
-5. **RBAC**: Role checks on admin, moderation, post, and file routes.
-6. **File upload validation**: MIME allowlist, 50 MB size cap, and dangerous filename blocking via `validateUploadFileName()`.
-7. **Security headers**: HSTS (HTTPS), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and Content-Security-Policy on page routes — applied via `proxy.ts` for both pages and API routes.
-8. **Rate limiting**: Global IP-based limits on all API routes; additional per-user cooldown on AI routes.
-9. **Realtime transport**: Socket.IO server (`socket-server/index.ts`) with CORS restricted to app origins; clients connect via `NEXT_PUBLIC_SOCKET_URL` (no server-to-server emit relay).
-10. **Known limitations**:
-    - **Virus/malware scanning**: Production Docker images run `clamscan` with definitions from `freshclam` at build time. Local dev skips scanning when `clamscan` is not installed.
-    - **Image moderation**: Text content is AI-moderated; image attachments and avatars are not scanned for explicit content.
-
-### 6.9 Additional endpoints
-
-Forums, threads, posts, comments, messages, files, collaboration spaces, moderation, reports, AI routes, and admin APIs are implemented — explore them in Swagger UI at `/api-docs` or via route handlers under `app/api/`.
-
-### 6.10 Support
-
-For API issues or questions, please contact: support@academify.com
 
 ---
 
