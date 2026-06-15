@@ -156,8 +156,11 @@ export default function ForumsPage() {
                   >
                     {forum.imageUrl ? (
                       <div className="h-36 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={forum.imageUrl} alt={forum.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+
                       </div>
+
                     ) : (
                       <div className="h-36 flex items-center justify-center" style={{ background: "linear-gradient(135deg, #ccfbf1, #99f6e4)" }}>
                         <span className="text-4xl font-bold text-teal-700">{forum.name.slice(0, 1).toUpperCase()}</span>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/components/current-user-context";
 
@@ -47,10 +48,12 @@ export default function EditProfilePage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState(currentUser?.avatarUrl ?? "");
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState("");
-  const [bannerUploading, setBannerUploading] = useState(false);
+
+
 
   useEffect(() => {
     fetch("/api/users/me")
@@ -220,7 +223,7 @@ export default function EditProfilePage() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
     let uploadedAvatarKey: string | null = null;
-    let uploadedBannerKey: string | null = null;
+
     try {
       let avatarKey: string | null = null;
       let avatarUploadError: string | null = null;
@@ -239,7 +242,7 @@ export default function EditProfilePage() {
       } catch (error) {
         bannerUploadError = error instanceof Error ? error.message : "Failed to upload banner image";
       }
-      uploadedBannerKey = bannerKey;
+
 
       const payload: Record<string, unknown> = {};
 

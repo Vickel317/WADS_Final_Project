@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
-import { generateObjectKey, isMinioEnabled, putObjectBytes, deleteObject } from "@/lib/storage";
+import { generateObjectKey, putObjectBytes, deleteObject } from "@/lib/storage";
+
 import { prisma } from "@/lib/prisma";
+
 
 const MAX_BANNER_BYTES = 5 * 1024 * 1024;
 

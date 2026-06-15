@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChatProfilePopover } from "@/components/chat-profile-popover";
+
 
 interface ConnectionUser {
   userId: string;

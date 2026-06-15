@@ -23,7 +23,15 @@ export const prisma = {
   notification: makeMock(),
   event: makeMock(),
   tag: makeMock(),
+
+  // models used by dashboard/profile pages
+  eventAttendee: makeMock(),
+  spaceMember: makeMock(),
+  follow: makeMock(),
+  collabSpace: makeMock(),
+
   $transaction: jest.fn(),
   $connect: jest.fn(),
   $disconnect: jest.fn(),
 };
+

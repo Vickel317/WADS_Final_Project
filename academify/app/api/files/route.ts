@@ -7,6 +7,7 @@ import { getPresignedGetUrl } from "@/lib/storage";
 import { getAccessibleFileWhere } from "@/lib/file-access";
 import { validateFileUpload } from "@/lib/validation";
 import { isRestrictedAccount } from "@/lib/moderation";
+import { scanObjectFromMinio } from "@/lib/clamav";
 
 type FileWithRelations = Prisma.FileGetPayload<{
   include: { uploadedBy: true; space: true };
@@ -162,6 +163,15 @@ export async function POST(request: NextRequest) {
     if (!validation.ok) return apiError(400, validation.error, "BAD_REQUEST");
 
     const { objectKey, fileName, fileType, fileSize, spaceId } = validation.data;
+
+    const scanResult = await scanObjectFromMinio(objectKey, fileName);
+    if (!scanResult.ok) {
+      return apiError(500, "File scan failed", "FILE_SCAN_FAILED");
+    }
+    if (scanResult.infected) {
+      return apiError(400, "Infected file detected", "FILE_INFECTED");
+    }
+
     const data: Prisma.FileUncheckedCreateInput = {
       uploadedByID: sessionUser.user.userId,
       fileName,

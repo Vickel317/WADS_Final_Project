@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/get-session";
 import { prisma } from "@/lib/prisma";
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
 
   const userId = session.user.userId;
-  const now = new Date();
+
 
   const [
     eventsJoinedCount,
