@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { disconnectSocket, getSocket } from "@/lib/socket-client";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { useCurrentUser } from "@/components/current-user-context";
 import { useSidebarLayout } from "@/components/sidebar-layout-context";
@@ -25,6 +25,13 @@ type Notification = {
 
 export default function Topbar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
   const currentUser = useCurrentUser();
   const { toggleMobileOpen } = useSidebarLayout();
   const [query, setQuery] = useState("");
@@ -129,6 +136,7 @@ export default function Topbar() {
     }
 
     function onNewNotification(notification: Notification) {
+      if (notification.link && pathnameRef.current.startsWith("/messages")) return;
       setNotifications((prev) => {
         if (prev.some((n) => n.notificationID === notification.notificationID)) return prev;
         return [notification, ...prev];
@@ -185,7 +193,9 @@ export default function Topbar() {
       <BrandLogo showName className="shrink-0 hidden sm:flex" />
       <BrandLogo showName={false} size="sm" className="shrink-0 flex sm:hidden" />
 
-      <div className="flex-1 min-w-0 max-w-xl relative">
+      <div className="flex-1" />
+
+      <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
           fill="none"

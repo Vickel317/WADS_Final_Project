@@ -63,7 +63,7 @@ Our web application provides an AI powered academic social platform designed to 
 
 #### 4. User Profiles & Authentication
 - User registration with email, username, password, major, and bio
-- Secure login/logout with JWT authentication
+- Secure login/logout with Better Auth (session cookies)
 
 #### 5. Asynchronous Messaging System
 - Send direct messages to other users
@@ -137,8 +137,80 @@ The AI processing, file storage, and caching services are separated from the mai
 
 #### 3. Where security is enforced
 
-The security is mainly enforced on the backend API layer. All of the requests have to be authenticated using the JWT (JSON Web Tokens) before accessing the protected resources. The role-based authorization is implemented to distinguish between regular users and moderators.
+Security is enforced across multiple layers:
 
-All communication between client and server uses HTTPS to prevent data interception. Input validation and output sanitization are applied to prevent XSS and injection attacks. Database queries are executed through Prisma ORM to avoid SQL injection.
+- **Backend API**: All protected routes require a valid Better Auth session. Role-based authorization distinguishes students, moderators, and admins.
+- **Input validation & sanitization**: Shared validators on API bodies; `sanitizeText()` on messages, posts, and comments; Prisma ORM prevents SQL injection.
+- **File uploads**: MIME allowlist, size caps, and dangerous filename blocking. Virus/malware scanning is **not** implemented (documented limitation).
+- **Moderation**: AI-driven text moderation with profanity fallback; banned/suspended users blocked from posting and messaging.
+- **Rate limiting**: Global IP-based limits on all `/api/*` routes; per-user cooldown on AI routes.
+- **Transport & headers**: HTTPS in production; security headers (HSTS, CSP, X-Frame-Options, etc.) via `proxy.ts`.
+- **Real-time socket server**: `/emit-notification` requires a shared secret; socket server should run on an internal network.
 
-Uploaded files are validated for type and size before storage. Sensitive credentials such as database passwords and API keys are stored using environment variables. Logging and monitoring are implemented to track suspicious activities and moderation actions.
+# Appendix B — Security & Testing Reference
+
+## B.1 Live Application URL
+
+| Environment | URL |
+|-------------|-----|
+| Production | https://e2526-wads-b4ac-02.csbihub.id |
+| Local development | http://localhost:3000 |
+
+## B.2 Security Feature Matrix
+
+| Area | Implementation | Status |
+|------|----------------|--------|
+| Auth & sessions | Better Auth, HTTP-only cookies, `Secure` in production | Implemented |
+| CSRF mitigation | `SameSite=Lax` session cookies; same-origin API calls | Implemented |
+| RBAC | Role checks on admin, moderation, post, and file routes | Implemented + tested |
+| Forum creation | Restricted to lecturers and admins (`canCreateForum`) | Implemented |
+| Input validation | Shared validators + Prisma ORM | Implemented |
+| XSS sanitization | `sanitizeText()` on messages, posts, and comments | Implemented + tested |
+| File uploads | MIME allowlist, size cap, filename validation | Implemented |
+| Virus/malware scan | Not integrated (ClamAV not deployed) | **Known limitation** |
+| Image moderation | Text-only AI moderation; images not scanned | **Known limitation** |
+| Text moderation | AI + profanity fallback; restricted users blocked | Implemented |
+| AI abuse control | Per-user cooldown on summarize/recommend routes | Implemented + tested |
+| Global rate limiting | IP-based limits on all `/api/*` routes via `proxy.ts` | Implemented + tested |
+| Socket emit auth | Shared secret on `/emit-notification` | Implemented |
+| Security headers | HSTS, CSP, X-Frame-Options, nosniff on pages + API | Implemented |
+
+## B.3 Security Test Coverage
+
+| Test file | What it verifies |
+|-----------|------------------|
+| `security-critical.test.ts` | Dangerous filenames, message/post/comment XSS sanitization, restricted users |
+| `api-authorization.test.ts` | RBAC on admin, posts, moderation routes |
+| `files-authorization.test.ts` | File access authorization |
+| `categories-authorization.test.ts` | Forum creation restricted to lecturers/admins |
+| `ai-rate-limit.test.ts` | AI route per-user cooldown |
+| `rate-limit.test.ts` | Global API rate limit presets |
+| `ai-moderation.test.ts` | AI moderation pipeline |
+
+## B.4 AI Security Scenarios
+
+| Scenario | Expected behavior | Test coverage |
+|----------|-------------------|---------------|
+| Prompt injection in post content | Content sent to moderation model; flagged content enters moderation queue | Manual / `ai-moderation.test.ts` |
+| AI service unavailable | Profanity fallback flags obvious violations; posts remain in PENDING until reviewed | `ai-moderation.test.ts` |
+| AI rate abuse | Per-user cooldown returns `429 RATE_LIMITED` | `ai-rate-limit.test.ts` |
+| Restricted user posting | Banned/suspended users receive `403` on posts, messages, comments | `security-critical.test.ts` |
+
+## B.5 AI Usage Disclosure
+
+| Feature | Model / Service | Data sent | Purpose |
+|---------|-----------------|-----------|---------|
+| Content moderation | Ollama (local LLM) | Post title + body text | Flag policy violations before publication |
+| Thread summarization | Ollama (local LLM) | Approved post + comments | Generate summary for readers |
+| Topic recommendation | Ollama (local LLM) + heuristics | User interests + forum metadata | Suggest relevant forums |
+
+No user passwords, session tokens, or private messages are sent to external AI services. AI features run against a locally hosted Ollama instance configured via environment variables.
+
+## B.6 Environment Variables (Security-Related)
+
+| Variable | Purpose |
+|----------|---------|
+| `BETTER_AUTH_SECRET` | Better Auth encryption/signing secret |
+| `SOCKET_EMIT_SECRET` | Shared secret for socket `/emit-notification` |
+| `RATE_LIMIT_*` | Optional overrides for global API rate limits |
+| `AI_RATE_LIMIT_MS` | Per-user AI route cooldown (default 15000 ms) |

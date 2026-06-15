@@ -4,9 +4,10 @@ import { ModerationStatus } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-import { parseJson, parseRequiredString } from "@/lib/validation";
+import { parseJson, parseRequiredString, validateUploadedFile } from "@/lib/validation";
 import { applyPostModeration } from "@/lib/ai/post-moderation";
 import { isRestrictedAccount } from "@/lib/moderation";
+import { sanitizeText } from "@/lib/sanitization";
 
 const slugify = (value: string) =>
   value
@@ -268,10 +269,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const safeTitle = sanitizeText(title.value!);
+    const safeContent = sanitizeText(content.value!);
+
     const created = await prisma.post.create({
       data: {
-        title: title.value!,
-        content: content.value!,
+        title: safeTitle,
+        content: safeContent,
         forumID: forum.forumID,
         authorID: sessionUser.user.userId,
         moderationStatus: ModerationStatus.PENDING,
@@ -285,20 +289,29 @@ export async function POST(request: NextRequest) {
 
     const file = body.file ?? null;
     if (file && file.size > 0) {
+      const validatedFile = validateUploadedFile({
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+      });
+      if (!validatedFile.ok) {
+        return apiError(400, validatedFile.error, "BAD_REQUEST");
+      }
+
       await prisma.file.create({
         data: {
           postID: created.postID,
           uploadedByID: sessionUser.user.userId,
-          fileName: file.name,
-          fileUrl: `/uploads/${file.name}`,
-          fileType: file.type || "application/octet-stream",
-          fileSize: file.size,
+          fileName: validatedFile.value.fileName,
+          fileUrl: `/uploads/${validatedFile.value.fileName}`,
+          fileType: validatedFile.value.fileType,
+          fileSize: validatedFile.value.fileSize,
         },
       });
     }
 
-    const postTitle = title.value!;
-    const postContent = content.value!;
+    const postTitle = safeTitle;
+    const postContent = safeContent;
     const forumName = forum.name;
 
     after(async () => {

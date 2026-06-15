@@ -92,15 +92,15 @@ export default function CollaborationPage() {
       <section className="relative overflow-hidden rounded-3xl border border-teal-100 bg-linear-to-br from-slate-950 via-teal-900 to-cyan-700 p-6 text-white shadow-sm">
         <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.2),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_28%)]" />
         <div className="relative flex flex-col gap-5">
-          <div className="max-w-3xl space-y-3">
+          <div className="max-w-3xl space-y-3 min-w-0">
             <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/75">
               Collab space · inside a forum
             </span>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl break-words">
                 {forumFilter ? `${forumFilter.name} — group workspaces` : "Team workspaces inside forums"}
               </h1>
-              <p className="mt-3 max-w-2xl text-sm text-white/80 sm:text-base">
+              <p className="mt-3 max-w-2xl text-sm text-white/80 sm:text-base break-words">
                 Shared files and small teams for assignments — not a replacement for threads. Pick a forum first, then create a space.
               </p>
             </div>
@@ -162,15 +162,15 @@ export default function CollaborationPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-semibold text-gray-900">{space.name}</h3>
-                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+                        <h3 className="text-base font-semibold text-gray-900 truncate">{space.name}</h3>
+                        <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
                           Forum space
                         </span>
                       </div>
-                      <p className="mt-2 text-sm text-gray-600">{space.description ?? "No description provided."}</p>
+                      <p className="mt-2 text-sm text-gray-600 line-clamp-2">{space.description ?? "No description provided."}</p>
                     </div>
 
-                    <div className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-4 lg:min-w-55">
+                    <div className="flex flex-col gap-3 rounded-2xl bg-gray-50 p-4 lg:min-w-55 shrink-0">
                       <Link href={`/collaboration/${space.spaceID}`} className="rounded-full bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700 text-center">
                         Open space
                       </Link>

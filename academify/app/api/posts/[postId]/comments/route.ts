@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
+import { isRestrictedAccount } from "@/lib/moderation";
+import { sanitizeText } from "@/lib/sanitization";
 
 
 
@@ -144,6 +146,10 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
+    if (isRestrictedAccount(author)) {
+      return apiError(403, "Your account is restricted from commenting", "FORBIDDEN");
+    }
+
     let parentId: string | null = null;
     if (body.parentId && typeof body.parentId === "string") {
       const parentComment = await prisma.comment.findUnique({
@@ -160,7 +166,7 @@ export async function POST(
     const newComment = await prisma.comment.create({
       data: {
         postID: postId,
-        content: content.value!,
+        content: sanitizeText(content.value!),
         authorID: author.userId,
         parentId,
       },

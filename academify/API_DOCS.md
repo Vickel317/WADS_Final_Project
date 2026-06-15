@@ -15,23 +15,32 @@ http://localhost:3000/api
 
 ## Authentication
 
-The API uses JWT (JSON Web Token) for authentication. After logging in, you'll receive a token that must be included in the `Authorization` header for protected endpoints.
+The API uses [Better Auth](https://www.better-auth.com/) with **HTTP-only session cookies**. After signing in through `/api/auth/*`, the browser automatically sends the session cookie on same-origin requests. Protected endpoints reject unauthenticated callers with `401 Unauthorized`.
 
-### Authentication Header Format
+### Session Cookie
 
-```
-Authorization: Bearer <your_jwt_token>
-```
+Better Auth sets an HTTP-only session cookie (configured in `lib/auth.ts`):
 
-### Cookie-based Authentication
+- `httpOnly: true` — not accessible to JavaScript
+- `sameSite: "lax"` — mitigates CSRF for cross-site POST requests while allowing top-level navigation
+- `secure: true` in production — HTTPS only
 
-Alternatively, the `auth_token` is set as an HTTP-only cookie during login, which is automatically included in requests.
+For same-origin browser clients, no manual `Authorization` header is required. API route handlers read the session via `getSessionUser()` / `verifyToken()`.
 
 ## API Endpoints
 
 ### Authentication Endpoints
 
-#### 1. Register a New Account
+Better Auth handles registration, login, logout, and session management. Primary routes:
+
+```
+POST /api/auth/sign-up/email
+POST /api/auth/sign-in/email
+POST /api/auth/sign-out
+GET  /api/auth/get-session
+```
+
+#### 1. Register a New Account (legacy reference)
 ```
 POST /api/auth/register
 ```
@@ -610,7 +619,19 @@ All error responses follow a consistent format:
 
 ## Rate Limiting
 
-Currently, there are no rate limits implemented. In production, you should implement appropriate rate limiting to prevent abuse.
+Global API rate limiting is enforced in `proxy.ts` (Next.js middleware) using client IP:
+
+| Traffic type | Default limit | Applies to |
+|--------------|---------------|------------|
+| Read (`GET`, etc.) | 120 requests / minute | All `/api/*` read routes |
+| Write (`POST`, `PUT`, `PATCH`, `DELETE`) | 30 requests / minute | All `/api/*` write routes |
+| Auth (`/api/auth/*`) | 10 requests / minute | Login, registration, session |
+
+When exceeded, the API returns `429 Too Many Requests` with `Retry-After` and error code `RATE_LIMITED`.
+
+AI-specific routes (`/api/ai/recommend`, `/api/ai/summarize`) additionally enforce a per-user cooldown (default 15 seconds) via `lib/ai/rate-limit.ts`.
+
+Limits are configurable through environment variables: `RATE_LIMIT_READ_MAX`, `RATE_LIMIT_WRITE_MAX`, `RATE_LIMIT_AUTH_MAX`, and corresponding `*_WINDOW_MS` values.
 
 ## CORS Policy
 
@@ -725,11 +746,18 @@ curl -X DELETE http://localhost:3000/api/events/event_1 \
 
 ## Security Considerations
 
-1. **JWT Expiration**: All tokens expire after 1 hour
-2. **Password Hashing**: Passwords are hashed using bcryptjs (10 salt rounds)
-3. **HTTP-only Cookies**: Authentication cookies are HTTP-only and cannot be accessed by JavaScript
-4. **HTTPS Only**: In production, all cookies are `Secure` (HTTPS only)
-5. **CSRF Protection**: Use SameSite cookie attributes set to "strict"
+1. **Session-based auth (Better Auth)**: Sessions are stored server-side; cookies are HTTP-only and cannot be read by client JavaScript.
+2. **Password hashing**: Passwords are hashed by Better Auth before storage.
+3. **CSRF mitigation**: Session cookies use `SameSite=Lax`. All state-changing requests are same-origin from the Next.js frontend, which prevents cross-site cookie submission on unsafe methods.
+4. **Input sanitization**: Messages, posts, and comments are sanitized server-side via `sanitizeText()` before persistence (HTML entity escaping).
+5. **RBAC**: Role checks on admin, moderation, post, and file routes.
+6. **File upload validation**: MIME allowlist, 50 MB size cap, and dangerous filename blocking via `validateUploadFileName()`.
+7. **Security headers**: HSTS (HTTPS), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and Content-Security-Policy on page routes — applied via `proxy.ts` for both pages and API routes.
+8. **Rate limiting**: Global IP-based limits on all API routes; additional per-user cooldown on AI routes.
+9. **Socket emit protection**: The socket server's `/emit-notification` endpoint requires a shared secret header (`X-Socket-Emit-Secret` / `SOCKET_EMIT_SECRET` env var).
+10. **Known limitations**:
+    - **Virus/malware scanning**: Uploads are validated by MIME type, size, and filename only. No ClamAV or antivirus integration is deployed.
+    - **Image moderation**: Text content is AI-moderated; image attachments and avatars are not scanned for explicit content.
 
 ## Future Endpoints
 
