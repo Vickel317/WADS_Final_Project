@@ -1,7 +1,16 @@
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import { NextResponse } from "next/server";
-import { swaggerSpec } from "@/lib/swagger";
+import { generateSwaggerSpec } from "@/lib/swagger";
 
-export async function GET() {
-  return NextResponse.json(swaggerSpec);
+function loadSwaggerSpec() {
+  const specPath = join(process.cwd(), "public", "openapi.json");
+  if (existsSync(specPath)) {
+    return JSON.parse(readFileSync(specPath, "utf8"));
+  }
+  return generateSwaggerSpec();
 }
 
+export async function GET() {
+  return NextResponse.json(loadSwaggerSpec());
+}
