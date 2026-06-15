@@ -9,7 +9,12 @@ function getClientIp(request: NextRequest) {
   );
 }
 
+function isApiDocsPath(pathname: string) {
+  return pathname === "/api-docs" || pathname === "/swagger-ui.html";
+}
+
 function applySecurityHeaders(response: NextResponse, request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
   const protocol = request.headers.get("x-forwarded-proto");
 
   if (protocol === "https") {
@@ -20,7 +25,10 @@ function applySecurityHeaders(response: NextResponse, request: NextRequest) {
   }
 
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set(
+    "X-Frame-Options",
+    isApiDocsPath(pathname) ? "SAMEORIGIN" : "DENY"
+  );
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set(
     "Permissions-Policy",

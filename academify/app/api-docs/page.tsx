@@ -1,9 +1,9 @@
+import SwaggerUi from "./swagger-ui";
+
 export default function ApiDocs() {
   return (
-    <iframe
-      src="/swagger-ui.html"
-      title="Academify API Documentation"
-      className="min-h-screen w-full border-0 bg-white"
-    />
+    <div className="min-h-screen bg-[#fafafa]">
+      <SwaggerUi />
+    </div>
   );
 }
