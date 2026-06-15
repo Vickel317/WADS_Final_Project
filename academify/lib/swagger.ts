@@ -318,4 +318,6 @@ const options = {
   apis: ["./lib/swagger-paths.ts", "./app/api/**/*.ts"],
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+export function generateSwaggerSpec() {
+  return swaggerJsdoc(options);
+}

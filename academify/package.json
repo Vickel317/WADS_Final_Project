@@ -7,6 +7,8 @@
     "dev": "next dev",
     "dev:socket": "ts-node --project tsconfig.server.json socket-server/index.ts",
     "dev:all": "concurrently -n next,socket -c cyan,magenta \"npm run dev\" \"npm run dev:socket\"",
+    "generate:swagger": "npx --yes tsx scripts/generate-swagger.ts",
+    "prebuild": "npm run generate:swagger",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
