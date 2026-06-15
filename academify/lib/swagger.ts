@@ -14,13 +14,44 @@ const options = {
         url: "http://localhost:3000",
         description: "Development server",
       },
+      {
+        url: "https://e2526-wads-b4ac-02.csbihub.id",
+        description: "Production server",
+      },
+    ],
+    tags: [
+      { name: "Authentication", description: "Better Auth session and sign-in" },
+      { name: "Users", description: "User profiles and connections" },
+      { name: "Profile", description: "Onboarding and profile setup" },
+      { name: "Search", description: "Global search" },
+      { name: "Categories", description: "Forum hubs (legacy /categories path)" },
+      { name: "Forums", description: "Forum membership and threads" },
+      { name: "Posts", description: "Threads and likes" },
+      { name: "Comments", description: "Comment likes" },
+      { name: "Messages", description: "DMs and collab-space chat" },
+      { name: "Events", description: "Study events and RSVP" },
+      { name: "Files", description: "File library and sharing" },
+      { name: "Storage", description: "MinIO uploads and presign" },
+      { name: "Collaboration", description: "Collab spaces" },
+      { name: "AI", description: "Moderation, recommendations, summarization" },
+      { name: "Moderation", description: "Moderator queue and actions" },
+      { name: "Reports", description: "User reports" },
+      { name: "Admin", description: "Platform administration" },
     ],
     components: {
       securitySchemes: {
+        sessionCookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "better-auth.session_token",
+          description:
+            "HTTP-only session cookie set by Better Auth after sign-in. Sign in via the app or POST /api/auth/sign-in/email, then use Try it out from the same origin.",
+        },
         bearerAuth: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
+          description: "Legacy alias — Academify uses session cookies, not Bearer JWT.",
         },
       },
       schemas: {
@@ -253,32 +284,38 @@ const options = {
         },
 
         // ── Error ─────────────────────────────────────────────
-        Error: {
+        ApiError: {
           type: "object",
           properties: {
             error: {
-              type: "string",
-              example: "An error occurred",
+              type: "object",
+              properties: {
+                code: {
+                  type: "string",
+                  example: "UNAUTHORIZED",
+                },
+                message: {
+                  type: "string",
+                  example: "Not authenticated",
+                },
+                details: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      field: { type: "string" },
+                      message: { type: "string" },
+                    },
+                  },
+                },
+              },
             },
           },
         },
       },
     },
-    security: [{ bearerAuth: [] }],
   },
-  apis: [
-    "./app/api/auth/**/*.ts",
-    "./app/api/posts/**/*.ts",
-    "./app/api/comments/**/*.ts",
-    "./app/api/files/**/*.ts",
-    "./app/api/messages/**/*.ts",
-    "./app/api/events/**/*.ts",
-    "./app/api/users/**/*.ts",
-    "./app/api/categories/**/*.ts",
-    "./app/api/reports/**/*.ts",
-    "./app/api/moderation/**/*.ts",
-    "./app/api/admin/**/*.ts",
-  ],
+  apis: ["./lib/swagger-paths.ts", "./app/api/**/*.ts"],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
