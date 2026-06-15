@@ -1,11 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { useCurrentUser } from "@/components/current-user-context";
 import { useSidebarLayout } from "@/components/sidebar-layout-context";
-import { canCreateForum } from "@/lib/forum-access";
 
 const primaryNav = [
   {
@@ -138,16 +136,11 @@ export default function Sidebar() {
   const currentUser = useCurrentUser();
   const { collapsed, mobileOpen, setMobileOpen } = useSidebarLayout();
   const pathname = usePathname();
-  const [forumOpen, setForumOpen] = useState(false);
-  const [forumName, setForumName] = useState("");
-  const [forumDescription, setForumDescription] = useState("");
-  const [creatingForum, setCreatingForum] = useState(false);
-  const [forumNameError, setForumNameError] = useState<string | null>(null);
 
   const roleNav = useMemo(() => {
     const role = currentUser?.role ?? "";
     const items: { href: string; label: string; icon: React.ReactNode }[] = [];
-    if (role === "moderator") {
+    if (role === "admin" || (currentUser?.moderatedForumIds?.length ?? 0) > 0) {
       items.push({
         href: "/moderation/queue",
         label: "Moderation",
@@ -181,7 +174,7 @@ export default function Sidebar() {
       });
     }
     return items;
-  }, [currentUser?.role]);
+  }, [currentUser?.role, currentUser?.moderatedForumIds]);
 
   const isActive = (href: string) => {
     if (href === "/dashboard") {
@@ -203,7 +196,6 @@ export default function Sidebar() {
   }, [mobileOpen, setMobileOpen]);
 
   const closeMobile = () => setMobileOpen(false);
-  const showCreateForum = canCreateForum(currentUser?.role);
 
   return (
     <>
@@ -232,26 +224,6 @@ export default function Sidebar() {
                 onNavigate={closeMobile}
               />
             ))}
-            {showCreateForum && !collapsed && (
-              <button
-                type="button"
-                onClick={() => setForumOpen(true)}
-                className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-              >
-                <Plus className="w-5 h-5 shrink-0" />
-                Create forum
-              </button>
-            )}
-            {showCreateForum && collapsed && (
-              <button
-                type="button"
-                onClick={() => setForumOpen(true)}
-                className="mt-1 flex w-full items-center justify-center rounded-lg px-2 py-2.5 text-gray-600 hover:bg-gray-50"
-                title="Create forum"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            )}
           </NavSection>
 
           <div className="border-t border-gray-100 pt-3">
@@ -285,85 +257,6 @@ export default function Sidebar() {
           )}
         </nav>
       </aside>
-
-      {forumOpen && (
-        <div
-          className="fixed inset-0 z-60 bg-black/40 p-4 flex items-center justify-center"
-          onClick={() => setForumOpen(false)}
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-900">Create forum</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Forums should be course/topic based and meaningful (e.g. Computer Science).
-            </p>
-            <label className="mt-4 block text-xs font-medium text-gray-600">Forum name</label>
-            <input
-              value={forumName}
-              onChange={(e) => {
-                setForumName(e.target.value);
-                setForumNameError(null);
-              }}
-              placeholder="e.g. Computer Science"
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            />
-            {forumNameError && <p className="mt-1 text-xs text-red-500">{forumNameError}</p>}
-            <p className="mt-1 text-xs text-gray-400">
-              Letters, numbers, spaces, hyphens, apostrophes, and ampersands only.
-            </p>
-            <label className="mt-3 block text-xs font-medium text-gray-600">Description</label>
-            <textarea
-              value={forumDescription}
-              onChange={(e) => setForumDescription(e.target.value)}
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                onClick={() => setForumOpen(false)}
-                className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={creatingForum}
-                onClick={async () => {
-                  if (!forumName.trim()) return;
-                  if (!/^[a-zA-Z0-9\s&'-]+$/.test(forumName.trim()) || forumName.trim().length < 2) {
-                    setForumNameError(
-                      "Name can only contain letters, numbers, spaces, hyphens, apostrophes, and ampersands."
-                    );
-                    return;
-                  }
-                  setCreatingForum(true);
-                  try {
-                    const res = await fetch("/api/categories", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({
-                        name: forumName.trim(),
-                        description: forumDescription.trim() || "Forum topic",
-                        slug: forumName.trim().toLowerCase().replace(/\s+/g, "-"),
-                      }),
-                    });
-                    if (!res.ok) throw new Error();
-                    setForumOpen(false);
-                    setForumName("");
-                    setForumDescription("");
-                  } catch {
-                    alert("Failed to create forum.");
-                  } finally {
-                    setCreatingForum(false);
-                  }
-                }}
-                className="rounded-lg bg-teal-600 px-3 py-2 text-sm text-white disabled:opacity-60"
-              >
-                {creatingForum ? "Creating..." : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

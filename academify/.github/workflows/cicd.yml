@@ -40,6 +40,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Build
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?sslmode=disable
+          BETTER_AUTH_SECRET: ci-build-placeholder-not-used-at-runtime
+        run: npm run build
+
       - name: Test (with coverage log)
         env:
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?sslmode=disable
@@ -54,11 +60,58 @@ jobs:
           retention-days: 7
 
   # =========================================================================
+  #  JOB 1b – Integration tests (real PostgreSQL)
+  # =========================================================================
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: academify_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d academify_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma migrate (test database)
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/academify_test?sslmode=disable
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/academify_test?sslmode=disable
+        run: npx prisma migrate deploy
+
+      - name: Integration tests
+        env:
+          TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/academify_test?sslmode=disable
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/academify_test?sslmode=disable
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/academify_test?sslmode=disable
+        run: npm run test:integration
+
+  # =========================================================================
   #  JOB 2 – Build Docker image and push to Docker Hub
   # =========================================================================
   build:
     name: Build & Push Image
-    needs: quality
+    needs: [quality, integration]
     runs-on: ubuntu-latest
 
     steps:
@@ -88,12 +141,6 @@ jobs:
             NEXT_PUBLIC_API_DOCS_ENABLED=${{ secrets.NEXT_PUBLIC_API_DOCS_ENABLED }}
             NEXT_PUBLIC_BETTER_AUTH_URL=${{ secrets.NEXT_PUBLIC_BETTER_AUTH_URL }}
             NEXT_PUBLIC_SOCKET_URL=${{ secrets.NEXT_PUBLIC_SOCKET_URL }}
-            NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-            NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-            NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
 
       - name: Build and Push Socket Image
         uses: docker/build-push-action@v6
@@ -146,13 +193,8 @@ jobs:
           BETTER_AUTH_URL=${{ secrets.BETTER_AUTH_URL }}
           NEXT_PUBLIC_BETTER_AUTH_URL=${{ secrets.NEXT_PUBLIC_BETTER_AUTH_URL }}
 
-          FIREBASE_WEB_API_KEY=${{ secrets.FIREBASE_WEB_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
 
           NEXT_PUBLIC_MINIO=${{ secrets.NEXT_PUBLIC_MINIO }}
           MINIO_ENDPOINT=${{ secrets.MINIO_ENDPOINT }}

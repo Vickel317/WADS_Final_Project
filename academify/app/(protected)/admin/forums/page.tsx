@@ -204,7 +204,13 @@ export default function AdminForumsPage() {
                     />
                   </div>
                   <p className="text-xs text-gray-500">ID: {forum.id} · Slug: {forum.slug}</p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`/admin/forums/${forum.id}/members`}
+                      className="rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                    >
+                      Manage members
+                    </a>
                     <button
                       onClick={() => saveForum(forum.id)}
                       disabled={updatingId === forum.id}

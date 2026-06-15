@@ -19,11 +19,14 @@ jest.mock("@/lib/prisma", () => ({
     user: { findUnique: jest.fn().mockResolvedValue({ name: "Test User", role: "STUDENT" }) },
     eventAttendee: { count: jest.fn() },
     file: { count: jest.fn(), findMany: jest.fn() },
-    spaceMember: { count: jest.fn() },
+    spaceMember: { count: jest.fn(), findMany: jest.fn() },
     follow: { count: jest.fn() },
     event: { findMany: jest.fn() },
     collabSpace: { findMany: jest.fn() },
     message: { findMany: jest.fn() },
+    forumMember: { findMany: jest.fn() },
+    post: { findMany: jest.fn() },
+    comment: { findMany: jest.fn() },
   },
 }));
 
@@ -45,8 +48,12 @@ describe("DashboardPage", () => {
     (prisma.follow.count as jest.Mock).mockResolvedValue(4);
     (prisma.event.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.file.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.collabSpace.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.spaceMember.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.message.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.forumMember.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.post.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comment.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.collabSpace.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   it("redirects to login when unauthenticated", async () => {
@@ -61,8 +68,8 @@ describe("DashboardPage", () => {
 expect(screen.getByRole("heading", { name: /test user/i })).toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: /browse forums/i })).toHaveAttribute("href", "/forums");
-expect(screen.getByRole("heading", { name: /my events/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /recent chats/i })).toBeInTheDocument();
-
+    expect(screen.getByRole("heading", { name: /my events/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /messages/i })).toBeInTheDocument();
+    expect(screen.getByText(/your forums/i)).toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ReportStatus } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalString } from "@/lib/validation";
+import { resolveReportTarget } from "@/lib/report-target";
 
 
 
@@ -92,22 +93,16 @@ export async function PUT(
       },
     });
 
+    const target = resolveReportTarget(updated);
+
     return NextResponse.json(
       {
         message: "Report marked as reviewed",
         report: {
           id: updated.reportreviewID,
           reportedBy: updated.reporterID,
-          targetType: updated.reportedPostID
-            ? "post"
-            : updated.reportedCommentID
-              ? "comment"
-              : "user",
-          targetId:
-            updated.reportedPostID ||
-            updated.reportedCommentID ||
-            updated.reportedUserID ||
-            "",
+          targetType: target.targetType,
+          targetId: target.targetId,
           reason: updated.reason,
           status: "reviewed",
           reviewNote: reviewNote.value || "",

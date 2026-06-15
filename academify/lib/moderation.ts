@@ -2,6 +2,11 @@ import { ActionType, ModerationStatus, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { appendModerationLog, type ModerationLogEntry } from "@/lib/moderation-log-store";
 import { sanitizeText } from "@/lib/sanitization";
+import {
+  canAccessModerationQueue,
+  canModerateForumContent,
+  isPlatformAdmin,
+} from "@/lib/forum-permissions";
 
 export const MODERATION_QUEUE_STATUSES = [
   ModerationStatus.PENDING,
@@ -9,10 +14,12 @@ export const MODERATION_QUEUE_STATUSES = [
   ModerationStatus.BLOCKED,
 ] as const;
 
+/** Platform-wide moderation (admin only). */
 export function hasModerationAccess(role?: string | null) {
-  const normalized = String(role ?? "").toLowerCase();
-  return normalized === "moderator" || normalized === "admin";
+  return isPlatformAdmin(role);
 }
+
+export { canAccessModerationQueue, canModerateForumContent };
 
 export function isRestrictedAccount(
   account?: { accountStatus?: UserStatus | string | null; isShadowBanned?: boolean | null } | null

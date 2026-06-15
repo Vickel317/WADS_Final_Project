@@ -120,6 +120,26 @@ io.on("connection", (socket) => {
     emitToUser(to, "stop_typing", { from: myUserId });
   });
 
+  socket.on(
+    "space_typing",
+    ({ spaceId, name }: { spaceId: string; name?: string }) => {
+      if (!myUserId || !spaceId) return;
+      socket.to(getSpaceRoom(spaceId)).emit("space_typing", {
+        spaceId,
+        userId: myUserId,
+        name,
+      });
+    }
+  );
+
+  socket.on("space_stop_typing", ({ spaceId }: { spaceId: string }) => {
+    if (!myUserId || !spaceId) return;
+    socket.to(getSpaceRoom(spaceId)).emit("space_stop_typing", {
+      spaceId,
+      userId: myUserId,
+    });
+  });
+
   socket.on("check_online", (userId: string, callback: (online: boolean) => void) => {
     if (typeof callback === "function") {
       callback(userSockets.has(userId));

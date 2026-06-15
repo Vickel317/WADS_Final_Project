@@ -11,6 +11,6 @@ describe("CollaborationPage", () => {
     expect(collabHits.length).toBeGreaterThan(0);
     await screen.findByText(/team workspaces inside forums/i);
     await screen.findByRole("heading", { name: /active spaces/i });
-    await screen.findByText(/live activity/i);
+    await screen.findByText(/collaboration rules/i);
   });
 });

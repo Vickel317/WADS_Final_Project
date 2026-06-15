@@ -4,6 +4,7 @@ import { getSession } from "@/lib/get-session";
 import { ProtectedShell } from "@/components/protected-shell";
 import { CurrentUserProvider } from "@/components/current-user-context";
 import { resolveAvatarUrl } from "@/lib/avatar-url";
+import { getModeratedForumIds } from "@/lib/forum-permissions";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const sessionData = await getSession();
@@ -16,11 +17,13 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   }
 
   const { user } = sessionData;
+  const moderatedForumIds = await getModeratedForumIds(user.userId);
   const currentUser = {
     userId: user.userId,
     name: user.name,
     avatarUrl: resolveAvatarUrl(user.userId, user.avatarUrl),
     role: user.role.toLowerCase(),
+    moderatedForumIds,
   };
 
   // Intercept for forced profile setup

@@ -7,7 +7,7 @@ import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 
 
-const VALID_ROLES = ["student", "moderator", "admin"];
+const VALID_ROLES = ["student", "lecturer", "admin"];
 
 /**
  * @swagger
@@ -33,8 +33,8 @@ const VALID_ROLES = ["student", "moderator", "admin"];
  *             properties:
  *               role:
  *                 type: string
- *                 enum: [student, moderator, admin]
- *                 example: moderator
+ *                 enum: [student, lecturer, admin]
+ *                 example: lecturer
  *     responses:
  *       200:
  *         description: User role updated successfully

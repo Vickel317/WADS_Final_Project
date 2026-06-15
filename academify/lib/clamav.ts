@@ -58,6 +58,13 @@ async function runClamscanOnFile(filePath: string): Promise<ClamScanResult> {
             }
             return resolve({ ok: true, infected: true, virusName: "Unknown" });
           }
+          if (
+            process.env.NODE_ENV !== "production" &&
+            (/ENOENT|not recognized|cannot find/i.test(output) || /ENOENT|not recognized|cannot find/i.test(err.message))
+          ) {
+            console.warn("ClamAV not available in development — skipping virus scan");
+            return resolve({ ok: true, infected: false });
+          }
           return resolve({ ok: false, error: `ClamAV scan failed: ${output || err.message}` });
         }
 
@@ -92,8 +99,7 @@ export async function scanBytesWithClamAV(
 
 export async function scanObjectFromMinio(objectKey: string, fileName: string): Promise<ClamScanResult> {
   const { body } = await getObjectBytes(objectKey);
-  // getObjectBytes returns streaming body; normalize to Buffer/Uint8Array
-  const bytes = Buffer.from(await (body as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer());
+  const bytes = Buffer.from(await body.transformToByteArray());
   return scanBytesWithClamAV(bytes, fileName);
 }
 

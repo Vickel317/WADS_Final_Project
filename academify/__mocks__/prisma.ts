@@ -29,6 +29,8 @@ export const prisma = {
   spaceMember: makeMock(),
   follow: makeMock(),
   collabSpace: makeMock(),
+  forumMember: makeMock(),
+  forumModerator: makeMock(),
 
   $transaction: jest.fn(),
   $connect: jest.fn(),

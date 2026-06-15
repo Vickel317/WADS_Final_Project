@@ -163,6 +163,13 @@ async function updateUserProfile(
         (body as { educationLevel?: unknown }).educationLevel
     );
     const skillsRaw = (body as { skills?: unknown }).skills;
+    const department = parseOptionalString((body as { department?: unknown }).department);
+    const consultationHours = parseOptionalString(
+      (body as { consultationHours?: unknown }).consultationHours
+    );
+    const specializationsRaw = (body as { specializations?: unknown }).specializations;
+    const verifiedPublicationsRaw = (body as { verifiedPublications?: unknown }).verifiedPublications;
+    const askMeAboutRaw = (body as { askMeAbout?: unknown }).askMeAbout;
     const errors = [] as Array<{ field?: string; message: string }>;
 
     if (name.error) errors.push({ field: "name", message: `name ${name.error}` });
@@ -172,11 +179,27 @@ async function updateUserProfile(
     if (location.error) errors.push({ field: "location", message: `location ${location.error}` });
     if (website.error) errors.push({ field: "website", message: `website ${website.error}` });
     if (year.error) errors.push({ field: "educationLevel", message: `educationLevel ${year.error}` });
+    if (department.error) errors.push({ field: "department", message: `department ${department.error}` });
+    if (consultationHours.error) {
+      errors.push({ field: "consultationHours", message: `consultationHours ${consultationHours.error}` });
+    }
     if (skillsRaw !== undefined && !Array.isArray(skillsRaw)) {
       errors.push({ field: "skills", message: "skills must be an array of strings" });
     }
     if (Array.isArray(skillsRaw) && skillsRaw.some((skill) => typeof skill !== "string")) {
       errors.push({ field: "skills", message: "skills must be an array of strings" });
+    }
+    for (const [field, value] of [
+      ["specializations", specializationsRaw],
+      ["verifiedPublications", verifiedPublicationsRaw],
+      ["askMeAbout", askMeAboutRaw],
+    ] as const) {
+      if (value !== undefined && !Array.isArray(value)) {
+        errors.push({ field, message: `${field} must be an array of strings` });
+      }
+      if (Array.isArray(value) && value.some((item) => typeof item !== "string")) {
+        errors.push({ field, message: `${field} must be an array of strings` });
+      }
     }
 
     if (errors.length) {
@@ -192,6 +215,11 @@ async function updateUserProfile(
       website?: string | null;
       academicLevel?: string | null;
       skillTags?: string[];
+      department?: string | null;
+      consultationHours?: string | null;
+      specializations?: string[];
+      verifiedPublications?: string[];
+      askMeAbout?: string[];
     } = {};
     if (name.value !== undefined) updates.name = name.value;
     if (major.value !== undefined) updates.major = major.value;
@@ -207,6 +235,19 @@ async function updateUserProfile(
     }
     if (Array.isArray(skillsRaw)) {
       updates.skillTags = skillsRaw.map((skill) => skill.trim()).filter(Boolean);
+    }
+    if (department.value !== undefined) updates.department = department.value || null;
+    if (consultationHours.value !== undefined) {
+      updates.consultationHours = consultationHours.value || null;
+    }
+    if (Array.isArray(specializationsRaw)) {
+      updates.specializations = specializationsRaw.map((item) => item.trim()).filter(Boolean);
+    }
+    if (Array.isArray(verifiedPublicationsRaw)) {
+      updates.verifiedPublications = verifiedPublicationsRaw.map((item) => item.trim()).filter(Boolean);
+    }
+    if (Array.isArray(askMeAboutRaw)) {
+      updates.askMeAbout = askMeAboutRaw.map((item) => item.trim()).filter(Boolean);
     }
 
     if (Object.keys(updates).length === 0) {

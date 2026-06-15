@@ -3,7 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { getRecentModerationLogs } from "@/lib/moderation-log-store";
-import { hasModerationAccess } from "@/lib/moderation";
+import { canAccessModerationQueue } from "@/lib/moderation";
 
 
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (!hasModerationAccess(decoded.role)) {
+    if (!(await canAccessModerationQueue(decoded.id, decoded.role))) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",

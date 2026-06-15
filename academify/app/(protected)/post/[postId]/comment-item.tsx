@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import CommentForm from "./comment-form";
 import CommentActions from "./comment-actions";
+import CommentLikeButton from "./comment-like-button";
 
 type CommentData = {
   id: string;
@@ -19,21 +20,20 @@ type CommentData = {
 export default function CommentItem({
   comment,
   currentUserId,
-  currentRole,
+  canModerate = false,
   depth = 0,
 }: {
   comment: CommentData;
   currentUserId: string;
-  currentRole: string;
+  canModerate?: boolean;
   depth?: number;
 }) {
   const [replying, setReplying] = useState(false);
   const maxDepth = 3;
 
-  const isModOrAdmin = currentRole === "admin" || currentRole === "moderator";
   const isAuthor = comment.authorId === currentUserId;
   const canEdit = isAuthor;
-  const canDelete = isAuthor || isModOrAdmin;
+  const canDelete = isAuthor || canModerate;
 
   return (
     <div className={depth > 0 ? "ml-6 mt-3 border-l-2 border-gray-100 pl-4" : ""}>
@@ -45,6 +45,7 @@ export default function CommentItem({
         </div>
         <p className="mt-2 text-sm text-gray-700">{comment.content}</p>
         <div className="mt-2 flex items-center gap-2">
+          <CommentLikeButton commentId={comment.id} />
           {depth < maxDepth && (
             <button
               onClick={() => setReplying(!replying)}
@@ -80,7 +81,7 @@ export default function CommentItem({
               key={reply.id}
               comment={reply}
               currentUserId={currentUserId}
-              currentRole={currentRole}
+              canModerate={canModerate}
               depth={depth + 1}
             />
           ))}

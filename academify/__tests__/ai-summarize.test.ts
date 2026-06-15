@@ -26,6 +26,9 @@ jest.mock("@/lib/prisma", () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    comment: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   },
 }));
 
@@ -46,6 +49,9 @@ describe("GET /api/ai/summarize/[postId]", () => {
   beforeEach(() => {
     resetAiRateLimitsForTests();
     jest.clearAllMocks();
+    (prisma.comment.findMany as jest.Mock).mockResolvedValue([
+      { content: "First reply", createdAt: new Date(), _count: { likes: 0 } },
+    ]);
   });
 
   it("returns 404 for hidden posts when viewer is not allowed", async () => {
@@ -120,6 +126,7 @@ describe("GET /api/ai/summarize/[postId]", () => {
     expect(response.status).toBe(200);
     expect(body.summary).toBe("Fresh summary");
     expect(body.cached).toBe(false);
+    expect(body.commentCount).toBe(1);
     expect(body.model).toBe("llama3.1:8b");
     expect(ollamaGenerate).toHaveBeenCalledTimes(1);
     expect(prisma.post.update).toHaveBeenCalledWith(
@@ -131,5 +138,66 @@ describe("GET /api/ai/summarize/[postId]", () => {
         }),
       })
     );
+  });
+
+  it("bypasses cache when refresh=1", async () => {
+    (verifyToken as jest.Mock).mockResolvedValue({
+      id: "user_author",
+      role: "student",
+    });
+    (prisma.post.findUnique as jest.Mock).mockResolvedValue({
+      ...basePost,
+      moderationStatus: ModerationStatus.APPROVED,
+      summaryJson: {
+        summary: "Cached summary",
+        keyPoints: ["Point A"],
+        openQuestions: [],
+      },
+      summaryAt: new Date("2026-06-14T10:00:00.000Z"),
+      summaryCommentCount: 1,
+    });
+    (ollamaGenerate as jest.Mock).mockResolvedValue({
+      summary: "Regenerated summary",
+      keyPoints: ["New point"],
+      openQuestions: [],
+    });
+    (prisma.post.update as jest.Mock).mockResolvedValue({});
+
+    const request = new NextRequest("http://localhost/api/ai/summarize/post_1?refresh=1");
+    const response = await summarizeGet(request, {
+      params: Promise.resolve({ postId: "post_1" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.summary).toBe("Regenerated summary");
+    expect(body.cached).toBe(false);
+    expect(ollamaGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it("strips empty open questions from AI output", async () => {
+    (verifyToken as jest.Mock).mockResolvedValue({
+      id: "user_author",
+      role: "student",
+    });
+    (prisma.post.findUnique as jest.Mock).mockResolvedValue({
+      ...basePost,
+      moderationStatus: ModerationStatus.APPROVED,
+    });
+    (ollamaGenerate as jest.Mock).mockResolvedValue({
+      summary: "Summary",
+      keyPoints: ["Point"],
+      openQuestions: ["", "  "],
+    });
+    (prisma.post.update as jest.Mock).mockResolvedValue({});
+
+    const request = new NextRequest("http://localhost/api/ai/summarize/post_1");
+    const response = await summarizeGet(request, {
+      params: Promise.resolve({ postId: "post_1" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.openQuestions).toEqual([]);
   });
 });

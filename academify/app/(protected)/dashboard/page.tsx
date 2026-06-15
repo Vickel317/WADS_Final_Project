@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/get-session";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/slugify";
+import { getRecentForumsForUser } from "@/lib/recent-forums";
 import DashboardCalendar from "@/components/dashboard-calendar";
 
 const fileIconColor: Record<string, { bg: string; text: string }> = {
@@ -62,8 +63,8 @@ export default async function DashboardPage() {
     connectionsCount,
     upcomingEvents,
     recentFiles,
-    collabSpaces,
     recentMessages,
+    recentForums,
     user,
   ] = await Promise.all([
     prisma.eventAttendee.count({ where: { userID: userId } }),
@@ -96,47 +97,75 @@ export default async function DashboardPage() {
       take: 5,
       select: { fileID: true, fileName: true, fileType: true, fileSize: true, updatedAt: true },
     }),
-    prisma.collabSpace.findMany({
-      where: { members: { some: { userID: userId } } },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        spaceID: true,
-        name: true,
-        forum: { select: { name: true } },
-        _count: { select: { members: true } },
-      },
-    }),
     prisma.message.findMany({
       where: { OR: [{ senderID: userId }, { receiverID: userId }] },
       orderBy: { sentAt: "desc" },
-      take: 40,
+      take: 60,
       include: {
-        sender: { select: { userId: true, name: true } },
-        receiver: { select: { userId: true, name: true } },
+        sender: { select: { userId: true, name: true, avatarUrl: true } },
+        receiver: { select: { userId: true, name: true, avatarUrl: true } },
       },
     }),
+    getRecentForumsForUser(userId, 5),
     prisma.user.findUnique({
       where: { userId },
       select: { name: true, role: true },
     }),
   ]);
 
+  const userSpaces = await prisma.spaceMember.findMany({
+    where: { userID: userId },
+    select: { spaceID: true },
+  });
+  const spaceIds = userSpaces.map((s) => s.spaceID);
+  const spaces =
+    spaceIds.length > 0
+      ? await prisma.collabSpace.findMany({
+          where: { spaceID: { in: spaceIds } },
+          select: { spaceID: true, name: true },
+        })
+      : [];
+  const spaceNameById = new Map(spaces.map((s) => [s.spaceID, s.name]));
+
   const conversationMap = new Map<
     string,
-    { userId: string; name: string; lastMessage: string; lastAt: Date; unread: boolean }
+    {
+      userId: string;
+      kind: "direct" | "space";
+      name: string;
+      lastMessage: string;
+      lastAt: Date;
+      unread: boolean;
+    }
   >();
 
   for (const message of recentMessages) {
+    if (message.senderID === userId && message.receiverID === userId) continue;
+
+    const spaceId = message.spaceID ?? null;
+    if (spaceId) {
+      const convKey = `space-${spaceId}`;
+      if (!conversationMap.has(convKey)) {
+        conversationMap.set(convKey, {
+          userId: convKey,
+          kind: "space",
+          name: spaceNameById.get(spaceId) ?? "Collab space",
+          lastMessage: message.content,
+          lastAt: message.sentAt,
+          unread: message.receiverID === userId && !message.read,
+        });
+      }
+      continue;
+    }
+
     const partnerId =
       message.senderID === userId ? message.receiverID : message.senderID;
     const partnerName =
-      message.senderID === userId
-        ? message.receiver.name
-        : message.sender.name;
+      message.senderID === userId ? message.receiver.name : message.sender.name;
     if (!conversationMap.has(partnerId)) {
       conversationMap.set(partnerId, {
         userId: partnerId,
+        kind: "direct",
         name: partnerName,
         lastMessage: message.content,
         lastAt: message.sentAt,
@@ -145,9 +174,23 @@ export default async function DashboardPage() {
     }
   }
 
-  const recentChats = Array.from(conversationMap.values())
+  for (const space of spaces) {
+    const convKey = `space-${space.spaceID}`;
+    if (!conversationMap.has(convKey)) {
+      conversationMap.set(convKey, {
+        userId: convKey,
+        kind: "space",
+        name: space.name,
+        lastMessage: "No messages yet",
+        lastAt: new Date(0),
+        unread: false,
+      });
+    }
+  }
+
+  const recentConversations = Array.from(conversationMap.values())
     .sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime())
-    .slice(0, 5);
+    .slice(0, 6);
 
   const greeting = (() => {
     const hour = new Date().getHours();
@@ -218,22 +261,24 @@ export default async function DashboardPage() {
           <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/20" />
           <div className="absolute -left-4 -bottom-4 w-28 h-28 rounded-full bg-white/15" />
         </div>
-        <div className="relative z-10">
-          <p className="text-sm font-medium text-white/80">{greeting}</p>
-          <h1 className="text-2xl font-bold mt-1">{user?.name ?? "Dashboard"}</h1>
-          <p className="text-sm text-white/70 mt-2 max-w-lg">
-            Your calendar, files, collab spaces, and chats — all in one place.
-          </p>
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white/80">{greeting}</p>
+            <h1 className="text-2xl font-bold mt-1">{user?.name ?? "Dashboard"}</h1>
+            <p className="text-sm text-white/70 mt-2 max-w-lg">
+              Your calendar, files, forums, and messages — all in one place.
+            </p>
+          </div>
+          <Link
+            href="/forums"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/25 shrink-0"
+          >
+            Browse forums
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </Link>
         </div>
-        <Link
-          href="/forums"
-          className="absolute right-6 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/25"
-        >
-          Browse forums
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </Link>
       </div>
 
       {/* Stats row */}
@@ -308,7 +353,66 @@ export default async function DashboardPage() {
           </Link>
         </section>
 
-        {/* Recent chats */}
+        {/* Your forums */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <SectionHeader
+            icon={
+              <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            }
+            title="Your forums"
+            subtitle="Forums you've joined or visited recently"
+          />
+          <ul className="mt-4 space-y-2">
+            {recentForums.length === 0 ? (
+              <li className="py-8 text-center">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                  style={{ background: "linear-gradient(135deg, #ccfbf1, #99f6e4)" }}
+                >
+                  <svg className="w-6 h-6 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                </div>
+                <p className="text-sm text-gray-500 font-medium">No forums yet</p>
+                <p className="text-xs text-gray-400 mt-1">Join a forum to see it here</p>
+              </li>
+            ) : (
+              recentForums.map((forum) => (
+                <li key={forum.forumID}>
+                  <Link
+                    href={`/forums/${forum.slug}`}
+                    className="group flex items-center gap-3 rounded-xl border border-gray-50 p-3.5 transition hover:border-teal-200 hover:shadow-sm"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-sm shrink-0">
+                      {forum.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 group-hover:text-teal-700 transition truncate">
+                        {forum.name}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Active {formatDistanceToNow(forum.lastActivityAt, { addSuffix: true })}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))
+            )}
+          </ul>
+          <Link
+            href="/forums"
+            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline transition"
+          >
+            Browse all forums
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </section>
+
+        {/* Messages — DMs + collab space chats */}
         <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <SectionHeader
             icon={
@@ -316,11 +420,11 @@ export default async function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             }
-            title="Recent chats"
-            subtitle="Your latest conversations"
+            title="Messages"
+            subtitle="Direct chats and collab space conversations"
           />
           <ul className="mt-4 space-y-2">
-            {recentChats.length === 0 ? (
+            {recentConversations.length === 0 ? (
               <li className="py-8 text-center">
                 <div
                   className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
@@ -331,28 +435,39 @@ export default async function DashboardPage() {
                   </svg>
                 </div>
                 <p className="text-sm text-gray-500 font-medium">No messages yet</p>
-                <p className="text-xs text-gray-400 mt-1">Start a conversation from a profile</p>
+                <p className="text-xs text-gray-400 mt-1">Start a chat or join a collab space</p>
               </li>
             ) : (
-              recentChats.map((chat) => (
+              recentConversations.map((chat) => (
                 <li key={chat.userId}>
                   <Link
                     href={`/messages/${chat.userId}`}
                     className="group flex items-center gap-3 rounded-xl border border-gray-50 p-3.5 transition hover:border-teal-200 hover:shadow-sm"
                   >
-                    <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-sm shrink-0">
-                      {chat.name.charAt(0).toUpperCase()}
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                        chat.kind === "space"
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-teal-100 text-teal-700"
+                      }`}
+                    >
+                      {chat.kind === "space" ? "#" : chat.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-gray-900 group-hover:text-teal-700 transition truncate">
                           {chat.name}
                         </p>
-                        <span className="text-[11px] text-gray-400 shrink-0">
-                          {formatDistanceToNow(chat.lastAt, { addSuffix: false })}
-                        </span>
+                        {chat.lastAt.getTime() > 0 && (
+                          <span className="text-[11px] text-gray-400 shrink-0">
+                            {formatDistanceToNow(chat.lastAt, { addSuffix: false })}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{chat.lastMessage}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                        {chat.kind === "space" ? "Collab space · " : ""}
+                        {chat.lastMessage}
+                      </p>
                     </div>
                     {chat.unread && (
                       <span className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0" />
@@ -425,68 +540,6 @@ export default async function DashboardPage() {
             className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline transition"
           >
             My uploads library
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </section>
-
-        {/* Collab spaces */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <SectionHeader
-            icon={
-              <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            }
-            title="Collab spaces"
-            subtitle="Your active workspaces"
-          />
-          <ul className="mt-4 space-y-2">
-            {collabSpaces.length === 0 ? (
-              <li className="py-8 text-center">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                  style={{ background: "linear-gradient(135deg, #ccfbf1, #99f6e4)" }}
-                >
-                  <svg className="w-6 h-6 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-500 font-medium">No collab spaces yet</p>
-                <p className="text-xs text-gray-400 mt-1">Join a space from the collaboration page</p>
-              </li>
-            ) : (
-              collabSpaces.map((space) => (
-                <li key={space.spaceID}>
-                  <Link
-                    href={`/collaboration/${space.spaceID}`}
-                    className="group block rounded-xl border border-gray-50 p-3.5 transition hover:border-teal-200 hover:shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-teal-700 transition truncate">
-                          {space.name}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">{space.forum.name}</p>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-400 shrink-0">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        <span>{space._count.members}</span>
-                      </div>
-                    </div>
-                  </Link>
-                </li>
-              ))
-            )}
-          </ul>
-          <Link
-            href="/collaboration"
-            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-600 hover:text-teal-700 hover:underline transition"
-          >
-            All collab spaces
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>

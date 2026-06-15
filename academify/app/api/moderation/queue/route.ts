@@ -3,7 +3,8 @@ import { verifyToken } from "@/lib/auth-session";
 import { ModerationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-import { hasModerationAccess, MODERATION_QUEUE_STATUSES } from "@/lib/moderation";
+import { canAccessModerationQueue, MODERATION_QUEUE_STATUSES } from "@/lib/moderation";
+import { getModeratedForumIds, isPlatformAdmin } from "@/lib/forum-permissions";
 
 
 
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (!hasModerationAccess(decoded.role)) {
+    if (!(await canAccessModerationQueue(decoded.id, decoded.role))) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",
@@ -41,8 +42,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const isAdmin = isPlatformAdmin(decoded.role);
+    const moderatedForumIds = isAdmin ? null : await getModeratedForumIds(decoded.id);
+    const forumFilter =
+      moderatedForumIds && moderatedForumIds.length > 0
+        ? { forumID: { in: moderatedForumIds } }
+        : moderatedForumIds
+          ? { forumID: { in: [] } }
+          : {};
+
     const queue = await prisma.post.findMany({
       where: {
+        ...forumFilter,
         moderationStatus: {
           in: [...MODERATION_QUEUE_STATUSES],
         },
@@ -57,6 +68,7 @@ export async function GET(request: NextRequest) {
 
     const approvedForReview = await prisma.post.findMany({
       where: {
+        ...forumFilter,
         moderationStatus: ModerationStatus.APPROVED,
         OR: [
           { aiReason: { not: null } },

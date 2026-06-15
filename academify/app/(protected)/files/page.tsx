@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Upload,
   Search,
@@ -19,8 +20,10 @@ interface FileItem {
   type: "pdf" | "zip" | "pptx" | "png" | "docx";
   size: string;
   uploadedAt: string;
+  uploadedAtMs: number;
   downloads: number;
   sharedWith?: string;
+  spaceId?: string | null;
   url: string;
 }
 
@@ -38,8 +41,15 @@ type FileApiRecord = {
   size: number;
   type: string;
   createdAt: string;
+  url?: string;
   spaceId?: string | null;
 };
+
+function spaceLabel(spaceId: string | null | undefined, spaces: CollaborationSpace[]) {
+  if (!spaceId) return undefined;
+  const space = spaces.find((s) => s.id === spaceId);
+  return space ? `In ${space.name}` : "In a collaboration space";
+}
 
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
@@ -93,30 +103,93 @@ function getFileIcon(type: FileItem["type"]) {
   }
 }
 
-function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: CollaborationSpace[]; onDelete: (id: string) => void }) {
+function FileRow({
+  file,
+  spaces,
+  onDelete,
+  onUpdate,
+}: {
+  file: FileItem;
+  spaces: CollaborationSpace[];
+  onDelete: (id: string) => void;
+  onUpdate: (id: string, patch: Partial<FileItem>) => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [shareSpace, setShareSpace] = useState<string>("");
+  const [moveSpace, setMoveSpace] = useState(file.spaceId ?? "");
+  const [renameValue, setRenameValue] = useState(file.name);
   const [shareEmail, setShareEmail] = useState<string>("");
   const [sharing, setSharing] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+
+  const updateMenuPosition = () => {
+    const button = menuButtonRef.current;
+    if (!button) return;
+    const rect = button.getBoundingClientRect();
+    const menuWidth = 160;
+    setMenuPosition({
+      top: rect.bottom + 6,
+      left: Math.max(8, rect.right - menuWidth),
+    });
+  };
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    updateMenuPosition();
+
+    const closeMenu = () => setMenuOpen(false);
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      closeMenu();
+    };
+
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", closeMenu, true);
+    document.addEventListener("mousedown", handlePointerDown);
+
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", closeMenu, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [menuOpen]);
+
+  const patchFile = async (body: { spaceId?: string | null; fileName?: string }) => {
+    const res = await fetch(`/api/files/${file.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error?.message || payload?.message || "Update failed");
+    }
+    return payload.file as { name?: string; spaceId?: string | null };
+  };
 
   const handleShare = async () => {
     if (!shareSpace) return;
 
     setSharing(true);
     try {
-      const res = await fetch(`/api/files/${file.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spaceId: shareSpace }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Unable to share file");
-      }
-
+      const updated = await patchFile({ spaceId: shareSpace });
       setShareOpen(false);
       setShareSpace("");
+      onUpdate(file.id, {
+        spaceId: updated.spaceId ?? shareSpace,
+        sharedWith: spaceLabel(updated.spaceId ?? shareSpace, spaces),
+      });
       alert("File shared to collaboration space");
     } catch {
       alert("Share failed");
@@ -125,8 +198,45 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
     }
   };
 
+  const handleRename = async () => {
+    const nextName = renameValue.trim();
+    if (!nextName) return alert("Enter a file name");
+
+    setRenaming(true);
+    try {
+      const updated = await patchFile({ fileName: nextName });
+      setRenameOpen(false);
+      setMenuOpen(false);
+      onUpdate(file.id, { name: updated.name ?? nextName });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Rename failed");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const handleMove = async () => {
+    if (!moveSpace) return alert("Select a collaboration space");
+
+    setMoving(true);
+    try {
+      const updated = await patchFile({ spaceId: moveSpace });
+      setMoveOpen(false);
+      setMenuOpen(false);
+      onUpdate(file.id, {
+        spaceId: updated.spaceId ?? moveSpace,
+        sharedWith: spaceLabel(updated.spaceId ?? moveSpace, spaces),
+      });
+      alert("File moved to collaboration space");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Move failed");
+    } finally {
+      setMoving(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 gap-3">
+    <div className="relative flex flex-col gap-3 border-b border-gray-100 px-4 py-3 transition-colors last:border-0 hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3 min-w-0">
         {getFileIcon(file.type)}
         <div className="min-w-0">
@@ -134,7 +244,7 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
           <p className="text-xs text-gray-400">
             <span className="hidden sm:inline">{file.size} • </span>Uploaded {file.uploadedAt} • {file.downloads} downloads
             {file.sharedWith && (
-              <span className="text-indigo-500"> • Shared by {file.sharedWith}</span>
+              <span className="text-indigo-500"> • {file.sharedWith}</span>
             )}
           </p>
         </div>
@@ -142,17 +252,21 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
       <div className="flex flex-wrap items-center gap-2 shrink-0 sm:ml-4">
         <button
           onClick={() => {
-            // Trigger native download/open
+            if (!file.url) {
+              alert("Download link is not available yet. Refresh the page and try again.");
+              return;
+            }
             try {
-              const a = document.createElement('a');
+              const a = document.createElement("a");
               a.href = file.url;
-              a.target = '_blank';
-              a.download = file.name || '';
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              a.download = file.name || "";
               document.body.appendChild(a);
               a.click();
               a.remove();
             } catch {
-              window.open(file.url, '_blank');
+              window.open(file.url, "_blank");
             }
           }}
           className="flex items-center gap-1 px-3 py-1.5 text-xs border border-gray-200 rounded-md hover:bg-gray-100 text-gray-600 transition-colors"
@@ -169,39 +283,150 @@ function FileRow({ file, spaces, onDelete }: { file: FileItem; spaces: Collabora
         </button>
         <div className="relative">
           <button
-            onClick={() => setMenuOpen(!menuOpen)}
+            ref={menuButtonRef}
+            type="button"
+            onClick={() => {
+              if (menuOpen) {
+                setMenuOpen(false);
+                return;
+              }
+              updateMenuPosition();
+              setMenuOpen(true);
+            }}
             className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 transition-colors"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
           >
             <MoreVertical size={16} />
           </button>
-          {menuOpen && (
-            <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-36">
-              <button className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
-                Rename
-              </button>
-              <button className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
-                Move to folder
-              </button>
-              <button
-                onClick={async () => {
-                  if (!confirm('Delete this file? This cannot be undone.')) return;
-                  try {
-                    const res = await fetch(`/api/files/${file.id}`, { method: 'DELETE', credentials: 'include' });
-                    if (!res.ok) throw new Error('Delete failed');
-                    onDelete(file.id);
-                    alert('File deleted');
-                  } catch {
-                    alert('Failed to delete file');
-                  }
-                }}
-                className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50"
+          {menuOpen && menuPosition &&
+            createPortal(
+              <div
+                ref={menuRef}
+                className="fixed z-[100] w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                style={{ top: menuPosition.top, left: menuPosition.left }}
+                role="menu"
               >
-                Delete
-              </button>
-            </div>
-          )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setRenameValue(file.name);
+                    setRenameOpen(true);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMoveSpace(file.spaceId ?? "");
+                    setMoveOpen(true);
+                    setMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Move to space
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={async () => {
+                    setMenuOpen(false);
+                    if (!confirm("Delete this file? This cannot be undone.")) return;
+                    try {
+                      const res = await fetch(`/api/files/${file.id}`, {
+                        method: "DELETE",
+                        credentials: "include",
+                      });
+                      if (!res.ok) throw new Error("Delete failed");
+                      onDelete(file.id);
+                      alert("File deleted");
+                    } catch {
+                      alert("Failed to delete file");
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>,
+              document.body
+            )}
         </div>
       </div>
+
+      {renameOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <h4 className="text-base font-semibold text-gray-900">Rename file</h4>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setRenameOpen(false)}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRename}
+                disabled={renaming}
+                className="flex-1 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {renaming ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {moveOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+            <h4 className="text-base font-semibold text-gray-900">Move to collaboration space</h4>
+            <p className="mt-1 text-sm text-gray-500">Attach this file to a space so members can access it there.</p>
+            <select
+              value={moveSpace}
+              onChange={(e) => setMoveSpace(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            >
+              <option value="">Select a space...</option>
+              {spaces.map((space) => (
+                <option key={space.id} value={space.id}>
+                  {space.name}
+                </option>
+              ))}
+            </select>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setMoveOpen(false)}
+                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleMove}
+                disabled={!moveSpace || moving}
+                className="flex-1 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {moving ? "Moving..." : "Move"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {shareOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -315,6 +540,24 @@ export default function FilesPage() {
           throw new Error(spacesPayload?.error?.message || "Failed to load collaboration spaces");
         }
 
+        const fMap: Record<string, string> = {};
+        (categoriesPayload.categories || []).forEach((c: { id: string; name: string }) => {
+          fMap[c.id] = c.name;
+        });
+
+        const loadedSpaces = (spacesPayload.spaces || []).map(
+          (space: { spaceID: string; name: string; description: string | null; forumID: string; createdAt: string }) => ({
+            id: space.spaceID,
+            name: space.name,
+            description: space.description,
+            forumID: space.forumID,
+            forumName: fMap[space.forumID] ?? space.forumID,
+            createdAt: space.createdAt,
+          })
+        );
+
+        setSpaces(loadedSpaces);
+
         setFiles(
           (filesPayload.files || []).map((file: FileApiRecord) => ({
             id: file.id,
@@ -322,24 +565,11 @@ export default function FilesPage() {
             type: normalizeFileType(file.type),
             size: formatFileSize(file.size),
             uploadedAt: new Date(file.createdAt).toLocaleDateString(),
+            uploadedAtMs: new Date(file.createdAt).getTime(),
             downloads: 0,
-            sharedWith: file.spaceId ? `Space ${file.spaceId}` : undefined,
-          }))
-        );
-
-        const fMap: Record<string, string> = {};
-        (categoriesPayload.categories || []).forEach((c: { id: string; name: string }) => {
-          fMap[c.id] = c.name;
-        });
-
-        setSpaces(
-          (spacesPayload.spaces || []).map((space: { spaceID: string; name: string; description: string | null; forumID: string; createdAt: string }) => ({
-            id: space.spaceID,
-            name: space.name,
-            description: space.description,
-            forumID: space.forumID,
-            forumName: fMap[space.forumID] ?? space.forumID,
-            createdAt: space.createdAt,
+            spaceId: file.spaceId ?? null,
+            sharedWith: spaceLabel(file.spaceId, loadedSpaces),
+            url: file.url ?? "",
           }))
         );
         setLoadError(null);
@@ -353,7 +583,15 @@ export default function FilesPage() {
     loadData();
   }, []);
 
-  const tabFiles = files;
+  const [recentCutoffMs] = useState(() => Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const tabFiles = files.filter((file) => {
+    if (activeTab === "shared") return Boolean(file.spaceId);
+    if (activeTab === "recent") {
+      return file.uploadedAtMs >= recentCutoffMs;
+    }
+    return true;
+  });
 
   const filteredFiles = tabFiles.filter((f) =>
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -367,7 +605,7 @@ export default function FilesPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
+    <div className="min-w-0 max-w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div>
@@ -457,9 +695,9 @@ export default function FilesPage() {
       </div>
 
       {/* Tabs + File List */}
-      <div className="bg-white rounded-xl border border-gray-200">
+      <div className="rounded-xl border border-gray-200 bg-white">
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 px-3 sm:px-4 overflow-x-auto">
+        <div className="flex border-b border-gray-100 px-3 sm:px-4">
           {(
             [
               { key: "my", label: "All Files" },
@@ -497,6 +735,11 @@ export default function FilesPage() {
               file={file}
               spaces={spaces}
               onDelete={(id) => setFiles((prev) => prev.filter((f) => f.id !== id))}
+              onUpdate={(id, patch) =>
+                setFiles((prev) =>
+                  prev.map((f) => (f.id === id ? { ...f, ...patch } : f))
+                )
+              }
             />
           ))
         ) : (
@@ -614,32 +857,26 @@ export default function FilesPage() {
 
                   setUploading(true);
                   try {
-                    const presignRes = await fetch('/api/storage/presign', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({ fileName: selectedFile.name, contentType: selectedFile.type }),
+                    const uploadFd = new FormData();
+                    uploadFd.append("file", selectedFile);
+
+                    const uploadRes = await fetch("/api/storage/upload", {
+                      method: "POST",
+                      credentials: "include",
+                      body: uploadFd,
                     });
 
-                    if (!presignRes.ok) {
-                      const payload = await presignRes.json().catch(() => ({}));
-                      throw new Error(payload?.error?.message || payload?.message || 'Failed to get upload URL');
+                    const uploadPayload = await uploadRes.json().catch(() => ({}));
+                    if (!uploadRes.ok) {
+                      throw new Error(
+                        uploadPayload?.error?.message ||
+                          uploadPayload?.message ||
+                          "Failed to upload file to storage"
+                      );
                     }
 
-                    const json = await presignRes.json().catch(() => ({}));
-                    const uploadUrl = json?.url;
-                    const objectKey = json?.key;
-                    if (!uploadUrl || !objectKey) throw new Error('Invalid presign response');
-
-                    const putRes = await fetch(uploadUrl, {
-                      method: 'PUT',
-                      body: selectedFile,
-                      headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
-                    });
-
-                    if (!putRes.ok) {
-                      throw new Error('Storage upload failed. File was not saved.');
-                    }
+                    const objectKey = uploadPayload?.key;
+                    if (!objectKey) throw new Error("Invalid upload response");
 
                     const createRes = await fetch('/api/files', {
                       method: 'POST',
@@ -662,9 +899,11 @@ export default function FilesPage() {
                         type: normalizeFileType(payload?.file?.type ?? selectedFile.type),
                         size: formatFileSize(payload?.file?.size ?? selectedFile.size),
                         uploadedAt: new Date(payload?.file?.createdAt ?? Date.now()).toLocaleDateString(),
+                        uploadedAtMs: new Date(payload?.file?.createdAt ?? Date.now()).getTime(),
                         downloads: 0,
-                        sharedWith: payload?.file?.spaceId ? `Space ${payload.file.spaceId}` : undefined,
-                        url: payload?.file?.url ?? '',
+                        spaceId: payload?.file?.spaceId ?? (selectedSpace || null),
+                        sharedWith: spaceLabel((payload?.file?.spaceId ?? selectedSpace) || null, spaces),
+                        url: payload?.file?.url ?? "",
                       },
                       ...prev,
                     ]);

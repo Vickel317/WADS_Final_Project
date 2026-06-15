@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import GoogleSignInButton from "@/components/google-sign-in-button";
+import OAuthErrorNotice from "@/components/oauth-error-notice";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -130,6 +132,10 @@ export default function RegisterPage() {
           </h2>
           <p className="text-gray-400 text-sm mb-6">Join the Academify student community today</p>
 
+          <Suspense fallback={null}>
+            <OAuthErrorNotice />
+          </Suspense>
+
           {errors.general && (
             <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-500 text-sm">
               {errors.general}
@@ -246,6 +252,14 @@ export default function RegisterPage() {
               ) : "Create Account"}
             </button>
           </form>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <GoogleSignInButton label="Sign up with Google" callbackURL="/setup" />
 
           <p className="text-center text-gray-400 text-sm mt-5">
             Already have an account?{" "}

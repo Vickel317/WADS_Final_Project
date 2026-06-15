@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { generateObjectKey, putObjectBytes, deleteObject } from "@/lib/storage";
+import { canManageForum } from "@/lib/forum-permissions";
 
 import { prisma } from "@/lib/prisma";
 
@@ -23,8 +24,8 @@ export async function POST(
 
     const { type, id } = await params;
 
-    if (type !== "event" && type !== "space") {
-      return apiError(400, "Invalid type. Must be 'event' or 'space'", "BAD_REQUEST");
+    if (type !== "event" && type !== "space" && type !== "forum") {
+      return apiError(400, "Invalid type. Must be 'event', 'space', or 'forum'", "BAD_REQUEST");
     }
 
     const formData = await request.formData().catch(() => null);
@@ -54,7 +55,40 @@ export async function POST(
     }
 
     try {
-      if (type === "event") {
+      if (type === "forum") {
+        const allowed = await canManageForum(session.user.userId, id, session.user.role);
+        if (!allowed) {
+          return apiError(403, "Forbidden: forum moderator access required", "FORBIDDEN");
+        }
+
+        const previous = await prisma.forumHub.findUnique({
+          where: { forumID: id },
+          select: { imageUrl: true },
+        });
+        if (!previous) {
+          return apiError(404, "Forum not found", "NOT_FOUND");
+        }
+
+        await prisma.forumHub.update({
+          where: { forumID: id },
+          data: { imageUrl: storedBannerUrl },
+        });
+
+        const prevKey = previous.imageUrl;
+        if (
+          prevKey &&
+          prevKey !== storedBannerUrl &&
+          !prevKey.startsWith("http") &&
+          !prevKey.startsWith("/") &&
+          !prevKey.startsWith("data:")
+        ) {
+          try {
+            await deleteObject(prevKey);
+          } catch {
+            /* ignore */
+          }
+        }
+      } else if (type === "event") {
         const previous = await prisma.event.findUnique({ where: { eventID: id }, select: { bannerUrl: true } });
         await prisma.event.update({ where: { eventID: id }, data: { bannerUrl: storedBannerUrl } });
         const prevKey = previous?.bannerUrl;

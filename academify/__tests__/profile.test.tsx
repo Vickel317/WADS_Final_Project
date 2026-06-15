@@ -10,7 +10,7 @@ jest.mock("next/navigation", () => ({
   useParams: () => ({ userId: mockUserId }),
 }));
 
-function makeResponse(payload: any) {
+function makeResponse(payload: unknown): Response {
   return {
     ok: true,
     status: 200,
@@ -19,7 +19,6 @@ function makeResponse(payload: any) {
     redirected: false,
     type: "basic",
     url: "",
-    useFinalURL: false,
     clone: () => makeResponse(payload),
     body: null,
     bodyUsed: false,
@@ -28,7 +27,7 @@ function makeResponse(payload: any) {
     formData: async () => new FormData(),
     json: async () => payload,
     text: async () => JSON.stringify(payload),
-  } as any;
+  } as Response;
 }
 
 
@@ -38,7 +37,7 @@ beforeEach(() => {
   jest.clearAllMocks();
 
   // Default fetch mock for ProfilePage
-  global.fetch = jest.fn((url: any) => {
+  global.fetch = jest.fn((url: RequestInfo | URL) => {
     const s = String(url);
 
     // Profile fetch

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -16,10 +16,18 @@ type SearchUser = {
   isConnected?: boolean;
 };
 
+const subscribeNoop = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+const searchInputClassName =
+  "w-full min-w-0 pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition";
+
 export default function Topbar() {
   const router = useRouter();
   const currentUser = useCurrentUser();
   const { toggleMobileOpen } = useSidebarLayout();
+  const searchMounted = useSyncExternalStore(subscribeNoop, getClientSnapshot, getServerSnapshot);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -114,18 +122,25 @@ export default function Topbar() {
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => {
-              if (results.length > 0 || loading) setShowDropdown(true);
-            }}
-            onBlur={() => {
-              setTimeout(() => setShowDropdown(false), 200);
-            }}
-            placeholder="Search people..."
-            className="w-full min-w-0 pl-9 pr-3 sm:pr-4 py-1.5 sm:py-2 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-600 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition"
-          />
+          {searchMounted ? (
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                if (results.length > 0 || loading) setShowDropdown(true);
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowDropdown(false), 200);
+              }}
+              placeholder="Search people..."
+              autoComplete="off"
+              className={searchInputClassName}
+            />
+          ) : (
+            <div className={`${searchInputClassName} text-transparent select-none`} aria-hidden>
+              Search people...
+            </div>
+          )}
 
           {showDropdown && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-xl shadow-teal-900/5 max-h-80 overflow-y-auto z-50">

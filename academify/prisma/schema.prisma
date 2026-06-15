@@ -134,8 +134,10 @@ model User {
   followers          Follow[]              @relation("Follower")
   following          Follow[]              @relation("Following")
   moderatedForums    ForumModerator[]      @relation("ForumModerators")
+  forumMemberships   ForumMember[]         @relation("ForumMembers")
   collabSpaces       SpaceMember[]         @relation("SpaceMembers")
   postLikes          PostLike[]            @relation("UserPostLikes")
+  commentLikes       CommentLike[]         @relation("UserCommentLikes")
 
   @@map("User")
 }
@@ -163,8 +165,10 @@ model ForumHub {
   // Relations
   posts        Post[]
   moderators   ForumModerator[]
+  members      ForumMember[]
   events       Event[]
   collabSpaces CollabSpace[]
+  reports      ReportReview[] @relation("ReportedForum")
 
   @@map("ForumHub")
 }
@@ -178,6 +182,19 @@ model ForumModerator {
 
   @@id([forumID, userID])
   @@map("ForumModerator")
+}
+
+model ForumMember {
+  forumID  String
+  userID   String
+  joinedAt DateTime @default(now())
+
+  forum ForumHub @relation(fields: [forumID], references: [forumID], onDelete: Cascade)
+  user  User     @relation("ForumMembers", fields: [userID], references: [userId], onDelete: Cascade)
+
+  @@id([forumID, userID])
+  @@index([userID])
+  @@map("ForumMember")
 }
 
 model CollabSpace {
@@ -257,6 +274,20 @@ model PostLike {
   @@map("PostLike")
 }
 
+model CommentLike {
+  commentID String
+  userID    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation("CommentLikes", fields: [commentID], references: [commentID], onDelete: Cascade)
+  user    User    @relation("UserCommentLikes", fields: [userID], references: [userId], onDelete: Cascade)
+
+  @@id([commentID, userID])
+  @@index([commentID])
+  @@index([userID])
+  @@map("CommentLike")
+}
+
 model Comment {
   commentID String   @id @default(cuid())
   postID    String
@@ -274,6 +305,7 @@ model Comment {
   author            User                  @relation("UserComments", fields: [authorID], references: [userId], onDelete: Cascade)
   reports           ReportReview[]        @relation("ReportedComment")
   moderationActions ModerationActionLog[] @relation("TargetComment")
+  likes             CommentLike[]         @relation("CommentLikes")
 
   @@index([postID])
   @@index([authorID])
@@ -364,6 +396,7 @@ model ReportReview {
   reportedUserID    String?
   reportedPostID    String?
   reportedCommentID String?
+  reportedForumID   String?
   reason            String
   description       String       @db.Text
   status            ReportStatus @default(PENDING)
@@ -375,10 +408,12 @@ model ReportReview {
   reportedUser      User?                 @relation("ReportedUser", fields: [reportedUserID], references: [userId], onDelete: Cascade)
   reportedPost      Post?                 @relation("ReportedPost", fields: [reportedPostID], references: [postID], onDelete: Cascade)
   reportedComment   Comment?              @relation("ReportedComment", fields: [reportedCommentID], references: [commentID], onDelete: Cascade)
+  reportedForum     ForumHub?             @relation("ReportedForum", fields: [reportedForumID], references: [forumID], onDelete: Cascade)
   moderationActions ModerationActionLog[] @relation("RelatedReport")
 
   @@index([reporterID])
   @@index([status])
+  @@index([reportedForumID])
   @@map("ReportReview")
 }
 

@@ -3,6 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { ReportStatus } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
+import { resolveReportTarget } from "@/lib/report-target";
 
 
 
@@ -64,27 +65,20 @@ export async function GET(
       );
     }
 
-    const targetType = report.reportedPostID
-      ? "post"
-      : report.reportedCommentID
-        ? "comment"
-        : "user";
-    const targetId =
-      report.reportedPostID || report.reportedCommentID || report.reportedUserID || "";
-    const status =
-      report.status === ReportStatus.UNDER_REVIEW
-        ? "reviewed"
-        : report.status.toLowerCase();
+    const target = resolveReportTarget(report);
 
     return NextResponse.json(
       {
         report: {
           id: report.reportreviewID,
           reportedBy: report.reporterID,
-          targetType,
-          targetId,
+          targetType: target.targetType,
+          targetId: target.targetId,
           reason: report.reason,
-          status,
+          status:
+            report.status === ReportStatus.UNDER_REVIEW
+              ? "reviewed"
+              : report.status.toLowerCase(),
           reviewNote: null,
           reviewedBy: null,
           createdAt: report.createdAt.toISOString(),

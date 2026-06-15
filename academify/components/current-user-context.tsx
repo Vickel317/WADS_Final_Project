@@ -7,6 +7,7 @@ export type CurrentUser = {
   name: string;
   avatarUrl: string | null;
   role: string;
+  moderatedForumIds: string[];
 };
 
 const CurrentUserContext = createContext<CurrentUser | null>(null);

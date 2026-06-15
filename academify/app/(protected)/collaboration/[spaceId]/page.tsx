@@ -3,8 +3,10 @@ import { format } from "date-fns";
 import { redirect } from "next/navigation";
 import JoinSpaceButton from "@/components/join-space-button";
 import SpaceBannerUpload from "@/components/space-banner-upload";
+import SpaceFileUpload from "@/components/space-file-upload";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
+import { getPresignedGetUrl } from "@/lib/storage";
 
 type SpaceMemberRow = {
   user: { userId: string; name: string };
@@ -18,6 +20,12 @@ type SpaceFileRow = {
   updatedAt: Date;
   uploadedBy?: { name: string };
 };
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${size} B`;
+}
 
 export default async function SpacePage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = await params;
@@ -35,9 +43,12 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
           fileID: true,
           fileName: true,
           fileUrl: true,
+          fileType: true,
+          fileSize: true,
           updatedAt: true,
           uploadedBy: { select: { name: true } },
         },
+        orderBy: { updatedAt: "desc" },
       },
       forum: { select: { name: true } },
     },
@@ -47,7 +58,15 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
       <div className="p-6">
         <h1 className="text-xl font-bold">Space not found</h1>
         <p className="text-sm text-gray-500">This collaboration space does not exist or could not be loaded.</p>
-        <Link href="/collaboration" className="mt-4 inline-block text-teal-600">Back to spaces</Link>
+        <Link
+          href="/collaboration"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:border-teal-300 hover:text-teal-700 transition"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to spaces
+        </Link>
       </div>
     );
   }
@@ -55,11 +74,32 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
   const isMember = space.members.some((m) => m.user.userId === currentUserId);
   const isOwner = space.members.some((m) => m.user.userId === currentUserId && m.role === "OWNER");
 
+  const filesWithUrls = await Promise.all(
+    (space.files ?? []).map(async (f: SpaceFileRow & { fileType: string; fileSize: number }) => ({
+      ...f,
+      downloadUrl: await getPresignedGetUrl(f.fileUrl),
+    }))
+  );
+
+  const bannerImageUrl = space.bannerUrl
+    ? space.bannerUrl.startsWith("http")
+      ? space.bannerUrl
+      : await getPresignedGetUrl(space.bannerUrl)
+    : null;
+
+  const bannerStyle = bannerImageUrl
+    ? {
+        backgroundImage: `url(${bannerImageUrl})`,
+        backgroundSize: "cover" as const,
+        backgroundPosition: "center" as const,
+      }
+    : { background: "linear-gradient(135deg, #065f46, #059669, #10b981)" };
+
   return (
     <div className="p-6">
       <Link
         href="/collaboration"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-teal-600 transition mb-4"
+        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:border-teal-300 hover:text-teal-700 transition mb-4"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -67,13 +107,7 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
         Back to spaces
       </Link>
 
-      <div
-        className="relative h-40 rounded-2xl overflow-hidden mb-6"
-        style={
-          // bannerUrl is not part of the current prisma include/select, so use fallback gradient
-          { background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }
-        }
-      >
+      <div className="relative h-40 rounded-2xl overflow-hidden mb-6" style={bannerStyle}>
         <div className="absolute inset-0 bg-black/20" />
         <SpaceBannerUpload spaceId={spaceId} isOwner={isOwner} />
         <div className="absolute bottom-4 left-6 right-6 flex items-end justify-between">
@@ -85,6 +119,25 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
           <JoinSpaceButton spaceId={spaceId} isMember={isMember} />
         </div>
       </div>
+
+      {isMember && (
+        <div className="mb-6">
+          <Link
+            href={`/messages/space-${spaceId}`}
+            className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-700 hover:bg-teal-100 transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            Open space chat
+          </Link>
+        </div>
+      )}
 
       <section className="mb-6">
         <h2 className="text-lg font-semibold">Members</h2>
@@ -103,16 +156,28 @@ export default async function SpacePage({ params }: { params: Promise<{ spaceId:
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold">Files in this space</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Files in this space</h2>
+          <SpaceFileUpload spaceId={spaceId} spaceName={space.name} canUpload={isMember} />
+        </div>
         <div className="mt-3 space-y-3">
-          {space.files?.length ? (
-            space.files.map((f: SpaceFileRow) => (
-              <div key={f.fileID} className="rounded-lg border p-3 flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium">{f.fileName}</div>
-                  <div className="text-xs text-gray-500">Uploaded by {f.uploadedBy?.name ?? 'Unknown'} • {format(new Date(f.updatedAt), 'PPP')}</div>
+          {filesWithUrls.length ? (
+            filesWithUrls.map((f) => (
+              <div key={f.fileID} className="rounded-lg border p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">{f.fileName}</div>
+                  <div className="text-xs text-gray-500">
+                    Uploaded by {f.uploadedBy?.name ?? "Unknown"} • {format(new Date(f.updatedAt), "PPP")} • {formatFileSize(f.fileSize)}
+                  </div>
                 </div>
-                <a href={f.fileUrl} className="text-sm text-teal-600">Download</a>
+                <a
+                  href={f.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded-full border border-teal-200 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 transition"
+                >
+                  Download
+                </a>
               </div>
             ))
           ) : (
