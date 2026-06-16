@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSmartBack } from "@/components/back-button";
 
 type EventActionsProps = {
   eventId: string;
@@ -11,6 +12,7 @@ type EventActionsProps = {
 
 export default function EventActions({ eventId, isHost, isAttending }: EventActionsProps) {
   const router = useRouter();
+  const goBack = useSmartBack("/events");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +36,7 @@ export default function EventActions({ eventId, isHost, isAttending }: EventActi
   };
 
   const deleteEvent = async () => {
-    if (!confirm("Delete this event? This cannot be undone.")) return;
+    if (!confirm("Are you sure you want to delete this event?")) return;
     setLoading(true);
     setError(null);
     try {
@@ -43,7 +45,7 @@ export default function EventActions({ eventId, isHost, isAttending }: EventActi
       if (!res.ok) {
         throw new Error(data.message || "Failed to delete event");
       }
-      router.push("/events");
+      goBack();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete event");
@@ -55,26 +57,32 @@ export default function EventActions({ eventId, isHost, isAttending }: EventActi
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={toggleRsvp}
-          disabled={loading}
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${
-            isAttending
-              ? "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
-              : "bg-teal-600 text-white hover:bg-teal-700"
-          }`}
-        >
-          {isAttending ? "Cancel RSVP" : "Join Event"}
-        </button>
-        {isHost && (
+        {isHost ? (
+          <>
+            <span className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700">
+              You&apos;re hosting
+            </span>
+            <button
+              type="button"
+              onClick={deleteEvent}
+              disabled={loading}
+              className="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+            >
+              Delete Event
+            </button>
+          </>
+        ) : (
           <button
             type="button"
-            onClick={deleteEvent}
+            onClick={toggleRsvp}
             disabled={loading}
-            className="rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-60 ${
+              isAttending
+                ? "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                : "bg-teal-600 text-white hover:bg-teal-700"
+            }`}
           >
-            Delete Event
+            {isAttending ? "Cancel RSVP" : "Join Event"}
           </button>
         )}
       </div>

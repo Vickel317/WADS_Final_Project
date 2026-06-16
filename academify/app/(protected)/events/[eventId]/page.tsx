@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/get-session";
 import EventActions from "./event-actions";
 import EventBannerUpload from "@/components/event-banner-upload";
+import BackButton from "@/components/back-button";
 
 const DEFAULT_DURATION_MINUTES = 60;
 
@@ -66,6 +67,7 @@ export default async function EventDetailPage({
 
 	return (
 		<div className="space-y-6">
+			<BackButton fallbackHref="/events" />
 			<div
 				className="relative h-48 rounded-2xl overflow-hidden"
 				style={{ background: "linear-gradient(135deg, #065f46, #059669, #10b981)" }}

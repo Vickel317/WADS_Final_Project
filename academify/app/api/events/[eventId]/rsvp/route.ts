@@ -104,6 +104,14 @@ export async function DELETE(
       return apiError(400, "You are not attending this event", "BAD_REQUEST");
     }
 
+    if (event.creatorID === decoded.id) {
+      return apiError(
+        400,
+        "Event hosts cannot cancel RSVP. Delete the event instead.",
+        "BAD_REQUEST"
+      );
+    }
+
     await prisma.eventAttendee.delete({
       where: {
         eventID_userID: { eventID: eventId, userID: decoded.id },

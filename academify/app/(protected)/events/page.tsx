@@ -152,12 +152,16 @@ function StatCard({ value, label }: { value: number | string; label: string }) {
 
 function EventCard({
   event,
+  currentUserId,
   onToggleRsvp,
+  onDeleteEvent,
   onOpen,
   rsvpLoading,
 }: {
   event: Event;
+  currentUserId: string | null;
   onToggleRsvp: (id: string) => void;
+  onDeleteEvent: (id: string) => void;
   onOpen: (id: string) => void;
   rsvpLoading: boolean;
 }) {
@@ -166,6 +170,7 @@ function EventCard({
   const full = hasCap && event.participants >= event.maxParticipants;
   const hostInitial = event.host?.slice(0, 1).toUpperCase() || "?";
   const gcalUrl = buildGoogleCalendarUrl(event);
+  const isHost = Boolean(currentUserId && event.creatorId === currentUserId);
 
   return (
     <div
@@ -214,22 +219,30 @@ function EventCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            if (isHost) {
+              onDeleteEvent(event.id);
+              return;
+            }
             if (!full || event.joined) onToggleRsvp(event.id);
           }}
-          disabled={rsvpLoading || (full && !event.joined)}
+          disabled={rsvpLoading || (!isHost && full && !event.joined)}
           className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
-            event.joined
+            isHost
+              ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              : event.joined
               ? "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
               : full
               ? "bg-gray-100 text-gray-400 cursor-not-allowed"
               : "text-white hover:opacity-90"
           }`}
           style={
-            !event.joined && !full ? { backgroundColor: "#0d9488" } : undefined
+            !isHost && !event.joined && !full ? { backgroundColor: "#0d9488" } : undefined
           }
         >
           {rsvpLoading
             ? "Saving..."
+            : isHost
+            ? "Delete Event"
             : event.joined
             ? "Cancel RSVP"
             : full
@@ -589,6 +602,7 @@ export default function EventsPage() {
   const handleToggleRsvp = async (id: string) => {
     const event = events.find((e) => e.id === id);
     if (!event || !currentUserId) return;
+    if (event.creatorId === currentUserId) return;
 
     const isAttending = Boolean(event.joined);
     const full =
@@ -624,6 +638,25 @@ export default function EventsPage() {
       );
     } catch (err) {
       setRsvpError(err instanceof Error ? err.message : "Failed to update RSVP");
+    } finally {
+      setRsvpLoadingId(null);
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this event?")) return;
+
+    setRsvpLoadingId(id);
+    setRsvpError(null);
+    try {
+      const res = await fetch(`/api/events/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || data.message || "Failed to delete event");
+      }
+      setEvents((prev) => prev.filter((event) => event.id !== id));
+    } catch (err) {
+      setRsvpError(err instanceof Error ? err.message : "Failed to delete event");
     } finally {
       setRsvpLoadingId(null);
     }
@@ -941,7 +974,9 @@ export default function EventsPage() {
                 <EventCard
                   key={event.id}
                   event={event}
+                  currentUserId={currentUserId}
                   onToggleRsvp={handleToggleRsvp}
+                  onDeleteEvent={handleDeleteEvent}
                   onOpen={(id) => router.push(`/events/${id}`)}
                   rsvpLoading={rsvpLoadingId === event.id}
                 />
