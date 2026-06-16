@@ -325,7 +325,7 @@ Explain:
 - Input → AI processing → Output
     - User submits a post or comment → Text is sent to local Ollama instance for classification → AI returns moderation decision (APPROVED, FLAGGED, or BLOCKED) → Result stored in `moderationStatus` field on the Post → Content visibility enforced based on status
 - How AI results are used in the system
-    - Posts with `PENDING` status are held for review. `APPROVED` posts are immediately visible. `FLAGGED` posts enter the moderation queue for moderator action. If Ollama is unavailable, profanity-based heuristic fallback is used.
+    - Posts with `PENDING` status are held for review. `APPROVED` posts are immediately visible. `FLAGGED` posts enter the moderation queue for moderator action. Low-risk `off_topic`-only flags are auto-downgraded to `APPROVED` to reduce false positives on beginner questions. If Ollama is unavailable, profanity-based heuristic fallback is used.
 
 **Thread Summarization:**
 - Input → AI processing → Output
@@ -453,6 +453,7 @@ CI runs **lint** and **unit tests with coverage** on every push to `main` / `mas
 | AI-MOD-02 | Profanity / slurs | FLAGGED or BLOCKED | `ai-moderation.test.ts` | Pass |
 | AI-MOD-03 | Ollama timeout / failure | Heuristic fallback | `ai-moderation.test.ts` | Pass |
 | AI-MOD-04 | Malformed model JSON | Safe fallback status | `ai-moderation.test.ts` | Pass |
+| AI-MOD-05 | Low-risk off-topic-only flag | Auto-approved (downgraded) | `ai-moderation.test.ts` | Pass |
 
 **Failure handling:** `lib/ai/post-moderation.ts` falls back to profanity heuristics when Ollama is unavailable.
 
