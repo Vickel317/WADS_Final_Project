@@ -87,6 +87,18 @@ describe("mapAiResultToModerationStatus", () => {
     expect(result.status).toBe(ModerationStatus.FLAGGED);
   });
 
+  it("downgrades low-risk off-topic-only flags to APPROVED", () => {
+    const result = mapAiResultToModerationStatus({
+      decision: "flag",
+      toxicity: 0.5,
+      spam: 0.2,
+      labels: ["off_topic"],
+      reason: "Request seems off-topic; clarify relevance",
+    });
+    expect(result.status).toBe(ModerationStatus.APPROVED);
+    expect(result.aiLabel).toContain("downgraded_off_topic");
+  });
+
   it("maps reject with high risk to BLOCKED", () => {
     const result = mapAiResultToModerationStatus({
       decision: "reject",

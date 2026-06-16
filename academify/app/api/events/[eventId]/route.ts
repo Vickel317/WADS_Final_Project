@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
+import { EVENT_PAST_DATE_MESSAGE, isEventDateInPast } from "@/lib/event-form-utils";
 import {
   parseJson,
   parseOptionalDate,
@@ -18,6 +19,13 @@ const parseCategoryFromTitle = (title: string) => {
     return { category: DEFAULT_CATEGORY, title };
   }
   return { category: match[1], title: match[2] };
+};
+
+const toStoredEventTitle = (titleValue: string, categoryValue?: string | null) => {
+  const cleanTitle = titleValue.trim();
+  const requestedCategory = categoryValue?.trim() || DEFAULT_CATEGORY;
+  const withoutExistingPrefix = cleanTitle.replace(/^\[(.+?)\]\s*/, "").trim();
+  return `[${requestedCategory}] ${withoutExistingPrefix || cleanTitle}`;
 };
 
 
@@ -141,6 +149,12 @@ export async function PUT(
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
+    if (date.value && isEventDateInPast(date.value)) {
+      return apiError(400, EVENT_PAST_DATE_MESSAGE, "BAD_REQUEST", [
+        { field: "date", message: EVENT_PAST_DATE_MESSAGE },
+      ]);
+    }
+
     if (
       !title.value &&
       description.value === undefined &&
@@ -155,10 +169,14 @@ export async function PUT(
     }
 
     // Update event
+    const existingParsed = parseCategoryFromTitle(existing.title);
+    const nextBaseTitle = title.value ?? existingParsed.title;
+    const nextCategory = category.value ?? existingParsed.category;
+
     const updatedEvent = await prisma.event.update({
       where: { eventID: eventId },
       data: {
-        ...(title.value ? { title: title.value } : {}),
+        title: toStoredEventTitle(nextBaseTitle, nextCategory),
         ...(description.value !== undefined ? { description: description.value } : {}),
         ...(date.value ? { dateTime: date.value } : {}),
         ...(location.value ? { location: location.value } : {}),

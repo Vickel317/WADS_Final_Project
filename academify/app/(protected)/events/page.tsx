@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  EVENT_PAST_DATE_MESSAGE,
+  isEventDateInPast,
+  todayDateInputValue,
+} from "@/lib/event-form-utils";
+import {
   Plus,
   Calendar,
   Clock,
@@ -302,6 +307,7 @@ function CreateEventModal({
   loading,
   error,
   forums,
+  lockedForum,
 }: {
   form: EventForm;
   onChange: (updates: Partial<EventForm>) => void;
@@ -310,7 +316,12 @@ function CreateEventModal({
   loading: boolean;
   error: string | null;
   forums: Array<{ id: string; name: string }>;
+  lockedForum?: { id: string; name: string } | null;
 }) {
+  const forumOptions = lockedForum ? [lockedForum] : forums;
+  const forumSelectDisabled = Boolean(lockedForum);
+  const activeForumId = lockedForum?.id ?? form.forumID;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/40 p-3 sm:items-center sm:p-4"
@@ -365,16 +376,22 @@ function CreateEventModal({
             </label>
             <select
               className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500 bg-white"
-              value={form.forumID}
+              value={activeForumId}
               onChange={(e) => onChange({ forumID: e.target.value })}
+              disabled={forumSelectDisabled}
             >
-              <option value="">Select a forum</option>
-              {forums.map((f) => (
+              {!lockedForum && <option value="">Select a forum</option>}
+              {forumOptions.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
                 </option>
               ))}
             </select>
+            {lockedForum && (
+              <p className="mt-1 text-xs text-gray-500">
+                Forum is locked because you started from a specific forum hub.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -384,6 +401,7 @@ function CreateEventModal({
               <input
                 type="date"
                 value={form.date}
+                min={todayDateInputValue()}
                 onChange={(e) => onChange({ date: e.target.value })}
                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-teal-500"
               />
@@ -670,7 +688,8 @@ export default function EventsPage() {
       return;
     }
 
-    if (!form.forumID) {
+    const forumID = forumFilter?.id ?? form.forumID;
+    if (!forumID) {
       setFormError("Please select a forum.");
       return;
     }
@@ -684,6 +703,10 @@ export default function EventsPage() {
     const dateTime = new Date(`${form.date}T${form.time}`);
     if (Number.isNaN(dateTime.getTime())) {
       setFormError("Please provide a valid date and time.");
+      return;
+    }
+    if (isEventDateInPast(dateTime)) {
+      setFormError(EVENT_PAST_DATE_MESSAGE);
       return;
     }
 
@@ -704,7 +727,7 @@ export default function EventsPage() {
           date: dateTime.toISOString(),
           location: form.location,
           category: form.type,
-          forumID: form.forumID,
+          forumID,
           maxAttendees: form.maxParticipants ? Number(form.maxParticipants) : undefined,
         }),
       });
@@ -732,7 +755,7 @@ export default function EventsPage() {
         maxParticipants: "",
         description: "",
         virtualLink: "",
-        forumID: "",
+        forumID: forumFilter?.id ?? "",
         bannerFile: null,
       });
       setFormError(null);
@@ -996,6 +1019,7 @@ export default function EventsPage() {
           loading={formLoading}
           error={formError}
           forums={forumsList}
+          lockedForum={forumFilter ? { id: forumFilter.id, name: forumFilter.name } : null}
         />
       )}
     </div>

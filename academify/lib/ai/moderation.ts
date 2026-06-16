@@ -42,6 +42,10 @@ export function mapAiResultToModerationStatus(ai: ModerationResult): {
   const aiScore = Math.max(ai.toxicity, ai.spam);
   const aiLabel = ai.labels.join(",") || ai.decision;
   const aiReason = sanitizeAiReason(ai.reason);
+  const normalizedLabels = ai.labels.map((label) => label.trim().toLowerCase());
+  const hasOnlySoftOffTopicSignal =
+    normalizedLabels.length > 0 &&
+    normalizedLabels.every((label) => label === "off_topic" || label === "safe");
 
   if (ai.decision === "approve") {
     return {
@@ -53,6 +57,18 @@ export function mapAiResultToModerationStatus(ai: ModerationResult): {
   }
 
   if (ai.decision === "flag") {
+    // Keep beginner/generic questions visible when the only concern is low-risk topicality.
+    if (hasOnlySoftOffTopicSignal && aiScore < 0.6) {
+      return {
+        status: ModerationStatus.APPROVED,
+        aiScore,
+        aiLabel: aiLabel ? `${aiLabel},downgraded_off_topic` : "downgraded_off_topic",
+        aiReason: aiReason
+          ? `${aiReason} (off-topic-only at low risk; auto-approved)`
+          : "Off-topic-only signal at low risk; auto-approved",
+      };
+    }
+
     return {
       status: ModerationStatus.FLAGGED,
       aiScore,

@@ -122,16 +122,10 @@ export default function CollaborationPage() {
                 Back to forum
               </Link>
             ) : (
-              <Link href="/forums" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-white/90">
-                Browse forums
+              <Link href="/files" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-white/90">
+                Back to my uploads
               </Link>
             )}
-            <Link href="/files" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
-              My uploads
-            </Link>
-            <Link href="/messages" className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
-              Open chat
-            </Link>
             <button
               onClick={() => setShowCreate(true)}
               className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-white"

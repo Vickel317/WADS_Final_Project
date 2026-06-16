@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  EVENT_PAST_DATE_MESSAGE,
+  isEventDateInPast,
+  todayDateInputValue,
+} from "@/lib/event-form-utils";
 
 export type EventType = "Study Session" | "Workshop" | "Seminar" | "Social";
 
@@ -62,6 +67,10 @@ export default function EventFormPage({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const selectedForumSlug = mode === "create" ? searchParams.get("forum") : null;
+  const lockedForum = selectedForumSlug
+    ? forums.find((forum) => forum.slug === selectedForumSlug) ?? null
+    : null;
 
   useEffect(() => {
     let ignore = false;
@@ -124,6 +133,10 @@ export default function EventFormPage({
     const dateTime = new Date(`${form.date}T${form.time}`);
     if (Number.isNaN(dateTime.getTime())) {
       setFormError("Please provide a valid date and time.");
+      return;
+    }
+    if (isEventDateInPast(dateTime)) {
+      setFormError(EVENT_PAST_DATE_MESSAGE);
       return;
     }
 
@@ -232,14 +245,20 @@ export default function EventFormPage({
                 className={`${inputClass} bg-white`}
                 value={form.forumID}
                 onChange={(e) => updateForm({ forumID: e.target.value })}
+                disabled={Boolean(lockedForum)}
               >
-                <option value="">Select a forum</option>
-                {forums.map((forum) => (
+                {!lockedForum && <option value="">Select a forum</option>}
+                {(lockedForum ? [lockedForum] : forums).map((forum) => (
                   <option key={forum.id} value={forum.id}>
                     {forum.name}
                   </option>
                 ))}
               </select>
+              {lockedForum && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Forum is locked because you started from a specific forum hub.
+                </p>
+              )}
             </div>
           </div>
 
@@ -251,6 +270,7 @@ export default function EventFormPage({
               <input
                 type="date"
                 value={form.date}
+                min={todayDateInputValue()}
                 onChange={(e) => updateForm({ date: e.target.value })}
                 className={inputClass}
               />

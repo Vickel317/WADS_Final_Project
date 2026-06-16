@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
+import { EVENT_PAST_DATE_MESSAGE, isEventDateInPast } from "@/lib/event-form-utils";
 import {
   parseJson,
   parseOptionalNumber,
@@ -44,6 +45,13 @@ const parseCategoryFromTitle = (titleValue: string) => {
     return { category: DEFAULT_CATEGORY, title: titleValue };
   }
   return { category: match[1], title: match[2] };
+};
+
+const toStoredEventTitle = (titleValue: string, categoryValue?: string | null) => {
+  const cleanTitle = titleValue.trim();
+  const requestedCategory = categoryValue?.trim() || DEFAULT_CATEGORY;
+  const withoutExistingPrefix = cleanTitle.replace(/^\[(.+?)\]\s*/, "").trim();
+  return `[${requestedCategory}] ${withoutExistingPrefix || cleanTitle}`;
 };
 
 export async function GET(request: NextRequest) {
@@ -176,6 +184,12 @@ export async function POST(request: NextRequest) {
       return apiError(400, "Invalid request", "BAD_REQUEST", errors);
     }
 
+    if (isEventDateInPast(date.value!)) {
+      return apiError(400, EVENT_PAST_DATE_MESSAGE, "BAD_REQUEST", [
+        { field: "date", message: EVENT_PAST_DATE_MESSAGE },
+      ]);
+    }
+
     const forum = await resolveForum(forumID.value ?? null);
     if (!forum) {
       return apiError(404, "Forum not found", "NOT_FOUND");
@@ -185,7 +199,7 @@ export async function POST(request: NextRequest) {
       data: {
         creatorID: sessionUser.user.userId,
         forumID: forumID.value!,
-        title: title.value!,
+        title: toStoredEventTitle(title.value!, category.value),
         description: description.value || "",
         dateTime: date.value!,
         location: location.value!,

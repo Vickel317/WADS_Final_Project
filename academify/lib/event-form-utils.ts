@@ -1,5 +1,15 @@
 import type { EventFormState, EventType } from "@/components/event-form-page";
 
+export const EVENT_PAST_DATE_MESSAGE = "Event date and time must be in the future.";
+
+export const todayDateInputValue = (reference = new Date()) => {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${reference.getFullYear()}-${pad(reference.getMonth() + 1)}-${pad(reference.getDate())}`;
+};
+
+export const isEventDateInPast = (dateTime: Date, now = new Date()) =>
+  dateTime.getTime() < now.getTime();
+
 const parseEventType = (category: string): EventType => {
   const normalized = category.toLowerCase();
   if (normalized.includes("workshop")) return "Workshop";
