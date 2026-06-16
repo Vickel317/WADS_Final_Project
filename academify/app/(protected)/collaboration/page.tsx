@@ -4,13 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-const SPACE_METRICS = [
-  { label: "Active spaces", value: "0", note: "loaded from the database" },
-  { label: "Shared files", value: "0", note: "connected files will appear here" },
-  { label: "Open tasks", value: "0", note: "no seeded tasks remain" },
-  { label: "Forums linked", value: "0", note: "spaces attached to forum hubs" },
-] as const;
-
 type ForumOption = { id: string; name: string; slug: string };
 
 export default function CollaborationPage() {
@@ -104,16 +97,6 @@ export default function CollaborationPage() {
                 Shared files and small teams for assignments — not a replacement for threads. Pick a forum first, then create a space.
               </p>
             </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {SPACE_METRICS.map((metric) => (
-              <div key={metric.label} className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-                <p className="text-xs uppercase tracking-[0.2em] text-white/60">{metric.label}</p>
-                <p className="mt-2 text-3xl font-bold">{metric.value}</p>
-                <p className="mt-1 text-xs text-white/70">{metric.note}</p>
-              </div>
-            ))}
           </div>
 
           <div className="flex flex-wrap gap-3">
