@@ -485,13 +485,13 @@ CI runs lint, build, unit tests, and integration tests on every push to `main` /
 | Auth (login/register/setup) | ✅ | ✅ setup | ✅ smoke |
 | Forums / threads | ✅ | ✅ categories | ✅ smoke |
 | Posts / comments | ✅ | ✅ comments + visibility | ✅ smoke |
-| Messages / chat | ✅ partial | ⬜ | ✅ smoke |
+| Messages / chat | ✅ partial | ✅ | ✅ smoke |
 | Events | ✅ | ✅ list | ✅ smoke |
-| Files / uploads | ✅ partial | ⬜ | ✅ smoke |
+| Files / uploads | ✅ partial | ✅ | ✅ smoke |
 | Collaboration | ✅ | ✅ create space | ✅ smoke |
-| Moderation / reports | ✅ partial | ⬜ | ⬜ |
-| Admin | ✅ | ⬜ | ✅ smoke |
-| AI endpoints | ✅ | ⬜ | ⬜ |
+| Moderation / reports | ✅ partial | ✅ | ✅ |
+| Admin | ✅ | ✅ | ✅ smoke |
+| AI endpoints | ✅ | ✅ | ✅ |
 
 **Legend:** ✅ covered · ⬜ add next · partial = some paths only
 
@@ -605,8 +605,6 @@ https://e2526-wads-b4ac-02.csbihub.id
 
 ## 12. GitHub Contribution Summary (individual)
 
-> Each member: copy this block, fill in, and ensure it matches commit history.
-
 **Student Name:** HES2209 (Harris Ekaputra Suryadi)
 
 - Features implemented: Project bootstrap (Next.js app structure, login/register pages, navbar, early dashboard), file sharing & collab spaces (collab pages/API, files library, MinIO Docker setup, presigned uploads, file share via DM), profile media (avatar upload/proxy + storage delete), auth migration (Better Auth integration + Firebase bridge route), Prisma/schema alignment (Category → ForumHub, enum/orderBy fixes, collab roles), upload reliability fixes (avatar/banner/files), collab-space chat UI bug fix, moderation logging + admin analytics enrichment.
@@ -718,11 +716,9 @@ https://e2526-wads-b4ac-02.csbihub.id
 
 Example (edit for your team):
 
-> ChatGPT / GitHub Copilot / Cursor were used to assist with boilerplate API routes, UI components, test scaffolding, and Docker/CI configuration. All code was reviewed, tested, and modified by the team. We can explain authentication, moderation, and AI fallback logic in presentation.
-
 **Tools used:** Github Copilot and Cursor AI  
-**Purpose:**    
-**Parts assisted:** 
+**Purpose:**    To help us with the code, answers questions, and explain errors that happens inside the code
+**Parts assisted:** Helps us in the API documentation, Testing, API routes, and CI/CD pipeline
 
 ---
 
@@ -758,7 +754,7 @@ Signed: Harris Ekaputra Suryadi · Kevin Makmur Kurniawan · Vickelsteins August
 ### Steps
 
 ```bash
-git clone <repo-url>
+git clone <https://github.com/Vickel317/WADS_Final_Project.git>
 cd academify
 cp .env.example .env.local
 # Edit .env.local — set DATABASE_URL, BETTER_AUTH_*, NEXT_PUBLIC_SOCKET_URL, etc.
