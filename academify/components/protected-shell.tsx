@@ -16,10 +16,10 @@ function MainArea({ children }: { children: React.ReactNode }) {
     <>
       <SidebarCollapseButton />
       <main
-        className={`mt-14 box-border max-w-full overflow-x-hidden transition-all duration-300 w-full ml-0 ${offsetClass} ${
+        className={`mt-14 box-border min-w-0 w-full max-w-full overflow-x-hidden transition-all duration-300 ml-0 ${offsetClass} ${
           isMessagesRoute
-            ? "h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] overflow-hidden pt-4 md:pt-5 px-4 md:px-6 pb-4 md:pb-5 flex flex-col"
-            : "min-h-[calc(100vh-3.5rem)] pt-4 md:pt-5 px-4 md:px-6 pb-6"
+            ? "h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] overflow-hidden pt-3 sm:pt-4 md:pt-5 px-3 sm:px-4 md:px-6 pb-4 md:pb-5 flex flex-col"
+            : "min-h-[calc(100dvh-3.5rem)] pt-3 sm:pt-4 md:pt-5 px-3 sm:px-4 md:px-6 pb-6"
         }`}
       >
         {children}

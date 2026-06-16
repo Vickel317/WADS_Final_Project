@@ -37,6 +37,7 @@ describe("Sidebar – rendering", () => {
     renderSidebar();
     expect(screen.getByRole("link", { name: /^dashboard$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^forums$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^events$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /^chat$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /connections/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /my uploads/i })).toBeInTheDocument();
@@ -44,15 +45,14 @@ describe("Sidebar – rendering", () => {
 
   it("does not show removed top-level items", () => {
     renderSidebar();
-    expect(screen.queryByRole("link", { name: /^events$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /collab space/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^events$/i })).not.toBeInTheDocument();
   });
 
   it("renders navigation links with correct hrefs", () => {
     renderSidebar();
     expect(screen.getByRole("link", { name: /^dashboard$/i })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByRole("link", { name: /^forums$/i })).toHaveAttribute("href", "/forums");
+    expect(screen.getByRole("link", { name: /^events$/i })).toHaveAttribute("href", "/events");
     expect(screen.getByRole("link", { name: /^chat$/i })).toHaveAttribute("href", "/messages");
     expect(screen.getByRole("link", { name: /my uploads/i })).toHaveAttribute("href", "/files");
   });
@@ -71,5 +71,19 @@ describe("Sidebar – active state", () => {
     renderSidebar();
     const forumsLink = screen.getByRole("link", { name: /^forums$/i });
     expect(forumsLink).toHaveClass("text-white");
+  });
+
+  it("applies active styles to the Events link when on /events", () => {
+    mockPathname.mockReturnValue("/events");
+    renderSidebar();
+    const eventsLink = screen.getByRole("link", { name: /^events$/i });
+    expect(eventsLink).toHaveClass("text-white");
+  });
+
+  it("applies active styles to nested event routes", () => {
+    mockPathname.mockReturnValue("/events/evt_123/edit");
+    renderSidebar();
+    const eventsLink = screen.getByRole("link", { name: /^events$/i });
+    expect(eventsLink).toHaveClass("text-white");
   });
 });

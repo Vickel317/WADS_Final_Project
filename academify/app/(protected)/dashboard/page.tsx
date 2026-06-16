@@ -251,10 +251,10 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6">
+    <div className="min-w-0 max-w-full flex-1 overflow-x-hidden space-y-4 sm:space-y-6 lg:mx-auto lg:max-w-5xl">
       {/* Welcome banner */}
       <div
-        className="relative overflow-hidden rounded-2xl p-6 text-white"
+        className="relative overflow-hidden rounded-2xl p-4 sm:p-6 text-white"
         style={{ backgroundImage: "linear-gradient(135deg, #0f766e, #14b8a6, #06b6d4)" }}
       >
         <div className="absolute inset-0 opacity-10">
@@ -282,12 +282,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         {stats.map((stat) => (
           <Link
             key={stat.label}
             href={stat.href}
-            className="group rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-teal-200 hover:shadow-md"
+            className="group min-w-0 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition hover:border-teal-200 hover:shadow-md sm:p-4"
           >
             <div className="flex items-center gap-2 sm:gap-3">
               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${stat.bg} ${stat.color}`}>
@@ -302,10 +302,10 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* Main grid */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* Main grid — single column on phones/tablets; two columns only on large screens */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {/* Calendar */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <SectionHeader
             icon={
               <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,7 +354,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* Your forums */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <SectionHeader
             icon={
               <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -413,7 +413,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* Messages — DMs + collab space chats */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <SectionHeader
             icon={
               <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -489,7 +489,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* Recent uploads */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <SectionHeader
             icon={
               <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

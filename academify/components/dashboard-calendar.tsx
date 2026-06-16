@@ -61,9 +61,9 @@ export default function DashboardCalendar({ events }: { events: CalendarEvent[] 
     : [];
 
   return (
-    <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:gap-5">
-      {/* Left: selected day events */}
-      <div className="min-w-0 flex-1">
+    <div className="flex min-w-0 flex-col gap-4 md:flex-row md:gap-5">
+      {/* Selected day events */}
+      <div className="min-w-0 flex-1 order-2 md:order-1">
         {selectedDate && (
           <>
             <div className="flex items-baseline gap-2 mb-3">
@@ -84,15 +84,15 @@ export default function DashboardCalendar({ events }: { events: CalendarEvent[] 
                       href={`/events?forum=${event.forumSlug}`}
                       className="group block rounded-xl border border-gray-100 p-3 transition hover:border-teal-200 hover:shadow-sm"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-gray-900 group-hover:text-teal-700 transition truncate">
+                      <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                        <p className="min-w-0 text-sm font-semibold text-gray-900 group-hover:text-teal-700 transition break-words">
                           {event.title}
                         </p>
-                        <span className="inline-block shrink-0 rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 uppercase">
+                        <span className="inline-block w-fit max-w-full shrink-0 rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 uppercase truncate">
                           {event.forumName}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                      <div className="mt-1.5 flex flex-col gap-1 text-xs text-gray-500 sm:flex-row sm:items-center sm:gap-3">
                         <span className="flex items-center gap-1">
                           <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -116,8 +116,8 @@ export default function DashboardCalendar({ events }: { events: CalendarEvent[] 
         )}
       </div>
 
-      {/* Right: mini calendar */}
-      <div className="w-full shrink-0 sm:w-48">
+      {/* Mini calendar */}
+      <div className="w-full min-w-0 shrink-0 order-1 md:order-2 md:w-48">
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}

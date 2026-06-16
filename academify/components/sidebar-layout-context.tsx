@@ -47,6 +47,6 @@ export function useSidebarLayout() {
 export function useSidebarOffsetClass() {
   const { collapsed } = useSidebarLayout();
   return collapsed
-    ? "md:ml-16 md:w-[calc(100%-4rem)]"
-    : "md:ml-56 md:w-[calc(100%-14rem)]";
+    ? "md:ml-16 md:w-[calc(100%-4rem)] md:max-w-[calc(100%-4rem)]"
+    : "md:ml-56 md:w-[calc(100%-14rem)] md:max-w-[calc(100%-14rem)]";
 }
