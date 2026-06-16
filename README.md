@@ -4,6 +4,7 @@
 **Course Name:** Web Application Development and Security  
 **Institution:** BINUS University International  
 **Project:** Academify — Student Community & Collaboration Platform
+**Youtube Video:** https://www.youtube.com/watch?v=uriarSAFQII 
 
 ---
 
@@ -210,7 +211,7 @@ All API's begin with `/api/`.
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | POST | /ai/moderate | AI content moderation | Yes |
-| POST | /ai/summarize/{postId} | Summarize a post | Yes |
+| GET | /ai/summarize/{postId} | Summarize a post | Yes |
 | GET | /ai/recommend | AI topic recommendations | Yes |
 | GET | /ai/recommend/forums | AI forum recommendations | Yes |
 | GET | /ai/health | Check AI service health | Yes |
@@ -234,7 +235,7 @@ All API's begin with `/api/`.
 
 ### 6.2 API Documentation
 
-- **Swagger / Postman link (if available)**
+- **Swagger link**
     - Interactive Documentation: Visit [https://e2526-wads-b4ac-02.csbihub.id/api-docs](https://e2526-wads-b4ac-02.csbihub.id/api-docs) to explore the API with Swagger UI
     - OpenAPI Spec: [/public/swagger.json](/public/swagger.json)
     - Base URL: `https://e2526-wads-b4ac-02.csbihub.id/api`
@@ -246,7 +247,8 @@ Request JSON:
 ```json
 {
   "email": "user@example.com",
-  "password": "SecurePassword123!"
+  "password": "password",
+  "name": "string"
 }
 ```
 
@@ -275,7 +277,7 @@ Explain why you chose:
 
 ### 7.2 Schema / Data Structure
 
-Insert ERD or data structure diagram.
+![Academify ERD](/images/erd.jpeg)
 
 Key models in our schema:
 
@@ -301,8 +303,6 @@ Key models in our schema:
 | `AuthUser` | Better Auth user table |
 | `AuthSession` | Better Auth session table |
 | `AuthAccount` | Better Auth account/provider table |
-
-ERD: generate with `npx prisma generate` and your preferred diagram tool from `prisma/schema.prisma`, or export from Neon/Prisma Studio.
 
 ---
 
@@ -392,7 +392,7 @@ TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/academify_test npx prism
 npm run test:integration
 ```
 
-CI runs lint, build, unit tests, and integration tests on every push to `main` / `master`.
+CI runs **lint** and **unit tests with coverage** on every push to `main` / `master`. Integration tests, production builds, and Playwright E2E are run **locally** before release (see commands below).
 
 ### 10.1 Frontend testing
 
@@ -465,6 +465,8 @@ CI runs lint, build, unit tests, and integration tests on every push to `main` /
 | AI-SUM-03 | Hidden / pending post (non-author) | 404 | `ai-summarize.test.ts` | Pass |
 | AI-SUM-04 | Rate limit exceeded | 429 | `ai-summarize.test.ts` | Pass |
 
+**Failure handling:** `app/api/ai/summarize/[postId]/route.ts` returns cached summaries when available; on Ollama timeout or error it responds with `503 AI_UNAVAILABLE` / `502 AI_ERROR`, and the `AiSummary` UI shows a retry button.
+
 #### AI Feature 3: Forum & thread recommendations
 
 | ID | Input | Expected output | Test file | Status |
@@ -472,11 +474,7 @@ CI runs lint, build, unit tests, and integration tests on every push to `main` /
 | AI-REC-01 | User with profile | Ranked suggestions | `ai-recommend-forums.test.ts` | Pass |
 | AI-REC-02 | Ollama failure | Heuristic fallback list | `ai-recommend-forums.test.ts` | Pass |
 
-#### AI Feature 4: Comment sorting by engagement
-
-| ID | Input | Expected output | Test file | Status |
-|----|-------|-----------------|-----------|--------|
-| AI-SORT-01 | Comments with like counts | Sorted by likes desc | `comment-sort.test.ts` | Pass |
+**Failure handling:** Recommendation routes (`/api/ai/recommend`, `/api/ai/recommend/forums`) call Ollama with a short timeout and `maxRetries: 0`; on timeout, rate limit, or schema error they return heuristic scores instead with `fallback: true`, and the `AiRecommend` client can re-request with `?heuristic=1`.
 
 ### Coverage matrix
 
@@ -495,81 +493,6 @@ CI runs lint, build, unit tests, and integration tests on every push to `main` /
 
 **Legend:** ✅ covered · ⬜ add next · partial = some paths only
 
-### Manual test checklist (demo / submission)
-
-Run these in the browser on **localhost** and on **production** (`https://e2526-wads-b4ac-02.csbihub.id`). Tick when verified.
-
-#### Auth & onboarding
-- [✅] Register with email/password → redirected to `/setup`
-- [✅] Complete setup (education level + skills) → lands on `/dashboard`
-- [✅] Google sign-in (if configured) → session works, no `state mismatch`
-- [✅] Logout → protected routes redirect to login
-
-#### Forums & posts
-- [✅] Browse forums, open a forum hub (Threads / Events / Collab tabs)
-- [✅] Create thread, comment, like post/comment
-- [✅] Moderator: edit forum description + banner (not name)
-- [✅] Pending post hidden from other users; author can still view
-
-#### Events
-- [✅] Create event from forum Events tab or `/events`
-- [✅] RSVP / cancel RSVP; attendee count updates
-- [✅] Past vs upcoming filter behaves correctly
-
-#### Files & collaboration
-- [✅] Upload file in a collab space; file appears in space + Files page
-- [✅] Rename file, move to another space (if member)
-- [✅] Download via presigned URL works
-
-#### Messages & realtime
-- [✅] DM another user; messages persist after refresh
-- [✅] Socket server running (`npm run dev:all` or prod port **3100**)
-
-#### Moderation & admin
-- [✅] Submit report on a post; mod/admin sees it in queue
-- [✅] Admin analytics page loads (admin account only)
-- [✅] AI moderation flags obvious profanity on new post
-
-#### AI features (document in demo)
-- [✅] Thread summarize on a post with comments
-- [✅] Forum recommendations on dashboard/profile
-- [✅] Show fallback when Ollama is offline (heuristic still works)
-
-#### Deploy / infra
-- [✅] `npm run build` passes
-- [✅] MinIO uploads on prod (port **3099** / configured endpoint)
-- [✅] Swagger UI at `/api-docs`
-
-Export Postman collection or paste sample responses into the API tables above for grader evidence.
-
-### How to document manual tests (Postman / demo)
-
-For submission, export Postman collection or add rows to the tables above with:
-
-- Request URL + method
-- Sample JSON body
-- Screenshot or pasted response
-- Pass/Fail from manual run
-
-Link Swagger UI: `/api-docs` on deployed app.
-
-### CI/CD test pipeline
-
-On push to `main` / `master`:
-
-1. **Lint & Test** — `npm run lint`, `npm run build`, `npm test --coverage`
-2. **Integration Tests** — Postgres service + `npm run test:integration`
-3. **Docker build & deploy** — only if jobs 1–2 pass
-
-### How to add a new integration test
-
-1. Create `__tests__/integration/<feature>.int.test.ts`
-2. Use `/** @jest-environment node */` at the top
-3. Create test data with unique names (`Date.now()` marker)
-4. Call real API handlers or Prisma directly
-5. Clean up in `afterAll`
-6. Run `npm run test:integration` against a **dedicated test database** (never production)
-
 ---
 
 ## 11. Deployment & Production Setup
@@ -585,7 +508,7 @@ docker compose --env-file .env.production up -d app socket minio
 
 ### 11.2 Production environment
 
-Secrets via `.env.production` (reconstructed from GitHub Secrets in CI). See [.env.example](./.env.example).
+Secrets via `.env.production` (reconstructed from GitHub Secrets in CI).
 
 | Variable | Purpose |
 |----------|---------|
@@ -714,8 +637,6 @@ https://e2526-wads-b4ac-02.csbihub.id
 
 ## 13. AI Usage Disclosure (mandatory)
 
-Example (edit for your team):
-
 **Tools used:** Github Copilot and Cursor AI  
 **Purpose:**    To help us with the code, answers questions, and explain errors that happens inside the code
 **Parts assisted:** Helps us in the API documentation, Testing, API routes, and CI/CD pipeline
@@ -788,7 +709,7 @@ npm run dev:all
 
 ## 17. DEPLOYMENT INSTRUCTIONS
 
-1. Push to `main` → GitHub Actions runs lint, test, build, integration tests
+1. Push to `main` / `master` → GitHub Actions runs lint, unit tests, Docker build/push, and VPS deploy
 2. On success: Docker images pushed to Docker Hub
 3. Self-hosted runner on VPS: `prisma migrate deploy` + `docker compose up -d`
 4. Ensure GitHub Secrets match `.env.example` (no Firebase secrets needed)

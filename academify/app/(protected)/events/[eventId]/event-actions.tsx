@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSmartBack } from "@/components/back-button";
@@ -62,6 +63,12 @@ export default function EventActions({ eventId, isHost, isAttending }: EventActi
             <span className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-700">
               You&apos;re hosting
             </span>
+            <Link
+              href={`/events/${eventId}/edit`}
+              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              Edit Event
+            </Link>
             <button
               type="button"
               onClick={deleteEvent}
