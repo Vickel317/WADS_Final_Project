@@ -244,6 +244,7 @@ model Post {
   summaryCommentCount Int?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  editedAt         DateTime?
 
   // Relations
   author            User                  @relation("UserPosts", fields: [authorID], references: [userId], onDelete: Cascade)

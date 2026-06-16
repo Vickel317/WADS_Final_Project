@@ -229,6 +229,7 @@ export async function PUT(
         content: safeContent,
         ...(shouldRemoderate
           ? {
+              editedAt: new Date(),
               moderationStatus: ModerationStatus.PENDING,
               aiLabel: "moderation_pending",
               aiReason: "Edited content is being reviewed by AI",

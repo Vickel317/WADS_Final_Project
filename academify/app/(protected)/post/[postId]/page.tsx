@@ -16,6 +16,7 @@ import {
   moderationStatusLabelClass,
   shouldShowModerationStatus,
 } from "@/lib/post-visibility";
+import { wasPostEditedByUser } from "@/lib/post-edited";
 
 export default async function PostDetailPage({
 	params,
@@ -40,6 +41,7 @@ export default async function PostDetailPage({
 			moderationStatus: true,
 			createdAt: true,
 			updatedAt: true,
+			editedAt: true,
 		},
 	});
 
@@ -106,11 +108,11 @@ export default async function PostDetailPage({
 							<span>
 								{formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
 							</span>
-              {new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 1000 && (
+              {wasPostEditedByUser(post.editedAt) && (
                 <>
                   <span>•</span>
                   <span className="font-semibold text-gray-500">
-                    edited {formatDistanceToNow(new Date(post.updatedAt), { addSuffix: true })}
+                    edited {formatDistanceToNow(new Date(post.editedAt!), { addSuffix: true })}
                   </span>
                 </>
               )}

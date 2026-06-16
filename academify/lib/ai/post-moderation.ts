@@ -69,6 +69,12 @@ export async function applyPostModeration(
   forumName: string
 ) {
   try {
+    const existing = await prisma.post.findUnique({
+      where: { postID: postId },
+      select: { updatedAt: true },
+    });
+    if (!existing) return;
+
     const result = await runPostModeration(title, content, forumName);
     await prisma.post.update({
       where: { postID: postId },
@@ -80,6 +86,7 @@ export async function applyPostModeration(
         summaryJson: Prisma.DbNull,
         summaryAt: null,
         summaryCommentCount: null,
+        updatedAt: existing.updatedAt,
       },
     });
   } catch (error) {

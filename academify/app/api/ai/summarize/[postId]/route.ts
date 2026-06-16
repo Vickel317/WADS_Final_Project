@@ -104,6 +104,7 @@ export async function GET(
         summaryJson: normalized,
         summaryAt: new Date(),
         summaryCommentCount: commentCount,
+        updatedAt: post.updatedAt,
       },
     });
 
