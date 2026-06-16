@@ -73,14 +73,21 @@ export default function AdminPage() {
 					</p>
 				</div>
 
-				<div className="grid grid-cols-2 divide-x divide-y divide-gray-100 border-t border-gray-100 md:grid-cols-4 md:divide-y-0">
+				<div className="grid grid-cols-2 border-t border-b border-gray-100 md:grid-cols-4">
 					{[
 						{ label: "Users", value: analytics?.users.total },
 						{ label: "Posts", value: analytics?.posts.total },
 						{ label: "Reports", value: analytics?.reports.total },
 						{ label: "Moderation", value: analytics?.moderation.totalActions },
-					].map((stat) => (
-						<div key={stat.label} className="px-5 py-4">
+					].map((stat, index) => (
+						<div
+							key={stat.label}
+							className={`px-5 py-4 ${
+								index % 2 === 1 ? "border-l border-gray-100" : ""
+							} ${index >= 2 ? "border-t border-gray-100 md:border-t-0" : ""} ${
+								index > 0 ? "md:border-l md:border-gray-100" : ""
+							}`}
+						>
 							<p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
 								{stat.label}
 							</p>

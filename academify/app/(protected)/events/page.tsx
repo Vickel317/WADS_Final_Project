@@ -182,15 +182,15 @@ function EventCard({
       onClick={() => onOpen(event.id)}
       className={`bg-white rounded-xl border ${styles.border} p-4 hover:shadow-sm transition-shadow cursor-pointer`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <span
-              className={`px-2 py-0.5 rounded text-xs font-semibold ${styles.badge}`}
+              className={`shrink-0 rounded px-2 py-0.5 text-xs font-semibold ${styles.badge}`}
             >
               {event.type}
             </span>
-            <span className="text-base font-semibold text-gray-900 truncate">
+            <span className="min-w-0 text-base font-semibold text-gray-900 break-words">
               {event.title}
             </span>
           </div>
@@ -205,66 +205,72 @@ function EventCard({
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <MapPin size={12} className="shrink-0" />
-              {event.location}
+              <span className="break-words">{event.location}</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-              <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-bold text-gray-500">
-                {hostInitial}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+              <div className="flex items-center gap-2">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[9px] font-bold text-gray-500">
+                  {hostInitial}
+                </div>
+                <span>by {event.host}</span>
               </div>
-              <span>by {event.host}</span>
-              <Users size={11} className="ml-1 shrink-0" />
-              <span>
-                {hasCap
-                  ? `${event.participants}/${event.maxParticipants} participants`
-                  : `${event.participants} participants`}
-              </span>
+              <div className="flex items-center gap-1">
+                <Users size={11} className="shrink-0" />
+                <span>
+                  {hasCap
+                    ? `${event.participants}/${event.maxParticipants} participants`
+                    : `${event.participants} participants`}
+                </span>
+              </div>
             </div>
           </div>
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (isHost) {
-              onDeleteEvent(event.id);
-              return;
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:min-w-[9.5rem]">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isHost) {
+                onDeleteEvent(event.id);
+                return;
+              }
+              if (!full || event.joined) onToggleRsvp(event.id);
+            }}
+            disabled={rsvpLoading || (!isHost && full && !event.joined)}
+            className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-60 sm:w-auto ${
+              isHost
+                ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                : event.joined
+                ? "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
+                : full
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "text-white hover:opacity-90"
+            }`}
+            style={
+              !isHost && !event.joined && !full ? { backgroundColor: "#0d9488" } : undefined
             }
-            if (!full || event.joined) onToggleRsvp(event.id);
-          }}
-          disabled={rsvpLoading || (!isHost && full && !event.joined)}
-          className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
-            isHost
-              ? "border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
-              : event.joined
-              ? "border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100"
-              : full
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "text-white hover:opacity-90"
-          }`}
-          style={
-            !isHost && !event.joined && !full ? { backgroundColor: "#0d9488" } : undefined
-          }
-        >
-          {rsvpLoading
-            ? "Saving..."
-            : isHost
-            ? "Delete Event"
-            : event.joined
-            ? "Cancel RSVP"
-            : full
-            ? "Full"
-            : "Join"}
-        </button>
-        {gcalUrl && (
-          <a
-            href={gcalUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="shrink-0 px-3 py-2 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:border-teal-200 hover:text-teal-700"
           >
-            Add to Google Calendar
-          </a>
-        )}
+            {rsvpLoading
+              ? "Saving..."
+              : isHost
+              ? "Delete Event"
+              : event.joined
+              ? "Cancel RSVP"
+              : full
+              ? "Full"
+              : "Join"}
+          </button>
+          {gcalUrl && (
+            <a
+              href={gcalUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-600 hover:border-teal-200 hover:text-teal-700 sm:w-auto"
+            >
+              Add to Google Calendar
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Participants bar */}
@@ -835,7 +841,7 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+    <div className="min-w-0 max-w-full flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 sm:p-6">
       {forumFilter && (
         <div className="mb-4 rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-800">
           Showing events for <strong>{forumFilter.name}</strong>.{" "}
@@ -856,18 +862,18 @@ export default function EventsPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
             {forumFilter ? `${forumFilter.name} — Events` : "Study Sessions & Events"}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="mt-0.5 text-sm text-gray-500">
             Forum-scoped calendar — create events from a forum hub when possible
           </p>
         </div>
         <button
           onClick={() => setModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+          className="flex shrink-0 items-center justify-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-medium text-white sm:self-auto"
           style={{ backgroundColor: "#0d9488" }}
         >
           <Plus size={16} /> Create Event

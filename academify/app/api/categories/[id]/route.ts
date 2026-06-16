@@ -257,11 +257,11 @@ export async function DELETE(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "admin" && decoded.role !== "ADMIN") {
+    if (!isPlatformAdmin(decoded.role)) {
       return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
-    const { id  } = await params;
+    const { id } = await params;
     const existing = await prisma.forumHub.findUnique({
       where: { forumID: id },
     });
@@ -269,7 +269,11 @@ export async function DELETE(
       return apiError(404, "Category not found", "NOT_FOUND");
     }
 
-    await prisma.forumHub.delete({ where: { forumID: id } });
+    // Posts reference forums with onDelete: Restrict, so remove forum content first.
+    await prisma.$transaction(async (tx) => {
+      await tx.post.deleteMany({ where: { forumID: id } });
+      await tx.forumHub.delete({ where: { forumID: id } });
+    });
 
     return NextResponse.json(
       { message: "Category deleted successfully" },
@@ -277,6 +281,17 @@ export async function DELETE(
     );
   } catch (error) {
     console.error("Delete category error:", error);
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: string }).code)
+        : "";
+    if (code === "P2003") {
+      return apiError(
+        409,
+        "Forum still has linked data that could not be removed. Try again or contact support.",
+        "CONFLICT"
+      );
+    }
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

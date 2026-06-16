@@ -61,9 +61,9 @@ export default function DashboardCalendar({ events }: { events: CalendarEvent[] 
     : [];
 
   return (
-    <div className="flex gap-5">
+    <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:gap-5">
       {/* Left: selected day events */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         {selectedDate && (
           <>
             <div className="flex items-baseline gap-2 mb-3">
@@ -117,7 +117,7 @@ export default function DashboardCalendar({ events }: { events: CalendarEvent[] 
       </div>
 
       {/* Right: mini calendar */}
-      <div className="w-48 shrink-0">
+      <div className="w-full shrink-0 sm:w-48">
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}

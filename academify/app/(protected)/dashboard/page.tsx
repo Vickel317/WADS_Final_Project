@@ -251,7 +251,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto w-full">
+    <div className="mx-auto w-full min-w-0 max-w-5xl space-y-6">
       {/* Welcome banner */}
       <div
         className="relative overflow-hidden rounded-2xl p-6 text-white"
@@ -289,13 +289,13 @@ export default async function DashboardPage() {
             href={stat.href}
             className="group rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:border-teal-200 hover:shadow-md"
           >
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${stat.bg} ${stat.color}`}>
                 {stat.icon}
               </div>
               <div className="min-w-0">
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide truncate">{stat.label}</p>
+                <p className="text-xl font-bold text-gray-900 sm:text-2xl">{stat.value}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-500 sm:text-xs">{stat.label}</p>
               </div>
             </div>
           </Link>
