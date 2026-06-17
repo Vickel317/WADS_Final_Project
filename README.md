@@ -160,7 +160,7 @@ All API's begin with `/api/`.
 | PATCH | /events/{eventId} | Update an event | Yes |
 | DELETE | /events/{eventId} | Delete an event | Yes |
 | POST | /events/{eventId}/rsvp | RSVP to an event | Yes |
-| GET | /events/{eventId}/attendees | Retrieve event attendees | Yes |
+| GET | /events/{eventId}/attendees | Retrieve event attendees (Prisma `EventAttendee`) | Yes |
 
 #### Messaging Endpoints
 
@@ -193,18 +193,19 @@ All API's begin with `/api/`.
 | GET | /admin/users/{userId} | Retrieve user details (admin) | Yes (Admin) |
 | PATCH | /admin/users/{userId}/role | Update user role | Yes (Admin) |
 | GET | /admin/analytics | Retrieve platform analytics | Yes (Admin) |
-| GET | /reports/ | Retrieve all reports | Yes (Moderator) |
-| GET | /reports/{reportId} | Retrieve a specific report | Yes (Moderator) |
-| POST | /reports/{reportId}/review | Review a report | Yes (Moderator) |
-| POST | /reports/{reportId}/action | Take action on report | Yes (Moderator) |
-| GET | /moderation/queue | Retrieve moderation queue | Yes (Moderator) |
-| POST | /moderation/approve/{postId} | Approve a post | Yes (Moderator) |
-| POST | /moderation/delete/{postId} | Delete flagged content | Yes (Moderator) |
-| POST | /moderation/revert/{postId} | Revert moderation action | Yes (Moderator) |
-| POST | /moderation/warn/{userId} | Warn a user | Yes (Moderator) |
-| POST | /moderation/suspend/{userId} | Suspend a user | Yes (Moderator) |
-| POST | /moderation/ban/{userId} | Ban a user | Yes (Moderator) |
-| GET | /moderation/logs | Retrieve moderation logs | Yes (Moderator) |
+| GET | /reports/ | Retrieve reports (scoped to moderated forums for forum mods) | Yes (Forum mod / Admin) |
+| GET | /reports/{reportId} | Retrieve a specific report | Yes (Forum mod / Admin) |
+| POST | /reports/{reportId}/review | Review a report | Yes (Forum mod / Admin) |
+| POST | /reports/{reportId}/action | Take action on report | Yes (Forum mod / Admin) |
+| GET | /moderation/queue | Retrieve moderation queue (forum-scoped for forum mods) | Yes (Forum mod / Admin) |
+| POST | /moderation/approve/{postId} | Approve a post | Yes (Forum mod / Admin) |
+| POST | /moderation/delete/{postId} | Delete flagged content | Yes (Forum mod / Admin) |
+| POST | /moderation/revert/{postId} | Revert moderation action | Yes (Forum mod / Admin) |
+| POST | /moderation/warn/{userId} | Warn a user (sets `accountStatus`; no action block) | Yes (Admin) |
+| POST | /moderation/suspend/{userId} | Suspend a user (blocks post/comment/DM/upload) | Yes (Admin) |
+| POST | /moderation/ban/{userId} | Ban a user (same restrictions as suspend) | Yes (Admin) |
+| POST | /moderation/restore/{userId} | Restore user to active | Yes (Admin) |
+| GET | /moderation/logs | Retrieve moderation logs | Yes (Forum mod / Admin) |
 
 #### AI Endpoints
 
@@ -346,7 +347,7 @@ Explain:
 | Control | Implementation |
 |---------|----------------|
 | Authentication | Better Auth session cookies (`lib/auth.ts`), HTTP-only, `secure` in production |
-| Authorization | Roles: `student`, `lecturer`, `admin`; per-forum moderators via `ForumModerator` |
+| Authorization | Roles: `student`, `lecturer`, `admin`; per-forum moderators via `ForumModerator` (content queue, reports, approve/delete scoped to their forums); platform `admin` for account sanctions (`warn` / `suspend` / `ban` / `restore`) |
 | Input validation | `lib/validation.ts` on API bodies |
 | XSS mitigation | `lib/sanitization.ts` — HTML stripped from user text |
 | SQL injection | Prisma parameterized queries only |
@@ -430,6 +431,10 @@ CI runs **lint** and **unit tests with coverage** on every push to `main` / `mas
 | API-11 | `GET /api/events` | Upcoming list | 200 + DB rows | `integration/events.int.test.ts` | Pass |
 | API-12 | `POST /api/collaboration` | Create space | 201 + owner row | `integration/collaboration.int.test.ts` | Pass |
 | API-13 | `POST /api/profile/setup` | Student education | `profileSetupComplete` | `integration/profile-setup.int.test.ts` | Pass |
+| API-14 | `POST /api/moderation/approve/:id` | Forum moderator | 200 | `api-moderation-access.test.ts` | Pass |
+| API-15 | `POST /api/moderation/ban/:userId` | Admin persists `accountStatus` | 200 + BANNED | `api-moderation-access.test.ts` | Pass |
+| API-16 | `GET /api/events/:id/attendees` | Authenticated | 200 + Prisma rows | `api-events-attendees.test.ts` | Pass |
+| API-17 | `GET /api/reports` | Forum moderator (`ForumModerator`) | 200 | `api-reports.test.ts`, `integration/reports.int.test.ts` | Pass |
 
 ### 10.3 Security testing
 
@@ -600,13 +605,13 @@ https://e2526-wads-b4ac-02.csbihub.id
   - Files/storage: GET/POST/DELETE /api/files, /api/files/{fileId}, /api/files/{fileId}/share, POST /api/files/scan, storage upload/presign/delete/avatar/banner/entity-banner
   - Collaboration: GET/POST /api/collaboration, GET/POST/DELETE /api/collaboration/{spaceId}
   - AI: GET /api/ai/health, POST /api/ai/moderate, GET /api/ai/recommend, /api/ai/recommend/forums, GET /api/ai/summarize/{postId}
-  - Moderation: queue/logs and approve/delete/revert/warn/suspend/ban
+  - Moderation: queue/logs and approve/delete/revert/warn/suspend/ban/restore; per-forum mod auth via `ForumModerator` + `lib/report-access.ts`; admin users UI for sanctions; `GET /api/events/{eventId}/attendees` backed by Prisma
   - Reports: GET/POST /api/reports, GET/PATCH /api/reports/{reportId}, review + action
   - Admin: GET /api/admin/analytics, user management + role assignment
   - Docs: GET /api/swagger
 
 - Tests written:
-  - Unit/component (Jest): login, register, profile, profile-edit, profile-setup, profile-education, admin, dashboard, forums, files, messages, collaboration, events, sidebar, topbar, post-comments, post-like, comment-sort, avatar-url, forum-access, categories-authorization, files-authorization, message-access, api-authorization, api-events, api-reports, api-search, rate-limit, security-critical
+  - Unit/component (Jest): login, register, profile, profile-edit, profile-setup, profile-education, admin, dashboard, forums, files, messages, collaboration, events, sidebar, topbar, post-comments, post-like, comment-sort, avatar-url, forum-access, categories-authorization, files-authorization, message-access, api-authorization, api-events, api-events-attendees, api-reports, api-moderation-access, api-search, rate-limit, security-critical
   - AI tests: ai-moderation, ai-summarize, ai-recommend-forums, ai-rate-limit
   - Integration (DB): categories, post-comments, post-visibility, profile-setup, collaboration, events
   - E2E (Playwright): e2e/smoke.spec.ts, e2e/login.spec.ts, e2e/register.spec.ts
@@ -619,7 +624,7 @@ https://e2526-wads-b4ac-02.csbihub.id
   - Rate limiting on write/auth/read and AI endpoints (lib/rate-limit.ts, lib/ai/rate-limit.ts)
   - Upload security: dangerous filename rejection, extension/MIME checks, size limits
   - ClamAV integration: freshclam in Docker (your commit); virus scan route (POST /api/files/scan)
-  - Account restrictions: blocked/banned/shadow-banned users prevented from messaging and commenting
+  - Account restrictions: `SUSPENDED` / `BANNED` users prevented from posting, messaging, commenting, and uploading (`lib/moderation.ts` → `isRestrictedAccount`)
   - DM privacy: canSendDirectMessage rules by restriction setting
   - Removed hardcoded mock identity; API keys/secrets env-only
   - (Teammate Harris also contributed dedicated security commits: “Security Critical Feature Done” and virus scan.)
@@ -648,8 +653,10 @@ https://e2526-wads-b4ac-02.csbihub.id
 
 - Ollama quality depends on host GPU/CPU; heuristics used when offline
 - E2E tests are smoke-level only (authenticated flows not fully automated)
-- Reports inbox is primarily platform-admin scoped
 - Email verification not enabled for Better Auth email provider
+- **Account sanctions:** `warn` / `suspend` / `ban` are platform-wide (`User.accountStatus`); forum-scoped suspend is not implemented. Suspend duration is logged but not auto-expired (admin must **Restore**). `WARNED` is visible in admin only — does not block actions; `SUSPENDED` and `BANNED` block new posts, comments, DMs, and uploads
+- **Shadow ban:** `isShadowBanned` column exists but is not enforced in API checks
+- User-only reports (no linked post/comment/forum) are visible to platform admins only
 
 ---
 
