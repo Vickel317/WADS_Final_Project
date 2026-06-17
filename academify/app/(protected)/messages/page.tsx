@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { getSocket } from "@/lib/socket-client";
@@ -29,8 +29,7 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [showNewMessage, setShowNewMessage] = useState(false);
 
-  // Load conversation list
-  useEffect(() => {
+  const refreshConversations = useCallback(() => {
     fetch("/api/messages")
       .then((r) => r.json())
       .then((data) => setConversations(data.conversations ?? []))
@@ -39,11 +38,26 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshConversations();
+      }
+    };
+    window.addEventListener("focus", refreshConversations);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refreshConversations);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshConversations]);
+
+  useEffect(() => {
     const handleSpacesUpdated = () => {
-      fetch("/api/messages")
-        .then((r) => r.json())
-        .then((data) => setConversations(data.conversations ?? []))
-        .catch(() => {});
+      refreshConversations();
     };
 
     const handleSpaceJoined = (ev: Event) => {
@@ -61,7 +75,7 @@ export default function MessagesPage() {
       window.removeEventListener("spaces-updated", handleSpacesUpdated);
       window.removeEventListener("space-joined", handleSpaceJoined as EventListener);
     };
-  }, [router]);
+  }, [router, refreshConversations]);
 
   // Socket — update conversation list when a new message arrives
   useEffect(() => {

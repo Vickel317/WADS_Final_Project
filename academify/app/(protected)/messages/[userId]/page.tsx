@@ -74,6 +74,12 @@ export default function ConversationPage() {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMessageAt = useRef<string | null>(null);
 
+  const clearActiveUnread = useCallback(() => {
+    setConversations((prev) =>
+      prev.map((c) => (c.userId === partnerId ? { ...c, unread: 0 } : c))
+    );
+  }, [partnerId]);
+
   const spaceTypingActive = isSpaceChat && Object.keys(spaceTypers).length > 0;
   const spaceTypingLabel = useMemo(() => {
     const names = Object.values(spaceTypers);
@@ -183,12 +189,30 @@ export default function ConversationPage() {
   }, [messages, isTyping, spaceTypingActive]);
 
   // Load conversation list
-  useEffect(() => {
+  const refreshConversations = useCallback(() => {
     fetch("/api/messages")
       .then((r) => r.json())
       .then((data) => setConversations(data.conversations ?? []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        refreshConversations();
+      }
+    };
+    window.addEventListener("focus", refreshConversations);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", refreshConversations);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshConversations]);
 
   // Fetch space name for space chats
   useEffect(() => {
@@ -217,15 +241,12 @@ export default function ConversationPage() {
 
   useEffect(() => {
     const handleSpacesUpdated = () => {
-      fetch("/api/messages")
-        .then((r) => r.json())
-        .then((data) => setConversations(data.conversations ?? []))
-        .catch(() => {});
+      refreshConversations();
     };
 
     window.addEventListener("spaces-updated", handleSpacesUpdated);
     return () => window.removeEventListener("spaces-updated", handleSpacesUpdated);
-  }, []);
+  }, [refreshConversations]);
 
   useEffect(() => {
     if (isSpaceChat || !partnerId) return;
@@ -281,13 +302,14 @@ export default function ConversationPage() {
             lastMessageAt.current = fetched[fetched.length - 1].createdAt;
           }
         }
+        clearActiveUnread();
       } catch {
         // ignore
       } finally {
         setLoadingMsgs(false);
       }
     },
-    [isSpaceChat, partnerId, spaceId, setMessages]
+    [isSpaceChat, partnerId, spaceId, setMessages, clearActiveUnread]
   );
 
   useEffect(() => {
@@ -511,6 +533,23 @@ export default function ConversationPage() {
           content: saved.content,
           createdAt: saved.createdAt,
         } satisfies SpaceChatMessage);
+
+        setConversations((prev) => {
+          const filtered = prev.filter((c) => c.userId !== partnerId);
+          const existing = prev.find((c) => c.userId === partnerId);
+          return [
+            {
+              userId: partnerId,
+              kind: "space",
+              name: existing?.name ?? resolvedSpaceName ?? "Collab space",
+              avatarUrl: null,
+              lastMessage: saved.content,
+              lastAt: saved.createdAt,
+              unread: 0,
+            },
+            ...filtered,
+          ];
+        });
       } else {
         // Relay to recipient in real-time
         getSocket().emit("send_message", saved);

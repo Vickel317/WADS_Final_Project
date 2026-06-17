@@ -83,16 +83,16 @@ export async function GET(
     const sinceParam = request.nextUrl.searchParams.get("since");
     const sinceDate = sinceParam ? new Date(sinceParam) : null;
 
-    if (!sinceDate) {
-      await prisma.message.updateMany({
-        where: {
-          spaceID: spaceId,
-          receiverID: currentUserId,
-          read: false,
-        },
-        data: { read: true },
-      });
-    }
+    // Viewing the space chat counts as read — including incremental `since` polls
+    // while the conversation page is open (socket catch-up).
+    await prisma.message.updateMany({
+      where: {
+        spaceID: spaceId,
+        receiverID: currentUserId,
+        read: false,
+      },
+      data: { read: true },
+    });
 
     const where: SpaceMessageWhere = {
       spaceID: spaceId,
