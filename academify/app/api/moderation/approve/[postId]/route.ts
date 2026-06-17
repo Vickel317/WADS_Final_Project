@@ -3,7 +3,8 @@ import { verifyToken } from "@/lib/auth-session";
 import { ModerationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
+import { canModerateForumContent } from "@/lib/forum-permissions";
+import { recordModerationAction } from "@/lib/moderation";
 
 
 
@@ -45,19 +46,19 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (!hasModerationAccess(decoded.role)) {
-      return apiError(
-        403,
-        "Forbidden: Moderator or Admin access required",
-        "FORBIDDEN"
-      );
-    }
-
     const { postId } = await params;
     const existing = await prisma.post.findUnique({ where: { postID: postId } });
 
     if (!existing) {
       return apiError(404, "Post not found", "NOT_FOUND");
+    }
+
+    if (!(await canModerateForumContent(decoded.id, existing.forumID, decoded.role))) {
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
+      );
     }
 
     const updatedPost = await prisma.post.update({

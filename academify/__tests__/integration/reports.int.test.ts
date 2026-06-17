@@ -14,6 +14,7 @@ describe("integration: reports API + database", () => {
   const marker = `int-reports-${Date.now()}`;
   let reporterId: string | null = null;
   let moderatorId: string | null = null;
+  let forumId: string | null = null;
   let postId: string | null = null;
   let reportId: string | null = null;
 
@@ -41,6 +42,11 @@ describe("integration: reports API + database", () => {
     const forum = await prisma.forumHub.create({
       data: { name: `${marker}-forum`, description: "Reports integration forum" },
     });
+    forumId = forum.forumID;
+
+    await prisma.forumModerator.create({
+      data: { forumID: forum.forumID, userID: moderatorId },
+    });
 
     const post = await prisma.post.create({
       data: {
@@ -65,6 +71,10 @@ describe("integration: reports API + database", () => {
     }
     if (postId) {
       await prisma.post.delete({ where: { postID: postId } }).catch(() => undefined);
+    }
+    if (forumId) {
+      await prisma.forumModerator.deleteMany({ where: { forumID: forumId } }).catch(() => undefined);
+      await prisma.forumHub.delete({ where: { forumID: forumId } }).catch(() => undefined);
     }
     if (moderatorId) {
       await prisma.user.delete({ where: { userId: moderatorId } }).catch(() => undefined);
@@ -96,10 +106,10 @@ describe("integration: reports API + database", () => {
     reportId = payload.report.id;
   });
 
-  it("lists reports for moderator", async () => {
+  it("lists reports for forum moderator", async () => {
     (verifyToken as jest.Mock).mockResolvedValue({
       id: moderatorId,
-      role: "moderator",
+      role: "student",
     });
 
     const request = new NextRequest("http://localhost/api/reports");
@@ -126,7 +136,7 @@ describe("integration: reports API + database", () => {
   it("marks a report as reviewed", async () => {
     (verifyToken as jest.Mock).mockResolvedValue({
       id: moderatorId,
-      role: "moderator",
+      role: "student",
     });
 
     const request = new NextRequest(`http://localhost/api/reports/${reportId}/review`, {

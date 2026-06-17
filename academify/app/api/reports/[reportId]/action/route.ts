@@ -5,6 +5,7 @@ import { ReportStatus } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseOptionalString, parseRequiredString } from "@/lib/validation";
 import { resolveReportTarget } from "@/lib/report-target";
+import { canModerateReport } from "@/lib/report-access";
 
 
 
@@ -63,21 +64,21 @@ export async function POST(
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (decoded.role !== "moderator" && decoded.role !== "admin") {
-      return apiError(
-        403,
-        "Forbidden: Moderator or Admin access required",
-        "FORBIDDEN"
-      );
-    }
-
-    const { reportId  } = await params;
+    const { reportId } = await params;
     const existing = await prisma.reportReview.findUnique({
       where: { reportreviewID: reportId },
     });
 
     if (!existing) {
       return apiError(404, "Report not found", "NOT_FOUND");
+    }
+
+    if (!(await canModerateReport(decoded.id, decoded.role, existing))) {
+      return apiError(
+        403,
+        "Forbidden: Moderator or Admin access required",
+        "FORBIDDEN"
+      );
     }
 
     const body = await parseJson<{ action?: unknown; note?: unknown }>(request);

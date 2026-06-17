@@ -8,6 +8,7 @@ import { parseJson, parseRequiredString, validateUploadedFile } from "@/lib/vali
 import { applyPostModeration } from "@/lib/ai/post-moderation";
 import { isRestrictedAccount } from "@/lib/moderation";
 import { sanitizeText } from "@/lib/sanitization";
+import { canModerateForumContent, isPlatformAdmin } from "@/lib/forum-permissions";
 
 const slugify = (value: string) =>
   value
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
   try {
     const sessionUser = await getSessionUser(request.headers);
     const role = String(sessionUser?.user?.role ?? "").toLowerCase();
-    const canSeeAll = role === "admin" || role === "moderator";
+    const userId = sessionUser?.user?.userId;
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get("categoryId");
     const forumId = searchParams.get("forumId");
@@ -140,8 +141,14 @@ export async function GET(request: NextRequest) {
     const forumQuery = forumId || categoryId || forum || category;
     const resolvedForum = forumQuery ? await resolveForum(forumQuery) : null;
 
+    const canSeeHiddenInForum =
+      isPlatformAdmin(role) ||
+      (userId && resolvedForum
+        ? await canModerateForumContent(userId, resolvedForum.forumID, role)
+        : false);
+
     const baseWhere = resolvedForum ? { forumID: resolvedForum.forumID } : {};
-    const visibilityWhere = canSeeAll
+    const visibilityWhere = canSeeHiddenInForum
       ? {}
       : sessionUser
       ? {

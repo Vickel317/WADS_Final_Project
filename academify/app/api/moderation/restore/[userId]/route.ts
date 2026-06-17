@@ -3,47 +3,13 @@ import { verifyToken } from "@/lib/auth-session";
 import { UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
-import { parseJson, parseRequiredString } from "@/lib/validation";
+import { parseJson, parseOptionalString } from "@/lib/validation";
 import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
 
 /**
- * @swagger
- * /api/moderation/warn/{userId}:
- *   post:
- *     summary: Issue a warning to a user (Admin only)
- *     tags: [Moderation]
- *     security:
- *       - sessionCookieAuth: []
- *     parameters:
- *       - in: path
- *         name: userId
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [reason]
- *             properties:
- *               reason:
- *                 type: string
- *                 example: Posting inappropriate content.
- *     responses:
- *       200:
- *         description: Warning issued successfully
- *       400:
- *         description: Missing reason
- *       401:
- *         description: Not authenticated
- *       403:
- *         description: Forbidden - Admin only
- *       500:
- *         description: Internal server error
+ * POST /api/moderation/restore/{userId}
+ * Restore a warned, suspended, or banned user to active (admin only).
  */
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -55,11 +21,7 @@ export async function POST(
     }
 
     if (!hasModerationAccess(decoded.role)) {
-      return apiError(
-        403,
-        "Forbidden: Admin access required",
-        "FORBIDDEN"
-      );
+      return apiError(403, "Forbidden: Admin access required", "FORBIDDEN");
     }
 
     const { userId } = await params;
@@ -68,12 +30,14 @@ export async function POST(
       return apiError(404, "User not found", "NOT_FOUND");
     }
 
-    const body = await parseJson<{ reason?: unknown }>(request);
-    if (!body) {
+    const contentLength = request.headers.get("content-length");
+    const hasBody = contentLength !== null && contentLength !== "0";
+    const body = hasBody ? await parseJson<{ reason?: unknown }>(request) : {};
+    if (hasBody && !body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
     }
 
-    const reason = parseRequiredString(body.reason);
+    const reason = parseOptionalString(body?.reason);
     if (reason.error) {
       return apiError(400, "Invalid request", "BAD_REQUEST", [
         { field: "reason", message: `reason ${reason.error}` },
@@ -82,20 +46,20 @@ export async function POST(
 
     const updated = await prisma.user.update({
       where: { userId },
-      data: { accountStatus: UserStatus.WARNED },
+      data: { accountStatus: UserStatus.ACTIVE },
       select: { userId: true, accountStatus: true },
     });
 
     await recordModerationAction({
       moderatorId: decoded.id,
-      actionType: "WARN_USER",
+      actionType: "UNBAN_USER",
       targetUserID: userId,
-      reason: reason.value!,
+      reason: reason.value || "Account restored to active",
     });
 
     return NextResponse.json(
       {
-        message: "Warning issued successfully",
+        message: "User restored to active",
         user: {
           id: updated.userId,
           accountStatus: updated.accountStatus.toLowerCase(),
@@ -104,7 +68,7 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    console.error("Warn user error:", error);
+    console.error("Restore user error:", error);
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }

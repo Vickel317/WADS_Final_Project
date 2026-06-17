@@ -4,6 +4,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { sanitizeText } from "@/lib/sanitization";
+import { canModerateForumContent, isPlatformAdmin } from "@/lib/forum-permissions";
 
 
 
@@ -145,15 +146,18 @@ export async function DELETE(
     const { commentId  } = await params;
     const comment = await prisma.comment.findUnique({
       where: { commentID: commentId },
+      include: { post: { select: { forumID: true } } },
     });
     if (!comment) {
       return apiError(404, "Comment not found", "NOT_FOUND");
     }
 
-    const isModerator =
-      decoded.role === "moderator" || decoded.role === "admin";
+    const canDelete =
+      comment.authorID === decoded.id ||
+      isPlatformAdmin(decoded.role) ||
+      (await canModerateForumContent(decoded.id, comment.post.forumID, decoded.role));
 
-    if (comment.authorID !== decoded.id && !isModerator) {
+    if (!canDelete) {
       return apiError(
         403,
         "Forbidden: You can only delete your own comments",

@@ -8,6 +8,7 @@ import { parseJson, parseRequiredString } from "@/lib/validation";
 import { applyPostModeration } from "@/lib/ai/post-moderation";
 import { canViewPost } from "@/lib/post-visibility";
 import { sanitizeText } from "@/lib/sanitization";
+import { canModerateForumContent, isPlatformAdmin } from "@/lib/forum-permissions";
 
 /**
  * @swagger
@@ -290,15 +291,19 @@ export async function DELETE(
     const { postId } = await params;
     const existing = await prisma.post.findUnique({
       where: { postID: postId },
-      select: { postID: true, authorID: true },
+      select: { postID: true, authorID: true, forumID: true },
     });
 
     if (!existing) {
       return apiError(404, "Post not found", "NOT_FOUND");
     }
 
-    const isModerator = decoded.role === "moderator" || decoded.role === "admin";
-    if (existing.authorID !== decoded.id && !isModerator) {
+    const canDelete =
+      existing.authorID === decoded.id ||
+      isPlatformAdmin(decoded.role) ||
+      (await canModerateForumContent(decoded.id, existing.forumID, decoded.role));
+
+    if (!canDelete) {
       return apiError(
         403,
         "Forbidden: You can only delete your own posts",

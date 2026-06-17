@@ -3,7 +3,7 @@ import { verifyToken } from "@/lib/auth-session";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 
-import { UserRole } from "@prisma/client";
+import { UserRole, UserStatus } from "@prisma/client";
 
 
 
@@ -57,19 +57,27 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const role = searchParams.get("role")?.toUpperCase();
-    const status = searchParams.get("status");
+    const statusFilter = searchParams.get("status")?.toLowerCase();
     const search = searchParams.get("search")?.toLowerCase();
+
+    const STATUS_MAP: Record<string, UserStatus> = {
+      active: UserStatus.ACTIVE,
+      warned: UserStatus.WARNED,
+      suspended: UserStatus.SUSPENDED,
+      banned: UserStatus.BANNED,
+    };
 
     if (role && !Object.values(UserRole).includes(role as UserRole)) {
       return apiError(400, "Invalid role", "BAD_REQUEST");
     }
 
-    if (status && status !== "active") {
-      return NextResponse.json({ users: [], total: 0 }, { status: 200 });
+    if (statusFilter && !STATUS_MAP[statusFilter]) {
+      return apiError(400, "Invalid status", "BAD_REQUEST");
     }
 
     const where = {
       ...(role ? { role: role as UserRole } : {}),
+      ...(statusFilter ? { accountStatus: STATUS_MAP[statusFilter] } : {}),
       ...(search
         ? {
             OR: [
@@ -89,7 +97,7 @@ export async function GET(request: NextRequest) {
           email: user.email,
           name: user.name,
           role: user.role.toLowerCase(),
-          status: "active",
+          status: user.accountStatus.toLowerCase(),
           createdAt: user.createdAt.toISOString(),
         })),
         total: users.length,

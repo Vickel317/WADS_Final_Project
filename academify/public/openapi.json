@@ -3365,7 +3365,7 @@
     },
     "/api/moderation/ban/{userId}": {
       "post": {
-        "summary": "Permanently ban a user (Moderator/Admin only)",
+        "summary": "Permanently ban a user (Admin only)",
         "tags": [
           "Moderation"
         ],
@@ -3414,7 +3414,7 @@
             "description": "Not authenticated"
           },
           "403": {
-            "description": "Forbidden - Moderator/Admin only"
+            "description": "Forbidden - Admin only"
           },
           "500": {
             "description": "Internal server error"
@@ -3543,7 +3543,7 @@
     },
     "/api/moderation/suspend/{userId}": {
       "post": {
-        "summary": "Suspend a user temporarily (Moderator/Admin only)",
+        "summary": "Suspend a user temporarily (Admin only)",
         "tags": [
           "Moderation"
         ],
@@ -3596,7 +3596,7 @@
             "description": "Not authenticated"
           },
           "403": {
-            "description": "Forbidden - Moderator/Admin only"
+            "description": "Forbidden - Admin only"
           },
           "500": {
             "description": "Internal server error"
@@ -3606,7 +3606,7 @@
     },
     "/api/moderation/warn/{userId}": {
       "post": {
-        "summary": "Issue a warning to a user (Moderator/Admin only)",
+        "summary": "Issue a warning to a user (Admin only)",
         "tags": [
           "Moderation"
         ],
@@ -3655,7 +3655,7 @@
             "description": "Not authenticated"
           },
           "403": {
-            "description": "Forbidden - Moderator/Admin only"
+            "description": "Forbidden - Admin only"
           },
           "500": {
             "description": "Internal server error"

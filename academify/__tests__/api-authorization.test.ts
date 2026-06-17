@@ -40,6 +40,7 @@ jest.mock("@/lib/prisma", () => ({
     forumModerator: {
       count: jest.fn().mockResolvedValue(1),
       findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
     },
     moderationLog: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -127,6 +128,32 @@ describe("Authorization checks", () => {
     expect(response.status).toBe(403);
   });
 
+  it("allows forum moderators to delete posts in their forum", async () => {
+    (verifyToken as jest.Mock).mockResolvedValue({
+      id: "user_mod",
+      email: "mod@example.com",
+      role: "student",
+    });
+    (prisma.post.findUnique as jest.Mock).mockResolvedValue({
+      postID: "post_mod",
+      authorID: "user_owner",
+      forumID: "forum_1",
+    });
+    (prisma.forumModerator.findUnique as jest.Mock).mockResolvedValue({
+      forumID: "forum_1",
+      userID: "user_mod",
+    });
+    (prisma.post.delete as jest.Mock).mockResolvedValue({});
+
+    const request = new NextRequest("http://localhost/api/posts/post_mod", {
+      method: "DELETE",
+    });
+
+    const response = await postDelete(request, { params: Promise.resolve({ postId: "post_mod" }) });
+
+    expect(response.status).toBe(200);
+  });
+
   it("returns 403 when non-owners delete posts", async () => {
     (verifyToken as jest.Mock).mockResolvedValue({
       id: "user_other",
@@ -136,7 +163,9 @@ describe("Authorization checks", () => {
     (prisma.post.findUnique as jest.Mock).mockResolvedValue({
       postID: "post_2",
       authorID: "user_owner",
+      forumID: "forum_1",
     });
+    (prisma.forumModerator.findUnique as jest.Mock).mockResolvedValue(null);
 
     const request = new NextRequest("http://localhost/api/posts/post_2", {
       method: "DELETE",

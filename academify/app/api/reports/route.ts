@@ -5,10 +5,7 @@ import { ReportStatus } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { resolveReportTarget } from "@/lib/report-target";
-
-function isModOrAdmin(role?: string) {
-  return role === "moderator" || role === "admin";
-}
+import { buildReportListWhere } from "@/lib/report-access";
 
 const REPORT_STATUS_MAP: Record<string, ReportStatus> = {
   pending: ReportStatus.PENDING,
@@ -87,7 +84,8 @@ export async function GET(request: NextRequest) {
       return apiError(401, "Not authenticated", "UNAUTHORIZED");
     }
 
-    if (!isModOrAdmin(decoded.role)) {
+    const accessWhere = await buildReportListWhere(decoded.id, decoded.role);
+    if (accessWhere === null) {
       return apiError(
         403,
         "Forbidden: Moderator or Admin access required",
@@ -98,13 +96,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const where = status
+    const statusWhere = status
       ? REPORT_STATUS_MAP[status]
         ? { status: REPORT_STATUS_MAP[status] }
         : null
       : undefined;
 
-    if (status && !where) {
+    if (status && !statusWhere) {
       return apiError(
         400,
         "status must be pending, reviewed, resolved, or dismissed",
@@ -113,7 +111,10 @@ export async function GET(request: NextRequest) {
     }
 
     const results = await prisma.reportReview.findMany({
-      where: where || undefined,
+      where: {
+        ...accessWhere,
+        ...(statusWhere || {}),
+      },
       orderBy: { createdAt: "desc" },
     });
 

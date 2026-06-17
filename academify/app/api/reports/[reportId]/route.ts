@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ReportStatus } from "@prisma/client";
 import { apiError } from "@/lib/api-response";
 import { resolveReportTarget } from "@/lib/report-target";
+import { canModerateReport } from "@/lib/report-access";
 
 
 
@@ -54,10 +55,11 @@ export async function GET(
       return apiError(404, "Report not found", "NOT_FOUND");
     }
 
-    // Reporter can view their own report; moderators/admins can view all
-    const isModOrAdmin =
-      decoded.role === "moderator" || decoded.role === "admin";
-    if (report.reporterID !== decoded.id && !isModOrAdmin) {
+    // Reporter can view their own report; moderators/admins can view scoped reports
+    const canView =
+      report.reporterID === decoded.id ||
+      (await canModerateReport(decoded.id, decoded.role, report));
+    if (!canView) {
       return apiError(
         403,
         "Forbidden: You can only view your own reports",

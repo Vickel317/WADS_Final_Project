@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/auth-session";
-import { userSanctions } from "../../warn/[userId]/route";
+import { UserStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-response";
 import { parseJson, parseRequiredString } from "@/lib/validation";
 import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
-
-
-
 
 /**
  * @swagger
  * /api/moderation/ban/{userId}:
  *   post:
- *     summary: Permanently ban a user (Moderator/Admin only)
+ *     summary: Permanently ban a user (Admin only)
  *     tags: [Moderation]
  *     security:
  *       - sessionCookieAuth: []
@@ -41,7 +39,7 @@ import { hasModerationAccess, recordModerationAction } from "@/lib/moderation";
  *       401:
  *         description: Not authenticated
  *       403:
- *         description: Forbidden - Moderator/Admin only
+ *         description: Forbidden - Admin only
  *       500:
  *         description: Internal server error
  */
@@ -59,12 +57,17 @@ export async function POST(
     if (!hasModerationAccess(decoded.role)) {
       return apiError(
         403,
-        "Forbidden: Moderator or Admin access required",
+        "Forbidden: Admin access required",
         "FORBIDDEN"
       );
     }
 
-    const { userId  } = await params;
+    const { userId } = await params;
+    const target = await prisma.user.findUnique({ where: { userId } });
+    if (!target) {
+      return apiError(404, "User not found", "NOT_FOUND");
+    }
+
     const body = await parseJson<{ reason?: unknown }>(request);
     if (!body) {
       return apiError(400, "Invalid JSON", "BAD_REQUEST");
@@ -77,16 +80,11 @@ export async function POST(
       ]);
     }
 
-    const sanction = {
-      id: `sanc_${Date.now()}`,
-      userId,
-      type: "ban" as const,
-      reason: reason.value!,
-      issuedBy: decoded.id,
-      createdAt: new Date().toISOString(),
-    };
-
-    userSanctions.push(sanction);
+    const updated = await prisma.user.update({
+      where: { userId },
+      data: { accountStatus: UserStatus.BANNED },
+      select: { userId: true, accountStatus: true },
+    });
 
     await recordModerationAction({
       moderatorId: decoded.id,
@@ -96,7 +94,13 @@ export async function POST(
     });
 
     return NextResponse.json(
-      { message: "User banned successfully", sanction },
+      {
+        message: "User banned successfully",
+        user: {
+          id: updated.userId,
+          accountStatus: updated.accountStatus.toLowerCase(),
+        },
+      },
       { status: 200 }
     );
   } catch (error) {
@@ -104,7 +108,3 @@ export async function POST(
     return apiError(500, "Internal server error", "INTERNAL_ERROR");
   }
 }
-
-
-
-
