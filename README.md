@@ -623,7 +623,7 @@ https://e2526-wads-b4ac-02.csbihub.id
   - Input validation (lib/validation.ts) and XSS sanitization (lib/sanitization.ts) on messages, posts, and comments — covered in security-critical.test.ts
   - Rate limiting on write/auth/read and AI endpoints (lib/rate-limit.ts, lib/ai/rate-limit.ts)
   - Upload security: dangerous filename rejection, extension/MIME checks, size limits
-  - ClamAV integration: freshclam in Docker (your commit); virus scan route (POST /api/files/scan)
+  - ClamAV integration: freshclam in Docker; virus scan route (POST /api/files/scan)
   - Account restrictions: `SUSPENDED` / `BANNED` users prevented from posting, messaging, commenting, and uploading (`lib/moderation.ts` → `isRestrictedAccount`)
   - DM privacy: canSendDirectMessage rules by restriction setting
   - Removed hardcoded mock identity; API keys/secrets env-only
