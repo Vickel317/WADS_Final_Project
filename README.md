@@ -627,7 +627,6 @@ https://e2526-wads-b4ac-02.csbihub.id
   - Account restrictions: `SUSPENDED` / `BANNED` users prevented from posting, messaging, commenting, and uploading (`lib/moderation.ts` → `isRestrictedAccount`)
   - DM privacy: canSendDirectMessage rules by restriction setting
   - Removed hardcoded mock identity; API keys/secrets env-only
-  - (Teammate Harris also contributed dedicated security commits: “Security Critical Feature Done” and virus scan.)
 
 - AI-related work:
   - Content moderation: Ollama-based async post moderation (lib/ai/post-moderation.ts), profanity heuristic fallback, moderation queue statuses, staff revert via POST /api/moderation/revert/{postId}
